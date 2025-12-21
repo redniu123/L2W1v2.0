@@ -1,0 +1,30 @@
+# L2W1 项目依赖环境
+
+# 深度学习框架
+paddlepaddle>=2.6.0
+torch>=2.1.0
+
+# 视觉语言模型
+transformers>=4.40.0
+qwen-vl-utils
+
+# 推理加速
+vllm>=0.3.0
+
+# 数据处理
+opencv-python>=4.8.0
+pillow>=10.0.0
+numpy>=1.24.0
+pandas>=2.0.0
+
+# 评估指标
+editdistance>=0.6.0
+
+# 工具库
+tqdm>=4.66.0
+pyyaml>=6.0
+tensorboard>=2.15.0
+
+# 其他依赖
+# （根据实际需要补充）
+

@@ -1,0 +1,985 @@
+"""
+L2W1 自动化数据处理流水线
+
+核心功能:
+1. 加载 HCTR 数据集（SCUT-HCCDoc, VisCGEC, CASIA 等）
+2. 使用 Agent A (TextRecognizerWithLogits) 进行全量推理
+3. 基于 difflib 进行难例挖掘和错误索引定位
+4. 生成 Agent B SFT 训练数据（JSONL 格式）
+
+技术要点:
+- 零切割原则：直接输入原始行图像，不做字符级切割
+- 完美 Router 模拟：使用 difflib 计算绝对正确的错误位置
+- EIP 数据格式：符合显式索引提示规范
+
+Usage:
+    python data_pipeline.py --data_dir ./data/raw/scut_hccdoc \
+                            --output_dir ./data/sft \
+                            --batch_size 16 \
+                            --max_cer 0.3
+"""
+
+import os
+import sys
+import json
+import argparse
+import difflib
+from pathlib import Path
+
+# 尝试导入 editdistance，如果失败则使用内置实现
+try:
+    import editdistance
+    def levenshtein_distance(s1: str, s2: str) -> int:
+        return editdistance.eval(s1, s2)
+except ImportError:
+    def levenshtein_distance(s1: str, s2: str) -> int:
+        """计算 Levenshtein 编辑距离（内置实现）"""
+        if len(s1) < len(s2):
+            return levenshtein_distance(s2, s1)
+        if len(s2) == 0:
+            return len(s1)
+        
+        previous_row = range(len(s2) + 1)
+        for i, c1 in enumerate(s1):
+            current_row = [i + 1]
+            for j, c2 in enumerate(s2):
+                insertions = previous_row[j + 1] + 1
+                deletions = current_row[j] + 1
+                substitutions = previous_row[j] + (c1 != c2)
+                current_row.append(min(insertions, deletions, substitutions))
+            previous_row = current_row
+        
+        return previous_row[-1]
+from typing import Dict, List, Tuple, Optional, Generator
+from dataclasses import dataclass, asdict
+from datetime import datetime
+import numpy as np
+
+# 添加项目路径
+SCRIPT_DIR = Path(__file__).parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT.parent))
+
+try:
+    from tqdm import tqdm
+except ImportError:
+    # 简单的 tqdm 替代
+    def tqdm(iterable, **kwargs):
+        return iterable
+
+
+# =============================================================================
+# 数据结构定义
+# =============================================================================
+
+@dataclass
+class DataSample:
+    """数据样本"""
+    id: str                     # 样本 ID
+    image_path: str             # 图像路径
+    ground_truth: str           # 真值文本
+    prediction: str = ""        # 预测文本
+    confidence: float = 0.0     # 置信度
+    cer: float = 0.0            # 字符错误率
+    error_index: int = -1       # 第一个错误位置
+    error_char_pred: str = ""   # 预测的错误字符
+    error_char_gt: str = ""     # 真值的错误字符
+
+
+@dataclass
+class SFTConversation:
+    """SFT 对话格式"""
+    id: str
+    image: str
+    conversations: List[Dict[str, str]]
+    
+    def to_dict(self) -> Dict:
+        return asdict(self)
+
+
+@dataclass
+class PipelineConfig:
+    """流水线配置"""
+    # 数据路径
+    data_dir: str = "./data/raw"
+    output_dir: str = "./data/sft"
+    
+    # 推理配置
+    batch_size: int = 16
+    use_gpu: bool = True
+    
+    # 过滤条件
+    max_cer: float = 0.3        # 最大 CER 阈值，过滤识别过差的样本
+    min_text_length: int = 2     # 最小文本长度
+    max_text_length: int = 100   # 最大文本长度
+    
+    # 输出配置
+    output_filename: str = "agent_b_train.jsonl"
+    
+    # Agent A 模型配置
+    rec_model_dir: str = ""
+    rec_image_shape: str = "3,48,320"
+    rec_algorithm: str = "SVTR_LCNet"
+    rec_char_dict_path: str = "./ppocr/utils/ppocr_keys_v1.txt"
+
+
+# =============================================================================
+# 数据加载器
+# =============================================================================
+
+class HCTRDatasetLoader:
+    """
+    HCTR 数据集加载器
+    
+    支持多种数据集格式:
+    - SCUT-HCCDoc: image_name.jpg + label.txt
+    - CASIA: 类似格式
+    - 通用格式: images/ + labels.txt (每行: image_name\ttext)
+    """
+    
+    SUPPORTED_FORMATS = ['scut', 'casia', 'generic', 'auto']
+    
+    def __init__(self, data_dir: str, format: str = 'auto'):
+        """
+        Args:
+            data_dir: 数据目录路径
+            format: 数据格式类型
+        """
+        self.data_dir = Path(data_dir)
+        self.format = format
+        
+        if not self.data_dir.exists():
+            raise FileNotFoundError(f"Data directory not found: {data_dir}")
+    
+    def _detect_format(self) -> str:
+        """自动检测数据格式"""
+        # 检查是否有 labels.txt
+        if (self.data_dir / "labels.txt").exists():
+            return 'generic'
+        if (self.data_dir / "label.txt").exists():
+            return 'generic'
+        
+        # 检查是否有与图像同名的 txt 文件
+        image_files = list(self.data_dir.glob("*.jpg")) + list(self.data_dir.glob("*.png"))
+        if image_files:
+            txt_file = image_files[0].with_suffix('.txt')
+            if txt_file.exists():
+                return 'scut'
+        
+        # 检查子目录结构
+        if (self.data_dir / "images").exists():
+            return 'generic'
+        
+        return 'generic'
+    
+    def load(self) -> Generator[DataSample, None, None]:
+        """
+        加载数据集
+        
+        Yields:
+            DataSample: 数据样本
+        """
+        if self.format == 'auto':
+            self.format = self._detect_format()
+        
+        if self.format == 'scut':
+            yield from self._load_scut_format()
+        elif self.format == 'casia':
+            yield from self._load_casia_format()
+        else:
+            yield from self._load_generic_format()
+    
+    def _load_generic_format(self) -> Generator[DataSample, None, None]:
+        """
+        加载通用格式
+        
+        格式: labels.txt 每行为 "image_name\ttext" 或 "image_name text"
+        """
+        # 查找标签文件
+        label_file = None
+        for name in ['labels.txt', 'label.txt', 'gt.txt', 'annotation.txt']:
+            if (self.data_dir / name).exists():
+                label_file = self.data_dir / name
+                break
+        
+        if label_file is None:
+            # 尝试查找图像目录
+            image_dir = self.data_dir / "images" if (self.data_dir / "images").exists() else self.data_dir
+            for name in ['labels.txt', 'label.txt', 'gt.txt']:
+                if (self.data_dir / name).exists():
+                    label_file = self.data_dir / name
+                    break
+        
+        if label_file is None:
+            print(f"[Warning] No label file found in {self.data_dir}")
+            return
+        
+        # 确定图像目录
+        image_dir = self.data_dir / "images" if (self.data_dir / "images").exists() else self.data_dir
+        
+        # 读取标签文件
+        with open(label_file, 'r', encoding='utf-8') as f:
+            for idx, line in enumerate(f):
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # 解析行：支持 tab 分隔或空格分隔
+                if '\t' in line:
+                    parts = line.split('\t', 1)
+                else:
+                    parts = line.split(' ', 1)
+                
+                if len(parts) < 2:
+                    continue
+                
+                image_name, text = parts[0], parts[1]
+                
+                # 查找图像文件
+                image_path = None
+                for ext in ['.jpg', '.png', '.jpeg', '.bmp', '']:
+                    candidate = image_dir / f"{image_name}{ext}"
+                    if candidate.exists():
+                        image_path = candidate
+                        break
+                    # 尝试原始名称
+                    candidate = image_dir / image_name
+                    if candidate.exists():
+                        image_path = candidate
+                        break
+                
+                if image_path is None:
+                    continue
+                
+                yield DataSample(
+                    id=f"sample_{idx:06d}",
+                    image_path=str(image_path),
+                    ground_truth=text
+                )
+    
+    def _load_scut_format(self) -> Generator[DataSample, None, None]:
+        """
+        加载 SCUT-HCCDoc 格式
+        
+        每个图像有对应的同名 txt 文件
+        """
+        image_files = sorted(
+            list(self.data_dir.glob("*.jpg")) + 
+            list(self.data_dir.glob("*.png"))
+        )
+        
+        for idx, image_path in enumerate(image_files):
+            txt_path = image_path.with_suffix('.txt')
+            if not txt_path.exists():
+                continue
+            
+            with open(txt_path, 'r', encoding='utf-8') as f:
+                text = f.read().strip()
+            
+            if text:
+                yield DataSample(
+                    id=f"scut_{idx:06d}",
+                    image_path=str(image_path),
+                    ground_truth=text
+                )
+    
+    def _load_casia_format(self) -> Generator[DataSample, None, None]:
+        """加载 CASIA 格式（与 SCUT 类似）"""
+        yield from self._load_scut_format()
+
+
+# =============================================================================
+# 错误分析工具
+# =============================================================================
+
+class ErrorAnalyzer:
+    """
+    错误分析器
+    
+    使用 difflib 进行预测文本和真值文本的对齐分析
+    """
+    
+    @staticmethod
+    def calculate_cer(pred: str, gt: str) -> float:
+        """
+        计算字符错误率 (CER)
+        
+        Args:
+            pred: 预测文本
+            gt: 真值文本
+            
+        Returns:
+            CER 值 (0-1)
+        """
+        if len(gt) == 0:
+            return 1.0 if len(pred) > 0 else 0.0
+        
+        distance = levenshtein_distance(pred, gt)
+        return min(distance / len(gt), 1.0)
+    
+    @staticmethod
+    def find_first_error_index(pred: str, gt: str) -> Tuple[int, str, str]:
+        """
+        找到第一个错误位置
+        
+        使用 difflib.SequenceMatcher 进行对齐，找到第一个不匹配的位置
+        
+        Args:
+            pred: 预测文本
+            gt: 真值文本
+            
+        Returns:
+            Tuple[error_index, pred_char, gt_char]:
+                - error_index: 错误位置 (基于预测文本的 0-indexed)
+                - pred_char: 预测的字符（如果是插入错误则为空）
+                - gt_char: 真值的字符（如果是删除错误则为空）
+        """
+        if pred == gt:
+            return -1, "", ""
+        
+        # 使用 SequenceMatcher 进行对齐
+        matcher = difflib.SequenceMatcher(None, pred, gt)
+        
+        # 获取操作码
+        opcodes = matcher.get_opcodes()
+        
+        for tag, i1, i2, j1, j2 in opcodes:
+            if tag == 'equal':
+                continue
+            elif tag == 'replace':
+                # 替换错误：预测和真值在该位置不同
+                return i1, pred[i1] if i1 < len(pred) else "", gt[j1] if j1 < len(gt) else ""
+            elif tag == 'delete':
+                # 删除错误：预测中多了字符
+                return i1, pred[i1] if i1 < len(pred) else "", ""
+            elif tag == 'insert':
+                # 插入错误：预测中少了字符
+                return i1, "", gt[j1] if j1 < len(gt) else ""
+        
+        # 如果没有找到，返回第一个不同的位置
+        for i, (p, g) in enumerate(zip(pred, gt)):
+            if p != g:
+                return i, p, g
+        
+        # 长度不同的情况
+        if len(pred) != len(gt):
+            return min(len(pred), len(gt)), "", ""
+        
+        return -1, "", ""
+    
+    @staticmethod
+    def get_all_error_indices(pred: str, gt: str) -> List[Tuple[int, str, str, str]]:
+        """
+        获取所有错误位置
+        
+        Returns:
+            List[Tuple[index, tag, pred_char, gt_char]]
+        """
+        if pred == gt:
+            return []
+        
+        errors = []
+        matcher = difflib.SequenceMatcher(None, pred, gt)
+        
+        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+            if tag == 'equal':
+                continue
+            
+            if tag == 'replace':
+                for offset in range(min(i2 - i1, j2 - j1)):
+                    errors.append((
+                        i1 + offset,
+                        'replace',
+                        pred[i1 + offset] if i1 + offset < len(pred) else "",
+                        gt[j1 + offset] if j1 + offset < len(gt) else ""
+                    ))
+            elif tag == 'delete':
+                for offset in range(i2 - i1):
+                    errors.append((
+                        i1 + offset,
+                        'delete',
+                        pred[i1 + offset] if i1 + offset < len(pred) else "",
+                        ""
+                    ))
+            elif tag == 'insert':
+                errors.append((i1, 'insert', "", gt[j1:j2]))
+        
+        return errors
+
+
+# =============================================================================
+# SFT 数据生成器
+# =============================================================================
+
+class SFTGenerator:
+    """
+    SFT 数据生成器
+    
+    生成符合 Agent B 微调格式的对话数据
+    """
+    
+    # 提示模板
+    PROMPT_TEMPLATE = (
+        "OCR识别结果为：'{ocr_text}'。\n"
+        "系统检测到第 {idx} 个字（即'{char}'）置信度存疑。\n"
+        "请结合行级视觉上下文，确认该位置的字符，并输出修正后的整行文本。"
+    )
+    
+    # 备选模板（当无法定位具体错误时）
+    FALLBACK_TEMPLATE = (
+        "OCR识别结果为：'{ocr_text}'。\n"
+        "系统检测到该行文本可能存在识别错误。\n"
+        "请结合行级视觉上下文，输出修正后的整行文本。"
+    )
+    
+    def __init__(self, output_dir: str, filename: str = "agent_b_train.jsonl"):
+        """
+        Args:
+            output_dir: 输出目录
+            filename: 输出文件名
+        """
+        self.output_dir = Path(output_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.output_path = self.output_dir / filename
+        self.samples_written = 0
+    
+    def format_prompt(self, sample: DataSample) -> str:
+        """
+        格式化提示文本
+        
+        Args:
+            sample: 数据样本
+            
+        Returns:
+            格式化后的提示文本
+        """
+        if sample.error_index >= 0 and sample.error_char_pred:
+            return self.PROMPT_TEMPLATE.format(
+                ocr_text=sample.prediction,
+                idx=sample.error_index + 1,  # 转为 1-indexed
+                char=sample.error_char_pred
+            )
+        else:
+            return self.FALLBACK_TEMPLATE.format(ocr_text=sample.prediction)
+    
+    def generate_conversation(self, sample: DataSample) -> SFTConversation:
+        """
+        生成对话格式数据
+        
+        Args:
+            sample: 数据样本
+            
+        Returns:
+            SFTConversation 对象
+        """
+        prompt = self.format_prompt(sample)
+        
+        conversations = [
+            {"from": "user", "value": prompt},
+            {"from": "assistant", "value": sample.ground_truth}
+        ]
+        
+        return SFTConversation(
+            id=sample.id,
+            image=sample.image_path,
+            conversations=conversations
+        )
+    
+    def write_sample(self, sample: DataSample):
+        """写入单个样本到 JSONL"""
+        conversation = self.generate_conversation(sample)
+        
+        with open(self.output_path, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(conversation.to_dict(), ensure_ascii=False) + '\n')
+        
+        self.samples_written += 1
+    
+    def write_batch(self, samples: List[DataSample]):
+        """批量写入样本"""
+        with open(self.output_path, 'a', encoding='utf-8') as f:
+            for sample in samples:
+                conversation = self.generate_conversation(sample)
+                f.write(json.dumps(conversation.to_dict(), ensure_ascii=False) + '\n')
+                self.samples_written += 1
+    
+    def clear_output(self):
+        """清空输出文件"""
+        if self.output_path.exists():
+            self.output_path.unlink()
+        self.samples_written = 0
+
+
+# =============================================================================
+# 主流水线
+# =============================================================================
+
+class DataPipeline:
+    """
+    L2W1 自动化数据处理流水线
+    
+    整合数据加载、推理、错误分析和 SFT 生成
+    """
+    
+    def __init__(self, config: PipelineConfig):
+        """
+        Args:
+            config: 流水线配置
+        """
+        self.config = config
+        self.error_analyzer = ErrorAnalyzer()
+        self.sft_generator = SFTGenerator(
+            output_dir=config.output_dir,
+            filename=config.output_filename
+        )
+        
+        # 统计信息
+        self.stats = {
+            "total_samples": 0,
+            "processed_samples": 0,
+            "error_samples": 0,
+            "filtered_by_cer": 0,
+            "filtered_by_length": 0,
+            "sft_samples": 0,
+        }
+        
+        # Agent A 推理器（延迟初始化）
+        self.recognizer = None
+    
+    def _init_recognizer(self):
+        """初始化 Agent A 推理器"""
+        if self.recognizer is not None:
+            return
+        
+        try:
+            # 尝试导入 TextRecognizerWithLogits
+            from modules.paddle_engine.predict_rec_modified import TextRecognizerWithLogits
+            import tools.infer.utility as utility
+            
+            # 构建参数
+            class Args:
+                pass
+            
+            args = Args()
+            args.rec_model_dir = self.config.rec_model_dir
+            args.rec_image_shape = self.config.rec_image_shape
+            args.rec_algorithm = self.config.rec_algorithm
+            args.rec_char_dict_path = self.config.rec_char_dict_path
+            args.rec_batch_num = self.config.batch_size
+            args.use_space_char = True
+            args.max_text_length = 25
+            args.rec_image_inverse = False
+            args.use_gpu = self.config.use_gpu
+            args.use_onnx = False
+            args.benchmark = False
+            args.return_word_box = False
+            args.precision = "fp32"
+            args.warmup = False
+            args.save_log_path = "./output/"
+            
+            self.recognizer = TextRecognizerWithLogits(args)
+            print("[INFO] Agent A (TextRecognizerWithLogits) 初始化成功")
+            
+        except Exception as e:
+            print(f"[WARNING] 无法初始化 Agent A: {e}")
+            print("[INFO] 将使用模拟推理模式")
+            self.recognizer = None
+    
+    def _simulate_inference(self, samples: List[DataSample]) -> List[DataSample]:
+        """
+        模拟推理（当无法使用真实模型时）
+        
+        用于测试流水线逻辑
+        """
+        import random
+        
+        for sample in samples:
+            gt = sample.ground_truth
+            
+            # 模拟识别错误：随机替换/删除/插入字符
+            pred = list(gt)
+            if len(pred) > 0 and random.random() < 0.3:  # 30% 概率出错
+                error_type = random.choice(['replace', 'delete', 'insert'])
+                pos = random.randint(0, len(pred) - 1)
+                
+                if error_type == 'replace':
+                    # 模拟形近字替换
+                    similar_chars = {
+                        '未': '末', '末': '未',
+                        '己': '已', '已': '己',
+                        '土': '士', '士': '土',
+                        '日': '曰', '曰': '日',
+                        '天': '夭', '夭': '天',
+                    }
+                    if pred[pos] in similar_chars:
+                        pred[pos] = similar_chars[pred[pos]]
+                    else:
+                        # 随机字符
+                        pred[pos] = chr(ord('一') + random.randint(0, 1000))
+                elif error_type == 'delete' and len(pred) > 1:
+                    pred.pop(pos)
+                elif error_type == 'insert':
+                    pred.insert(pos, chr(ord('一') + random.randint(0, 1000)))
+            
+            sample.prediction = ''.join(pred)
+            sample.confidence = random.uniform(0.7, 0.99)
+        
+        return samples
+    
+    def _run_inference(self, samples: List[DataSample]) -> List[DataSample]:
+        """
+        运行 Agent A 推理
+        
+        Args:
+            samples: 待推理的样本列表
+            
+        Returns:
+            更新了预测结果的样本列表
+        """
+        if self.recognizer is None:
+            return self._simulate_inference(samples)
+        
+        try:
+            import cv2
+            
+            # 加载图像
+            images = []
+            valid_indices = []
+            for i, sample in enumerate(samples):
+                img = cv2.imread(sample.image_path)
+                if img is not None:
+                    images.append(img)
+                    valid_indices.append(i)
+            
+            if not images:
+                return samples
+            
+            # 批量推理
+            output = self.recognizer(images)
+            results = output['results']
+            
+            # 更新样本
+            for idx, result in zip(valid_indices, results):
+                if isinstance(result, (list, tuple)) and len(result) >= 2:
+                    samples[idx].prediction = result[0]
+                    samples[idx].confidence = result[1]
+                elif isinstance(result, dict):
+                    samples[idx].prediction = result.get('text', '')
+                    samples[idx].confidence = result.get('conf', 0.0)
+            
+            return samples
+            
+        except Exception as e:
+            print(f"[WARNING] 推理失败: {e}")
+            return self._simulate_inference(samples)
+    
+    def _analyze_errors(self, samples: List[DataSample]) -> List[DataSample]:
+        """
+        分析错误
+        
+        计算 CER 并定位第一个错误位置
+        """
+        for sample in samples:
+            # 计算 CER
+            sample.cer = self.error_analyzer.calculate_cer(
+                sample.prediction, 
+                sample.ground_truth
+            )
+            
+            # 定位第一个错误
+            error_idx, pred_char, gt_char = self.error_analyzer.find_first_error_index(
+                sample.prediction,
+                sample.ground_truth
+            )
+            sample.error_index = error_idx
+            sample.error_char_pred = pred_char
+            sample.error_char_gt = gt_char
+        
+        return samples
+    
+    def _filter_samples(self, samples: List[DataSample]) -> List[DataSample]:
+        """
+        过滤样本
+        
+        - 只保留有错误的样本 (pred != gt)
+        - 过滤 CER 过高的样本
+        - 过滤长度不合适的样本
+        """
+        filtered = []
+        
+        for sample in samples:
+            # 跳过完全正确的样本
+            if sample.prediction == sample.ground_truth:
+                continue
+            
+            self.stats["error_samples"] += 1
+            
+            # 过滤 CER 过高的样本
+            if sample.cer > self.config.max_cer:
+                self.stats["filtered_by_cer"] += 1
+                continue
+            
+            # 过滤长度不合适的样本
+            if (len(sample.ground_truth) < self.config.min_text_length or
+                len(sample.ground_truth) > self.config.max_text_length):
+                self.stats["filtered_by_length"] += 1
+                continue
+            
+            filtered.append(sample)
+        
+        return filtered
+    
+    def run(self, data_dir: str = None, data_format: str = 'auto'):
+        """
+        运行流水线
+        
+        Args:
+            data_dir: 数据目录（如果为 None，使用配置中的路径）
+            data_format: 数据格式
+        """
+        data_dir = data_dir or self.config.data_dir
+        
+        print("=" * 60)
+        print("L2W1 自动化数据处理流水线")
+        print("=" * 60)
+        print(f"数据目录: {data_dir}")
+        print(f"输出目录: {self.config.output_dir}")
+        print(f"批次大小: {self.config.batch_size}")
+        print(f"最大 CER: {self.config.max_cer}")
+        print()
+        
+        # 初始化推理器
+        self._init_recognizer()
+        
+        # 清空输出文件
+        self.sft_generator.clear_output()
+        
+        # 加载数据
+        print("[1/4] 加载数据集...")
+        loader = HCTRDatasetLoader(data_dir, format=data_format)
+        
+        # 收集所有样本
+        all_samples = list(loader.load())
+        self.stats["total_samples"] = len(all_samples)
+        print(f"      共加载 {len(all_samples)} 个样本")
+        
+        if len(all_samples) == 0:
+            print("[ERROR] 未找到有效样本，请检查数据目录和格式")
+            return
+        
+        # 批量处理
+        print("[2/4] 运行 Agent A 推理...")
+        batch_size = self.config.batch_size
+        
+        for i in tqdm(range(0, len(all_samples), batch_size), desc="推理进度"):
+            batch = all_samples[i:i + batch_size]
+            
+            # 推理
+            batch = self._run_inference(batch)
+            self.stats["processed_samples"] += len(batch)
+            
+            # 错误分析
+            batch = self._analyze_errors(batch)
+            
+            # 过滤
+            filtered_batch = self._filter_samples(batch)
+            
+            # 生成 SFT 数据
+            if filtered_batch:
+                self.sft_generator.write_batch(filtered_batch)
+                self.stats["sft_samples"] += len(filtered_batch)
+        
+        # 输出统计
+        print()
+        print("[3/4] 生成 SFT 数据...")
+        print(f"      输出文件: {self.sft_generator.output_path}")
+        
+        print()
+        print("[4/4] 统计信息:")
+        print(f"      总样本数: {self.stats['total_samples']}")
+        print(f"      处理样本数: {self.stats['processed_samples']}")
+        print(f"      错误样本数: {self.stats['error_samples']}")
+        print(f"      CER 过滤: {self.stats['filtered_by_cer']}")
+        print(f"      长度过滤: {self.stats['filtered_by_length']}")
+        print(f"      SFT 样本数: {self.stats['sft_samples']}")
+        
+        # 保存统计信息
+        stats_path = self.sft_generator.output_dir / "pipeline_stats.json"
+        with open(stats_path, 'w', encoding='utf-8') as f:
+            json.dump({
+                **self.stats,
+                "timestamp": datetime.now().isoformat(),
+                "config": {
+                    "data_dir": str(data_dir),
+                    "batch_size": self.config.batch_size,
+                    "max_cer": self.config.max_cer,
+                }
+            }, f, ensure_ascii=False, indent=2)
+        
+        print()
+        print("=" * 60)
+        print("流水线执行完成!")
+        print("=" * 60)
+    
+    def run_test(self, num_samples: int = 10):
+        """
+        测试模式：使用模拟数据验证流水线逻辑
+        
+        Args:
+            num_samples: 测试样本数量
+        """
+        print("=" * 60)
+        print("L2W1 数据流水线测试模式")
+        print("=" * 60)
+        
+        # 生成模拟样本
+        test_samples = []
+        test_texts = [
+            "中国科学院计算技术研究所",
+            "在时间的未尾",
+            "人工智能技术发展",
+            "深度学习模型训练",
+            "自然语言处理应用",
+            "计算机视觉识别",
+            "机器学习算法优化",
+            "神经网络架构设计",
+            "数据挖掘与分析",
+            "知识图谱构建方法",
+        ]
+        
+        for i, text in enumerate(test_texts[:num_samples]):
+            test_samples.append(DataSample(
+                id=f"test_{i:04d}",
+                image_path=f"./test_images/img_{i:04d}.jpg",
+                ground_truth=text
+            ))
+        
+        print(f"生成 {len(test_samples)} 个测试样本")
+        print()
+        
+        # 模拟推理
+        print("[1/3] 模拟推理...")
+        test_samples = self._simulate_inference(test_samples)
+        
+        # 错误分析
+        print("[2/3] 错误分析...")
+        test_samples = self._analyze_errors(test_samples)
+        
+        # 显示结果
+        print("[3/3] 分析结果:")
+        print("-" * 60)
+        
+        for sample in test_samples:
+            print(f"ID: {sample.id}")
+            print(f"  真值: '{sample.ground_truth}'")
+            print(f"  预测: '{sample.prediction}'")
+            print(f"  CER: {sample.cer:.2%}")
+            
+            if sample.error_index >= 0:
+                print(f"  错误位置: 第 {sample.error_index + 1} 个字符")
+                print(f"  预测字符: '{sample.error_char_pred}' -> 真值: '{sample.error_char_gt}'")
+                
+                # 生成提示
+                prompt = self.sft_generator.format_prompt(sample)
+                print(f"  提示: {prompt[:80]}...")
+            else:
+                print("  无错误")
+            print()
+        
+        # 过滤并生成 SFT
+        filtered = self._filter_samples(test_samples)
+        print(f"过滤后样本数: {len(filtered)}")
+        
+        if filtered:
+            self.sft_generator.clear_output()
+            self.sft_generator.write_batch(filtered)
+            print(f"SFT 文件已生成: {self.sft_generator.output_path}")
+            
+            # 显示第一条
+            with open(self.sft_generator.output_path, 'r', encoding='utf-8') as f:
+                first_line = f.readline()
+                print(f"\n第一条 SFT 数据:")
+                print(json.dumps(json.loads(first_line), ensure_ascii=False, indent=2))
+        
+        print()
+        print("=" * 60)
+        print("测试完成!")
+        print("=" * 60)
+
+
+# =============================================================================
+# 命令行入口
+# =============================================================================
+
+def parse_args():
+    """解析命令行参数"""
+    parser = argparse.ArgumentParser(
+        description="L2W1 自动化数据处理流水线",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+示例:
+    # 处理 SCUT-HCCDoc 数据集
+    python data_pipeline.py --data_dir ./data/raw/scut_hccdoc --batch_size 16
+    
+    # 测试模式
+    python data_pipeline.py --test
+    
+    # 指定输出目录和 CER 阈值
+    python data_pipeline.py --data_dir ./data/raw --output_dir ./data/sft --max_cer 0.2
+        """
+    )
+    
+    parser.add_argument("--data_dir", type=str, default="./data/raw",
+                        help="数据目录路径")
+    parser.add_argument("--output_dir", type=str, default="./data/sft",
+                        help="输出目录路径")
+    parser.add_argument("--batch_size", type=int, default=16,
+                        help="推理批次大小")
+    parser.add_argument("--max_cer", type=float, default=0.3,
+                        help="最大 CER 阈值 (0-1)")
+    parser.add_argument("--min_length", type=int, default=2,
+                        help="最小文本长度")
+    parser.add_argument("--max_length", type=int, default=100,
+                        help="最大文本长度")
+    parser.add_argument("--data_format", type=str, default="auto",
+                        choices=["auto", "scut", "casia", "generic"],
+                        help="数据格式")
+    parser.add_argument("--rec_model_dir", type=str, default="",
+                        help="Agent A 模型目录")
+    parser.add_argument("--use_gpu", action="store_true", default=True,
+                        help="使用 GPU")
+    parser.add_argument("--test", action="store_true",
+                        help="运行测试模式")
+    
+    return parser.parse_args()
+
+
+def main():
+    """主函数"""
+    args = parse_args()
+    
+    # 构建配置
+    config = PipelineConfig(
+        data_dir=args.data_dir,
+        output_dir=args.output_dir,
+        batch_size=args.batch_size,
+        max_cer=args.max_cer,
+        min_text_length=args.min_length,
+        max_text_length=args.max_length,
+        use_gpu=args.use_gpu,
+        rec_model_dir=args.rec_model_dir,
+    )
+    
+    # 创建流水线
+    pipeline = DataPipeline(config)
+    
+    if args.test:
+        # 测试模式
+        pipeline.run_test(num_samples=10)
+    else:
+        # 正式运行
+        pipeline.run(data_dir=args.data_dir, data_format=args.data_format)
+
+
+if __name__ == "__main__":
+    main()
