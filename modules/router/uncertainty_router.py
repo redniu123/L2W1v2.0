@@ -78,7 +78,7 @@ class RoutingResult:
 
 class CTCAligner:
     """
-    CTC 时间步对齐器
+    CTC 时间步对齐器 (加固版)
     
     将固定长度的 logits 序列 (e.g., 80) 映射到可变长度的字符序列 (e.g., 10)
     
@@ -87,7 +87,16 @@ class CTCAligner:
     2. 应用 CTC 解码规则：移除连续重复 + 移除 blank
     3. 记录每个最终字符对应的时间步范围
     4. 将时间步的熵值聚合到对应字符
+    
+    加固策略 (v5.0.1):
+    - 容错窗口: 允许 ±2 字符的长度误差
+    - 贪婪映射: 长度不匹配时，基于熵权重的动态调整
+    - 极端回退: 仅在误差 >30% 时使用均匀分配
     """
+    
+    # 容错配置
+    TOLERANCE_WINDOW = 2          # 允许的字符数差异
+    EXTREME_MISMATCH_RATIO = 0.3  # 极端不匹配比例阈值 (30%)
     
     def __init__(self, blank_idx: int = 0):
         """
@@ -96,19 +105,30 @@ class CTCAligner:
         """
         self.blank_idx = blank_idx
     
-    def align(self, logits: np.ndarray, text: str) -> List[Tuple[int, List[int]]]:
+    def align(
+        self, 
+        logits: np.ndarray, 
+        text: str,
+        timestep_entropy: np.ndarray = None
+    ) -> List[Tuple[int, List[int]]]:
         """
-        对齐 logits 时间步到字符位置
+        对齐 logits 时间步到字符位置 (加固版)
         
         Args:
             logits: 原始 logits，形状 [Seq_Len, Vocab_Size]
             text: 识别出的文本字符串
+            timestep_entropy: 预计算的时间步熵 (可选，用于贪婪映射)
             
         Returns:
             List[Tuple[char_idx, List[timestep_indices]]]:
                 每个字符对应的时间步索引列表
         """
         seq_len, vocab_size = logits.shape
+        text_len = len(text)
+        
+        # 边界条件: 空文本
+        if text_len == 0:
+            return []
         
         # Step 1: 对每个时间步取 argmax
         pred_indices = np.argmax(logits, axis=-1)  # [Seq_Len,]
@@ -144,26 +164,214 @@ class CTCAligner:
         if current_timesteps:
             char_to_timesteps.append((current_char_idx, current_timesteps))
         
-        # Step 3: 验证对齐结果
-        # 如果解码出的字符数与文本长度不匹配，使用均匀分配
-        if len(char_to_timesteps) != len(text):
-            return self._fallback_align(seq_len, text)
+        decoded_len = len(char_to_timesteps)
         
-        return char_to_timesteps
+        # Step 3: 验证对齐结果 (加固策略)
+        if decoded_len == text_len:
+            # 完美匹配
+            return char_to_timesteps
+        
+        # 计算长度差异
+        length_diff = abs(decoded_len - text_len)
+        mismatch_ratio = length_diff / max(text_len, 1)
+        
+        # 策略 1: 容错窗口 (±2 字符)
+        if length_diff <= self.TOLERANCE_WINDOW:
+            return self._tolerant_align(
+                char_to_timesteps, text_len, seq_len, 
+                logits, timestep_entropy
+            )
+        
+        # 策略 2: 中等误差 - 贪婪映射
+        if mismatch_ratio <= self.EXTREME_MISMATCH_RATIO:
+            return self._greedy_align(
+                char_to_timesteps, text_len, seq_len,
+                logits, timestep_entropy
+            )
+        
+        # 策略 3: 极端误差 (>30%) - 均匀回退
+        return self._fallback_align(seq_len, text)
     
-    def _fallback_align(self, seq_len: int, text: str) -> List[Tuple[int, List[int]]]:
+    def _tolerant_align(
+        self,
+        decoded_alignment: List[Tuple[int, List[int]]],
+        target_len: int,
+        seq_len: int,
+        logits: np.ndarray = None,
+        timestep_entropy: np.ndarray = None
+    ) -> List[Tuple[int, List[int]]]:
+        """
+        容错对齐: 处理 ±2 字符的长度误差
+        
+        策略:
+        - 解码长度 > 目标: 截断末尾 (通常是重复字符)
+        - 解码长度 < 目标: 填充末尾 (使用最后一个时间步附近)
+        """
+        decoded_len = len(decoded_alignment)
+        
+        if decoded_len == target_len:
+            return decoded_alignment
+        
+        if decoded_len > target_len:
+            # 截断: 保留前 target_len 个
+            result = []
+            for i in range(target_len):
+                if i < len(decoded_alignment):
+                    result.append((i, decoded_alignment[i][1]))
+                else:
+                    # 不应该发生，但做个保护
+                    result.append((i, [seq_len - 1]))
+            return result
+        
+        else:  # decoded_len < target_len
+            # 填充: 复用解码结果，并为缺失的字符分配时间步
+            result = []
+            
+            # 先复制已解码的
+            for i, (_, timesteps) in enumerate(decoded_alignment):
+                result.append((i, timesteps))
+            
+            # 为缺失的字符分配时间步
+            # 策略: 从序列末尾均匀分配
+            last_timestep = decoded_alignment[-1][1][-1] if decoded_alignment else 0
+            remaining_steps = list(range(last_timestep + 1, seq_len))
+            
+            num_missing = target_len - decoded_len
+            if remaining_steps:
+                steps_per_missing = max(1, len(remaining_steps) // num_missing)
+                
+                for i in range(num_missing):
+                    char_idx = decoded_len + i
+                    start = i * steps_per_missing
+                    end = min(start + steps_per_missing, len(remaining_steps))
+                    
+                    if start < len(remaining_steps):
+                        timesteps = [remaining_steps[j] for j in range(start, end)]
+                    else:
+                        timesteps = [seq_len - 1]
+                    
+                    result.append((char_idx, timesteps))
+            else:
+                # 没有剩余时间步，复用最后一个
+                for i in range(num_missing):
+                    result.append((decoded_len + i, [seq_len - 1]))
+            
+            return result
+    
+    def _greedy_align(
+        self,
+        decoded_alignment: List[Tuple[int, List[int]]],
+        target_len: int,
+        seq_len: int,
+        logits: np.ndarray = None,
+        timestep_entropy: np.ndarray = None
+    ) -> List[Tuple[int, List[int]]]:
+        """
+        贪婪对齐: 基于熵权重的动态调整
+        
+        策略:
+        - 计算每个时间步的熵值
+        - 根据高熵区域动态划分字符边界
+        - 确保峰值熵时间步落在合理的字符索引上
+        """
+        # 如果没有预计算熵，使用均匀分配
+        if logits is None:
+            return self._fallback_align(seq_len, target_len)
+        
+        # 计算时间步熵
+        if timestep_entropy is None:
+            # 计算 softmax
+            logits_max = np.max(logits, axis=-1, keepdims=True)
+            exp_logits = np.exp(logits - logits_max)
+            probs = exp_logits / np.sum(exp_logits, axis=-1, keepdims=True)
+            
+            # Shannon Entropy
+            epsilon = 1e-10
+            timestep_entropy = -np.sum(probs * np.log(probs + epsilon), axis=-1)
+        
+        # 找到熵的局部峰值 (这些是不确定的位置)
+        peaks = []
+        for t in range(1, seq_len - 1):
+            if (timestep_entropy[t] > timestep_entropy[t-1] and 
+                timestep_entropy[t] > timestep_entropy[t+1]):
+                peaks.append((t, timestep_entropy[t]))
+        
+        # 按熵值降序排列
+        peaks.sort(key=lambda x: x[1], reverse=True)
+        
+        # 使用均匀分配作为基础，但调整高熵区域
+        result = []
+        steps_per_char = seq_len / target_len
+        
+        for char_idx in range(target_len):
+            start_t = int(char_idx * steps_per_char)
+            end_t = int((char_idx + 1) * steps_per_char)
+            
+            # 确保至少有一个时间步
+            if start_t >= seq_len:
+                start_t = seq_len - 1
+            if end_t > seq_len:
+                end_t = seq_len
+            if end_t <= start_t:
+                end_t = start_t + 1
+            
+            timesteps = list(range(start_t, min(end_t, seq_len)))
+            if not timesteps:
+                timesteps = [min(start_t, seq_len - 1)]
+            
+            result.append((char_idx, timesteps))
+        
+        # 将最高熵峰值关联到最近的字符
+        # (这确保 suspicious_index 指向真正不确定的位置)
+        if peaks and result:
+            peak_t, peak_entropy = peaks[0]  # 最高熵峰值
+            
+            # 找到包含这个时间步的字符
+            for char_idx, timesteps in result:
+                if peak_t in timesteps:
+                    break  # 已经正确关联
+            else:
+                # 没有字符包含这个峰值，找最近的
+                min_dist = float('inf')
+                closest_char = 0
+                for char_idx, timesteps in result:
+                    for t in timesteps:
+                        dist = abs(t - peak_t)
+                        if dist < min_dist:
+                            min_dist = dist
+                            closest_char = char_idx
+                
+                # 将峰值时间步添加到最近的字符
+                if closest_char < len(result):
+                    result[closest_char] = (
+                        closest_char, 
+                        sorted(set(result[closest_char][1] + [peak_t]))
+                    )
+        
+        return result
+    
+    def _fallback_align(self, seq_len: int, text_or_len) -> List[Tuple[int, List[int]]]:
         """
         回退对齐策略：均匀分配时间步到字符
         
-        当 CTC 解码结果与文本长度不匹配时使用
+        仅在极端误差 (>30%) 时使用
+        
+        Args:
+            seq_len: 序列长度
+            text_or_len: 文本字符串或目标长度
         """
-        if len(text) == 0:
+        if isinstance(text_or_len, str):
+            text_len = len(text_or_len)
+        else:
+            text_len = text_or_len
+        
+        if text_len == 0:
             return []
         
         char_to_timesteps = []
-        steps_per_char = seq_len / len(text)
+        steps_per_char = seq_len / text_len
         
-        for char_idx in range(len(text)):
+        for char_idx in range(text_len):
             start_t = int(char_idx * steps_per_char)
             end_t = int((char_idx + 1) * steps_per_char)
             timesteps = list(range(start_t, min(end_t, seq_len)))
@@ -172,6 +380,51 @@ class CTCAligner:
             char_to_timesteps.append((char_idx, timesteps))
         
         return char_to_timesteps
+    
+    def get_alignment_stats(
+        self, 
+        logits: np.ndarray, 
+        text: str
+    ) -> Dict:
+        """
+        获取对齐统计信息 (用于调试和分析)
+        
+        Returns:
+            dict: 对齐统计信息
+        """
+        seq_len, vocab_size = logits.shape
+        pred_indices = np.argmax(logits, axis=-1)
+        
+        # 解码
+        decoded_chars = 0
+        prev_idx = -1
+        for idx in pred_indices:
+            if idx != self.blank_idx and idx != prev_idx:
+                decoded_chars += 1
+            prev_idx = idx
+        
+        text_len = len(text)
+        length_diff = abs(decoded_chars - text_len)
+        mismatch_ratio = length_diff / max(text_len, 1)
+        
+        # 判断使用哪种策略
+        if decoded_chars == text_len:
+            strategy = "perfect_match"
+        elif length_diff <= self.TOLERANCE_WINDOW:
+            strategy = "tolerant_align"
+        elif mismatch_ratio <= self.EXTREME_MISMATCH_RATIO:
+            strategy = "greedy_align"
+        else:
+            strategy = "fallback_align"
+        
+        return {
+            "seq_len": seq_len,
+            "text_len": text_len,
+            "decoded_chars": decoded_chars,
+            "length_diff": length_diff,
+            "mismatch_ratio": round(mismatch_ratio, 4),
+            "strategy": strategy,
+        }
 
 
 class VisualEntropyCalculator:
@@ -460,19 +713,72 @@ class UncertaintyRouter:
         self, 
         logits: np.ndarray, 
         text: str,
-        confidence: float = 1.0
+        confidence: float = 1.0,
+        image_size: Tuple[int, int] = None
     ) -> RoutingResult:
         """
-        完整路由流程
+        完整路由流程 (加固版)
         
         Args:
             logits: 原始 logits，形状 [Seq_Len, Vocab_Size]
             text: 识别文本
             confidence: Agent A 的置信度分数
+            image_size: 图像尺寸 (width, height)，用于极端长宽比检测
             
         Returns:
             RoutingResult: 路由结果
         """
+        # ========== 边界条件守护 (Boundary Case Guarding) ==========
+        
+        # Guard 1: 空文本 → 直接标记为 CRITICAL
+        if len(text) == 0:
+            return RoutingResult(
+                is_hard=True,
+                suspicious_index=-1,
+                suspicious_char="",
+                risk_level=RiskLevel.CRITICAL.value,
+                visual_entropy=0.0,
+                max_char_entropy=0.0,
+                semantic_ppl=float('inf'),
+                entropy_sequence=[]
+            )
+        
+        # Guard 2: 单字符文本 → 简化处理，跳过复杂对齐
+        if len(text) == 1:
+            # 计算整体熵
+            timestep_entropy = self.visual_calculator.compute_timestep_entropy(logits)
+            max_entropy = float(np.max(timestep_entropy))
+            
+            is_hard = max_entropy > self.config.entropy_threshold_low or confidence < 0.8
+            risk_level = RiskLevel.MEDIUM.value if is_hard else RiskLevel.LOW.value
+            
+            return RoutingResult(
+                is_hard=is_hard,
+                suspicious_index=0,  # 唯一的字符
+                suspicious_char=text[0],
+                risk_level=risk_level,
+                visual_entropy=max_entropy,
+                max_char_entropy=max_entropy,
+                semantic_ppl=1.0,  # 单字符无法计算 PPL
+                entropy_sequence=[max_entropy]
+            )
+        
+        # Guard 3: 极端长宽比检测 (>25:1)
+        if image_size is not None:
+            width, height = image_size
+            if height > 0:
+                aspect_ratio = width / height
+                if aspect_ratio > 25.0:
+                    import warnings
+                    warnings.warn(
+                        f"[Router] 检测到极端长宽比: {aspect_ratio:.1f}:1 "
+                        f"(image: {width}x{height})。Agent B 的动态分辨率 Padding 将被激活。"
+                    )
+                    # 极端长宽比通常意味着更高的识别风险
+                    confidence *= 0.8  # 降低置信度
+        
+        # ========== 正常路由流程 ==========
+        
         # Step 1: 计算视觉不确定性
         char_entropies, suspicious_idx, max_entropy = self.calculate_visual_entropy(logits, text)
         visual_entropy_mean = np.mean(char_entropies) if char_entropies else 0.0
@@ -483,9 +789,13 @@ class UncertaintyRouter:
         # Step 3: 路由决策
         is_hard, risk_level = self.should_reroute(max_entropy, semantic_ppl)
         
-        # Step 4: 确定存疑字符
+        # Step 4: 确定存疑字符 (使用安全索引访问)
         suspicious_char = ""
-        if suspicious_idx >= 0 and suspicious_idx < len(text):
+        if 0 <= suspicious_idx < len(text):
+            suspicious_char = text[suspicious_idx]
+        elif suspicious_idx >= len(text):
+            # 索引越界保护：钳制到最后一个字符
+            suspicious_idx = len(text) - 1
             suspicious_char = text[suspicious_idx]
         
         # Step 5: 考虑置信度因素

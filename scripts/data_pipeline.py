@@ -453,11 +453,26 @@ class SFTGenerator:
             
         Returns:
             格式化后的提示文本
+            
+        Note:
+            索引转换规则: 
+            - 内部逻辑使用 0-indexed (sample.error_index)
+            - Prompt 显示使用 1-indexed (人类可读)
         """
+        # 导入统一索引管理工具
+        try:
+            from modules.utils.indexing import to_display_index
+        except ImportError:
+            # 回退：手动转换
+            def to_display_index(idx): return idx + 1
+        
         if sample.error_index >= 0 and sample.error_char_pred:
+            # 转换为 1-indexed (人类可读)
+            display_index = to_display_index(sample.error_index)
+            
             return self.PROMPT_TEMPLATE.format(
                 ocr_text=sample.prediction,
-                idx=sample.error_index + 1,  # 转为 1-indexed
+                idx=display_index,
                 char=sample.error_char_pred
             )
         else:
