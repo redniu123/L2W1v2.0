@@ -1,30 +1,174 @@
-# L2W1 项目依赖环境
+# ============================================================================
+# L2W1 v5.0 项目依赖环境配置
+# 目标平台: Linux (Ubuntu 20.04+), RTX 2080Ti (11GB), CUDA 11.8
+# Python 版本: 3.8 - 3.11
+# ============================================================================
 
-# 深度学习框架
-paddlepaddle>=2.6.0
-torch>=2.1.0
+# ============================================================================
+# 1. 深度学习框架 (Core Deep Learning Frameworks)
+# ============================================================================
 
-# 视觉语言模型
-transformers>=4.40.0
-qwen-vl-utils
+# PaddlePaddle - Agent A (PP-OCRv5) 引擎
+# 注意: PaddlePaddle 会自动检测 CUDA，无需指定 CUDA 版本
+paddlepaddle>=2.6.0,<3.0.0
 
-# 推理加速
-vllm>=0.3.0
+# PyTorch - Agent B (Qwen2.5-VL) 训练与推理
+# CUDA 11.8 兼容版本 (RTX 2080Ti 支持 CUDA 11.x)
+# 安装命令: pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu118
+torch>=2.1.0,<2.2.0
+torchvision>=0.16.0,<0.17.0
+torchaudio>=2.1.0,<2.2.0
 
-# 数据处理
-opencv-python>=4.8.0
-pillow>=10.0.0
-numpy>=1.24.0
-pandas>=2.0.0
+# ============================================================================
+# 2. 量化与参数高效微调 (Quantization & Parameter-Efficient Fine-tuning)
+# ============================================================================
 
-# 评估指标
-editdistance>=0.6.0
+# bitsandbytes - 4-bit 量化 (QLoRA 必需)
+# 注意: bitsandbytes 需要编译，确保系统有 CUDA Toolkit 和编译工具
+# Linux 安装可能需要: sudo apt-get install build-essential
+bitsandbytes>=0.41.0,<0.43.0
 
-# 工具库
-tqdm>=4.66.0
-pyyaml>=6.0
-tensorboard>=2.15.0
+# peft - LoRA / QLoRA 微调库
+peft>=0.7.0,<0.11.0
 
-# 其他依赖
-# （根据实际需要补充）
+# accelerate - Transformers 训练加速
+accelerate>=0.25.0,<0.30.0
 
+# ============================================================================
+# 3. 视觉语言模型 (Vision-Language Models)
+# ============================================================================
+
+# transformers - HuggingFace Transformers (Qwen2.5-VL)
+# 版本 >= 4.40.0 支持 Qwen2.5-VL
+transformers>=4.40.0,<4.46.0
+
+# qwen-vl-utils - Qwen VL 工具库
+qwen-vl-utils>=0.0.2
+
+# sentencepiece - Qwen tokenizer 依赖
+sentencepiece>=0.1.99
+
+# ============================================================================
+# 4. 推理加速 (Inference Acceleration)
+# ============================================================================
+
+# vLLM - 推理加速 (可选，用于大规模批量推理)
+# 注意: vLLM 需要 CUDA 11.8+，且可能与其他库存在版本冲突
+# 如果遇到问题，可以注释掉这行
+vllm>=0.3.0,<0.6.0
+
+# ============================================================================
+# 5. 数据处理 (Data Processing)
+# ============================================================================
+
+# OpenCV - 图像处理
+opencv-python>=4.8.0,<5.0.0
+
+# Pillow - 图像 I/O
+pillow>=10.0.0,<11.0.0
+
+# NumPy - 数值计算
+numpy>=1.24.0,<2.0.0
+
+# Pandas - 数据分析
+pandas>=2.0.0,<3.0.0
+
+# SciPy - 科学计算 (某些评估指标需要)
+scipy>=1.11.0,<2.0.0
+
+# ============================================================================
+# 6. 评估指标 (Evaluation Metrics)
+# ============================================================================
+
+# editdistance - 编辑距离计算 (CER 计算)
+editdistance>=0.6.0,<0.7.0
+
+# ============================================================================
+# 7. 可视化 (Visualization)
+# ============================================================================
+
+# Matplotlib - 基础绘图
+matplotlib>=3.7.0,<4.0.0
+
+# Seaborn - 统计可视化
+seaborn>=0.12.0,<0.14.0
+
+# ============================================================================
+# 8. 工具库 (Utilities)
+# ============================================================================
+
+# tqdm - 进度条
+tqdm>=4.66.0,<5.0.0
+
+# PyYAML - YAML 配置文件解析
+pyyaml>=6.0,<7.0.0
+
+# TensorBoard - 训练监控
+tensorboard>=2.15.0,<3.0.0
+
+# Protobuf - PaddleOCR 依赖
+protobuf>=4.23.0,<5.0.0
+
+# ============================================================================
+# 9. 其他依赖 (Other Dependencies)
+# ============================================================================
+
+# requests - HTTP 请求 (模型下载等)
+requests>=2.31.0
+
+# safetensors - 模型安全加载
+safetensors>=0.4.0
+
+# psutil - 系统资源监控
+psutil>=5.9.0
+
+# ============================================================================
+# 10. 可选依赖 (Optional Dependencies)
+# ============================================================================
+
+# Flash Attention 2 - 加速注意力计算 (需要单独安装，因为需要编译)
+# 安装命令: pip install flash-attn --no-build-isolation
+# 注意: flash-attn 需要 CUDA Toolkit 和编译环境
+# 如果安装失败，可以跳过，代码会自动回退到标准注意力机制
+# flash-attn>=2.3.0
+
+# ============================================================================
+# 安装说明 (Installation Instructions)
+# ============================================================================
+#
+# 1. 创建虚拟环境:
+#    python3 -m venv l2w1_env
+#    source l2w1_env/bin/activate
+#
+# 2. 升级 pip:
+#    pip install --upgrade pip setuptools wheel
+#
+# 3. 安装 PyTorch (CUDA 11.8):
+#    pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 \
+#        --index-url https://download.pytorch.org/whl/cu118
+#
+# 4. 安装其他依赖:
+#    pip install -r requirements.txt
+#
+# 5. (可选) 安装 Flash Attention 2:
+#    pip install flash-attn --no-build-isolation
+#
+# 6. 验证安装:
+#    python -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA Available: {torch.cuda.is_available()}')"
+#    python -c "import bitsandbytes as bnb; print(f'bitsandbytes: {bnb.__version__}')"
+#    python -c "import peft; print(f'peft: {peft.__version__}')"
+#    python check_env.py  # 运行环境检查脚本
+#
+# ============================================================================
+# 系统要求 (System Requirements)
+# ============================================================================
+#
+# - OS: Ubuntu 20.04+ / CentOS 7+ / Debian 11+
+# - Python: 3.8, 3.9, 3.10, 3.11 (推荐 3.10)
+# - CUDA: 11.8 (RTX 2080Ti 支持 CUDA 11.0 - 11.8)
+# - cuDNN: 8.9.2 (CUDA 11.8 配套)
+# - 显存: 11GB (RTX 2080Ti)
+# - 系统内存: 32GB+ (推荐)
+# - 磁盘空间: 50GB+ (模型权重 + 数据集)
+#
+# ============================================================================
