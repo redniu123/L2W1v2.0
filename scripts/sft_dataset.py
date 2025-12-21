@@ -236,6 +236,7 @@ class AgentBSFTDataset(Dataset):
             return
         
         negative_samples = []
+        debug_samples = []  # 用于调试验证
         
         for i in range(num_negative):
             # 随机选择一个正样本作为模板
@@ -267,12 +268,33 @@ class AgentBSFTDataset(Dataset):
             }
             
             negative_samples.append(negative_sample)
+            
+            # 收集调试样本（前 5 个）
+            if len(debug_samples) < 5:
+                debug_samples.append({
+                    'neg_id': negative_sample['id'],
+                    'source_id': template.get('id', ''),
+                    'image': template.get('image', ''),
+                    'correct_text': correct_text[:50] + ('...' if len(correct_text) > 50 else ''),
+                    'prompt_preview': negative_prompt[:60] + '...',
+                })
         
         # 添加到样本列表并打乱
         self.samples.extend(negative_samples)
         random.shuffle(self.samples)
         
         logger.info(f"[负样本生成] 添加 {len(negative_samples)} 个负样本 (幻觉抑制)")
+        
+        # ========== 调试验证日志 ==========
+        # 打印 5 个随机负样本，验证图像与 correct_text 的对应关系
+        if debug_samples:
+            logger.info("[负样本验证] 抽样检查 (请确认 image 与 correct_text 对应):")
+            for idx, sample in enumerate(debug_samples):
+                logger.info(f"  [{idx+1}] ID: {sample['neg_id']} <- {sample['source_id']}")
+                logger.info(f"      Image: {sample['image']}")
+                logger.info(f"      Text: '{sample['correct_text']}'")
+                logger.info(f"      Prompt: {sample['prompt_preview']}")
+            logger.info("  [!] 如果 image 与 text 不对应，请检查数据源的一致性")
     
     def __len__(self) -> int:
         return len(self.samples)

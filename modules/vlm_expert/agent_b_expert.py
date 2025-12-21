@@ -123,26 +123,42 @@ OCR识别结果："{ocr_text}"
         
         Args:
             ocr_text: OCR 识别文本
-            suspicious_index: 存疑字符位置 (0-indexed)
+            suspicious_index: 存疑字符位置 (0-indexed，内部约定)
             suspicious_char: 存疑字符
             risk_level: 风险等级
             entropy_sequence: 熵序列（可选，用于多位置提示）
             
         Returns:
             格式化后的提示文本
+            
+        Note:
+            索引转换规则: 
+            - 内部逻辑 (Router, Evaluator) 使用 0-indexed
+            - Prompt 显示使用 1-indexed (人类可读)
+            - 使用 modules.utils.indexing 统一管理
         """
+        # 导入统一索引管理工具
+        try:
+            from modules.utils.indexing import to_display_index
+        except ImportError:
+            # 回退：手动转换
+            def to_display_index(idx): return idx + 1
+        
         if suspicious_index >= 0 and suspicious_char:
+            # 转换为 1-indexed (人类可读)
+            display_index = to_display_index(suspicious_index)
+            
             if risk_level == "high" or risk_level == "critical":
                 return cls.HIGH_RISK_TEMPLATE.format(
                     ocr_text=ocr_text,
-                    suspicious_index=suspicious_index + 1,  # 转为 1-indexed
+                    suspicious_index=display_index,
                     suspicious_char=suspicious_char,
                     risk_level=risk_level
                 )
             else:
                 return cls.STANDARD_TEMPLATE.format(
                     ocr_text=ocr_text,
-                    suspicious_index=suspicious_index + 1,
+                    suspicious_index=display_index,
                     suspicious_char=suspicious_char
                 )
         else:
