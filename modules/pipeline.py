@@ -76,7 +76,7 @@ class PipelineResult:
     """
     流水线结果
     
-    符合 L2W1 Master Data Protocol v1.0 (data_protocol_v1.json)
+    符合 L2W1 Master Data Protocol v2.0 (data_protocol_v2.json)
     
     输出结构:
     {
@@ -86,7 +86,7 @@ class PipelineResult:
         "agent_a": { "text", "confidence", "suspicious_index", "suspicious_char", "raw_logits_shape" },
         "router": { "is_hard", "visual_entropy", "semantic_ppl", "risk_level", "decision" },
         "agent_b": { "text", "is_corrected", "refinement_strategy" },
-        "metadata": { "source", "difficulty", "error_type", "gt_char_len", "processing_time_ms", "environment" }
+        "metadata": { "source", "split", "difficulty", "error_type", "gt_char_len", "processing_time_ms", "environment" }
     }
     """
     # ========== 顶层字段 ==========
@@ -121,16 +121,17 @@ class PipelineResult:
     routed_to_agent_b: bool = False
     processing_time_ms: int = 0      # 毫秒
     source: str = ""                 # 数据来源 (viscgec, scut, casia 等)
+    split: str = ""                  # 数据集划分 (train, val, test) [v2.0 新增]
     difficulty: str = "normal"       # "easy" | "normal" | "hard"
     error_type: str = ""             # 错误类型 (grammar_omission, similar_char 等)
     environment: str = ""            # 运行环境描述
     
     def to_dict(self) -> Dict:
         """
-        转换为符合 Data Protocol v1.0 的嵌套结构
+        转换为符合 Data Protocol v2.0 的嵌套结构
         
         Returns:
-            符合 data_protocol_v1.json 规范的字典
+            符合 data_protocol_v2.json 规范的字典
         """
         # 计算 logits shape
         logits_shape = list(self.agent_a_logits_shape)
@@ -181,9 +182,10 @@ class PipelineResult:
                 "refinement_strategy": self.agent_b_refinement_strategy,
             },
             
-            # Metadata 嵌套结构
+            # Metadata 嵌套结构 (v2.0)
             "metadata": {
                 "source": self.source,
+                "split": self.split,  # [v2.0 新增]
                 "difficulty": difficulty,
                 "error_type": self.error_type,
                 "gt_char_len": len(self.gt_text),
@@ -195,10 +197,10 @@ class PipelineResult:
     @classmethod
     def from_dict(cls, data: Dict) -> 'PipelineResult':
         """
-        从 Data Protocol v1.0 格式的字典构建 PipelineResult
+        从 Data Protocol v2.0 格式的字典构建 PipelineResult
         
         Args:
-            data: 符合 data_protocol_v1.json 规范的字典
+            data: 符合 data_protocol_v2.json 规范的字典
             
         Returns:
             PipelineResult 实例
@@ -233,8 +235,9 @@ class PipelineResult:
             agent_b_is_corrected=agent_b.get('is_corrected', False),
             agent_b_refinement_strategy=agent_b.get('refinement_strategy', 'explicit_indexing_prompt'),
             
-            # Metadata
+            # Metadata (v2.0)
             source=metadata.get('source', ''),
+            split=metadata.get('split', ''),  # [v2.0 新增]
             difficulty=metadata.get('difficulty', 'normal'),
             error_type=metadata.get('error_type', ''),
             processing_time_ms=metadata.get('processing_time_ms', 0),

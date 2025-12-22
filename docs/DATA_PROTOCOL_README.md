@@ -1,4 +1,4 @@
-# L2W1 Master Data Protocol v1.0
+# L2W1 Master Data Protocol v2.0
 
 本文档定义了 L2W1 项目中数据交换的标准格式。
 
@@ -6,7 +6,49 @@
 
 1. **suspicious_index 始终为 0-indexed**：系统内部所有逻辑统一使用 0-indexed
 2. **嵌套结构**：按照 Agent A → Router → Agent B → Metadata 的逻辑分层
-3. **向后兼容**：评估模块同时支持嵌套格式和扁平格式
+3. **物理隔离**：Train/Val/Test 数据集严格分离，使用独立的 JSONL 文件
+4. **向后兼容**：评估模块同时支持嵌套格式和扁平格式
+
+---
+
+## 0. 物理存储结构 (v2.0 新增)
+
+### 目录结构
+
+```
+data/raw/[dataset_name]/
+├── images/                    # 图像文件目录
+│   ├── train/                 # 训练集图像
+│   │   ├── 001.png
+│   │   └── ...
+│   ├── val/                   # 验证集图像
+│   └── test/                  # 测试集图像
+├── train.jsonl                # 训练集元数据 (必需)
+├── val.jsonl                  # 验证集元数据 (可选)
+└── test.jsonl                 # 测试集元数据 (可选)
+```
+
+### JSONL 文件格式
+
+每行一个 JSON 对象：
+
+```jsonl
+{"id": "viscgec_train_001", "image": "images/train/001.png", "gt_text": "真值文本", "source": "viscgec"}
+{"id": "viscgec_train_002", "image": "images/train/002.png", "gt_text": "另一行文本", "source": "viscgec"}
+```
+
+### 加载示例
+
+```bash
+# 加载训练集
+python scripts/data_pipeline.py --data_dir ./data/raw/viscgec --split train
+
+# 加载测试集
+python scripts/data_pipeline.py --data_dir ./data/raw/viscgec --split test
+
+# 加载所有划分
+python scripts/data_pipeline.py --data_dir ./data/raw/viscgec --split all
+```
 
 ---
 
@@ -44,6 +86,7 @@
   
   "metadata": {
     "source": "viscgec",
+    "split": "test",                    // [v2.0 新增] train, val, test
     "difficulty": "hard",
     "error_type": "grammar_omission",
     "gt_char_len": 17,
