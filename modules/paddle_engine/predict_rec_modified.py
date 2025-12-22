@@ -58,12 +58,12 @@ logger = get_logger()
 class TextRecognizerWithLogits(object):
     """
     L2W1 增强版文本识别器 - 支持 Logits 导出
-    
+
     与原版 TextRecognizer 的关键区别:
     1. __call__ 返回字典格式，包含原始 logits
     2. 支持获取 CTC 解码前的概率分布，用于熵计算
     """
-    
+
     def __init__(self, args, logger=None):
         if os.path.exists(f"{args.rec_model_dir}/inference.yml"):
             model_config = utility.load_config(f"{args.rec_model_dir}/inference.yml")
@@ -97,7 +97,7 @@ class TextRecognizerWithLogits(object):
         self.rec_image_shape = [int(v) for v in args.rec_image_shape.split(",")]
         self.rec_batch_num = args.rec_batch_num
         self.rec_algorithm = args.rec_algorithm
-        
+
         # 后处理参数配置
         postprocess_params = {
             "name": "CTCLabelDecode",
@@ -609,17 +609,17 @@ class TextRecognizerWithLogits(object):
     def __call__(self, img_list):
         """
         L2W1 核心修改: 增强版推理接口，支持 Logits 导出
-        
+
         Args:
             img_list: 输入图像列表
-            
+
         Returns:
             dict: {
                 'results': List[Tuple[str, float]] - 识别结果列表 [(text, confidence), ...]
                 'logits': List[np.ndarray] - 原始 logits 列表，形状为 [Seq_Len, Vocab_Size]
                 'elapsed_time': float - 推理耗时
             }
-            
+
         Note:
             - logits 在 CTC Decode 之前拦截，用于熵计算
             - 使用 deepcopy 防止 PaddlePredictor 内存复用覆盖
@@ -632,12 +632,12 @@ class TextRecognizerWithLogits(object):
         # Sorting can speed up the recognition process
         indices = np.argsort(np.array(width_list))
         rec_res = [["", 0.0]] * img_num
-        
+
         # ========== L2W1 关键修改: Logits 存储 ==========
         # 存储每个样本的原始 logits
         all_logits = [None] * img_num
         # ================================================
-        
+
         batch_num = self.rec_batch_num
         st = time.time()
         if self.benchmark:
@@ -924,25 +924,25 @@ class TextRecognizerWithLogits(object):
                 rec_result = self.postprocess_op(preds)
             for rno in range(len(rec_result)):
                 rec_res[indices[beg_img_no + rno]] = rec_result[rno]
-                
+
                 # ========== L2W1 关键修改: 按原始顺序存储 logits ==========
                 if batch_raw_logits is not None:
                     # batch_raw_logits 形状: [Batch, Seq_Len, Vocab_Size]
                     # 取出当前样本的 logits
                     all_logits[indices[beg_img_no + rno]] = batch_raw_logits[rno].copy()
                 # =========================================================
-                
+
             if self.benchmark:
                 self.autolog.times.end(stamp=True)
-        
+
         elapsed_time = time.time() - st
-        
+
         # ========== L2W1 关键修改: 返回字典格式 ==========
         # 返回格式变更：从 (rec_res, time) 变更为 dict
         return {
-            'results': rec_res,      # List[Tuple[str, float]] - [(text, conf), ...]
-            'logits': all_logits,    # List[np.ndarray] - 每个样本的原始 logits
-            'elapsed_time': elapsed_time
+            "results": rec_res,  # List[Tuple[str, float]] - [(text, conf), ...]
+            "logits": all_logits,  # List[np.ndarray] - 每个样本的原始 logits
+            "elapsed_time": elapsed_time,
         }
         # =================================================
 
@@ -987,15 +987,15 @@ def main(args):
     try:
         # L2W1: 获取增强返回值
         output = text_recognizer(img_list)
-        rec_res = output['results']
-        logits_list = output['logits']
-        elapsed = output['elapsed_time']
+        rec_res = output["results"]
+        logits_list = output["logits"]
+        elapsed = output["elapsed_time"]
 
     except Exception as E:
         logger.info(traceback.format_exc())
         logger.info(E)
         exit()
-    
+
     for ino in range(len(img_list)):
         logger.info(
             "Predicts of {}:{}".format(valid_image_file_list[ino], rec_res[ino])
@@ -1006,16 +1006,15 @@ def main(args):
                 "  -> Logits shape: {} (Seq_Len={}, Vocab_Size={})".format(
                     logits_list[ino].shape,
                     logits_list[ino].shape[0],
-                    logits_list[ino].shape[1]
+                    logits_list[ino].shape[1],
                 )
             )
-    
+
     logger.info(f"Total elapsed time: {elapsed:.3f}s")
-    
+
     if args.benchmark:
         text_recognizer.autolog.report()
 
 
 if __name__ == "__main__":
     main(utility.parse_args())
-
