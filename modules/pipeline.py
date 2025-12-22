@@ -39,6 +39,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Union
+import time as time_module
 from dataclasses import dataclass, field
 import numpy as np
 
@@ -72,57 +73,177 @@ class PipelineConfig:
 
 @dataclass
 class PipelineResult:
-    """流水线结果"""
-    # 输入信息
-    image_path: str = ""
+    """
+    流水线结果
     
-    # Agent A 输出
+    符合 L2W1 Master Data Protocol v1.0 (data_protocol_v1.json)
+    
+    输出结构:
+    {
+        "id": str,
+        "image": str,
+        "gt_text": str,
+        "agent_a": { "text", "confidence", "suspicious_index", "suspicious_char", "raw_logits_shape" },
+        "router": { "is_hard", "visual_entropy", "semantic_ppl", "risk_level", "decision" },
+        "agent_b": { "text", "is_corrected", "refinement_strategy" },
+        "metadata": { "source", "difficulty", "error_type", "gt_char_len", "processing_time_ms", "environment" }
+    }
+    """
+    # ========== 顶层字段 ==========
+    id: str = ""                     # 样本唯一 ID
+    image_path: str = ""             # 图像路径
+    gt_text: str = ""                # 真值文本 (Ground Truth)
+    
+    # ========== Agent A 输出 ==========
     agent_a_text: str = ""
     agent_a_confidence: float = 0.0
     agent_a_logits: Optional[np.ndarray] = None
+    agent_a_logits_shape: Tuple[int, int] = (0, 0)  # raw_logits_shape
     
-    # Router 输出
+    # ========== Router 输出 ==========
     is_hard: bool = False
-    suspicious_index: int = -1
+    suspicious_index: int = -1       # 0-indexed (系统内部统一使用 0-indexed)
     suspicious_char: str = ""
     risk_level: str = "low"
     visual_entropy: float = 0.0
     semantic_ppl: float = 0.0
+    router_decision: str = "pass"    # "pass" | "route_to_agent_b"
     
-    # Agent B 输出
+    # ========== Agent B 输出 ==========
     agent_b_text: str = ""
     agent_b_is_corrected: bool = False
+    agent_b_refinement_strategy: str = "explicit_indexing_prompt"  # EIP 策略
     
-    # 最终输出
+    # ========== 最终输出 ==========
     final_text: str = ""
     
-    # 元信息
+    # ========== 元信息 ==========
     routed_to_agent_b: bool = False
-    processing_time: float = 0.0
+    processing_time_ms: int = 0      # 毫秒
+    source: str = ""                 # 数据来源 (viscgec, scut, casia 等)
+    difficulty: str = "normal"       # "easy" | "normal" | "hard"
+    error_type: str = ""             # 错误类型 (grammar_omission, similar_char 等)
+    environment: str = ""            # 运行环境描述
     
     def to_dict(self) -> Dict:
-        """转换为字典"""
+        """
+        转换为符合 Data Protocol v1.0 的嵌套结构
+        
+        Returns:
+            符合 data_protocol_v1.json 规范的字典
+        """
+        # 计算 logits shape
+        logits_shape = list(self.agent_a_logits_shape)
+        if self.agent_a_logits is not None and len(self.agent_a_logits.shape) >= 2:
+            logits_shape = list(self.agent_a_logits.shape[-2:])
+        
+        # Router 决策
+        decision = "route_to_agent_b" if self.is_hard else "pass"
+        
+        # 难度评估
+        difficulty = self.difficulty
+        if not difficulty:
+            if self.visual_entropy > 4.0 or self.semantic_ppl > 150:
+                difficulty = "hard"
+            elif self.visual_entropy > 2.5 or self.semantic_ppl > 80:
+                difficulty = "normal"
+            else:
+                difficulty = "easy"
+        
         return {
-            "image_path": self.image_path,
+            # 顶层字段
+            "id": self.id,
+            "image": self.image_path,
+            "gt_text": self.gt_text,
+            
+            # Agent A 嵌套结构
             "agent_a": {
                 "text": self.agent_a_text,
-                "confidence": self.agent_a_confidence,
+                "confidence": round(self.agent_a_confidence, 4),
+                "suspicious_index": self.suspicious_index,  # 0-indexed
+                "suspicious_char": self.suspicious_char,
+                "raw_logits_shape": logits_shape,
             },
+            
+            # Router 嵌套结构
             "router": {
                 "is_hard": self.is_hard,
-                "suspicious_index": self.suspicious_index,
-                "suspicious_char": self.suspicious_char,
-                "risk_level": self.risk_level,
                 "visual_entropy": round(self.visual_entropy, 4),
-                "semantic_ppl": round(self.semantic_ppl, 4),
+                "semantic_ppl": round(self.semantic_ppl, 2),
+                "risk_level": self.risk_level,
+                "decision": decision,
             },
+            
+            # Agent B 嵌套结构
             "agent_b": {
                 "text": self.agent_b_text,
                 "is_corrected": self.agent_b_is_corrected,
+                "refinement_strategy": self.agent_b_refinement_strategy,
             },
-            "final_text": self.final_text,
-            "routed_to_agent_b": self.routed_to_agent_b,
+            
+            # Metadata 嵌套结构
+            "metadata": {
+                "source": self.source,
+                "difficulty": difficulty,
+                "error_type": self.error_type,
+                "gt_char_len": len(self.gt_text),
+                "processing_time_ms": self.processing_time_ms,
+                "environment": self.environment,
+            },
         }
+    
+    @classmethod
+    def from_dict(cls, data: Dict) -> 'PipelineResult':
+        """
+        从 Data Protocol v1.0 格式的字典构建 PipelineResult
+        
+        Args:
+            data: 符合 data_protocol_v1.json 规范的字典
+            
+        Returns:
+            PipelineResult 实例
+        """
+        agent_a = data.get('agent_a', {})
+        router = data.get('router', {})
+        agent_b = data.get('agent_b', {})
+        metadata = data.get('metadata', {})
+        
+        return cls(
+            # 顶层字段
+            id=data.get('id', ''),
+            image_path=data.get('image', ''),
+            gt_text=data.get('gt_text', ''),
+            
+            # Agent A
+            agent_a_text=agent_a.get('text', ''),
+            agent_a_confidence=agent_a.get('confidence', 0.0),
+            agent_a_logits_shape=tuple(agent_a.get('raw_logits_shape', [0, 0])),
+            suspicious_index=agent_a.get('suspicious_index', -1),
+            suspicious_char=agent_a.get('suspicious_char', ''),
+            
+            # Router
+            is_hard=router.get('is_hard', False),
+            visual_entropy=router.get('visual_entropy', 0.0),
+            semantic_ppl=router.get('semantic_ppl', 0.0),
+            risk_level=router.get('risk_level', 'low'),
+            router_decision=router.get('decision', 'pass'),
+            
+            # Agent B
+            agent_b_text=agent_b.get('text', ''),
+            agent_b_is_corrected=agent_b.get('is_corrected', False),
+            agent_b_refinement_strategy=agent_b.get('refinement_strategy', 'explicit_indexing_prompt'),
+            
+            # Metadata
+            source=metadata.get('source', ''),
+            difficulty=metadata.get('difficulty', 'normal'),
+            error_type=metadata.get('error_type', ''),
+            processing_time_ms=metadata.get('processing_time_ms', 0),
+            environment=metadata.get('environment', ''),
+            
+            # 计算字段
+            routed_to_agent_b=router.get('decision') == 'route_to_agent_b',
+            final_text=agent_b.get('text', '') if router.get('is_hard') else agent_a.get('text', ''),
+        )
 
 
 class L2W1Pipeline:
@@ -223,7 +344,11 @@ class L2W1Pipeline:
     def process(
         self,
         image: Union[str, np.ndarray],
-        image_path: str = ""
+        image_path: str = "",
+        sample_id: str = "",
+        gt_text: str = "",
+        source: str = "",
+        error_type: str = ""
     ) -> PipelineResult:
         """
         处理单张图像
@@ -231,14 +356,25 @@ class L2W1Pipeline:
         Args:
             image: 图像路径或 numpy 数组
             image_path: 图像路径（用于记录）
+            sample_id: 样本唯一 ID
+            gt_text: 真值文本 (Ground Truth)
+            source: 数据来源 (viscgec, scut 等)
+            error_type: 错误类型分类
             
         Returns:
-            PipelineResult: 处理结果
+            PipelineResult: 处理结果 (符合 Data Protocol v1.0)
         """
-        import time
-        start_time = time.time()
+        start_time = time_module.time()
         
-        result = PipelineResult(image_path=image_path or str(image))
+        # 初始化结果
+        result = PipelineResult(
+            id=sample_id or f"sample_{self.stats['total_processed']:06d}",
+            image_path=image_path or str(image),
+            gt_text=gt_text,
+            source=source,
+            error_type=error_type,
+            environment=self._get_environment_info(),
+        )
         
         # Step 1: Agent A 推理
         if self.config.verbose:
@@ -248,6 +384,10 @@ class L2W1Pipeline:
         result.agent_a_text = agent_a_output.get('text', '')
         result.agent_a_confidence = agent_a_output.get('confidence', 0.0)
         result.agent_a_logits = agent_a_output.get('logits', None)
+        
+        # 记录 logits 形状
+        if result.agent_a_logits is not None:
+            result.agent_a_logits_shape = result.agent_a_logits.shape[-2:] if len(result.agent_a_logits.shape) >= 2 else (0, 0)
         
         # Step 2: Router 决策
         if self.config.verbose:
@@ -261,7 +401,7 @@ class L2W1Pipeline:
             )
             
             result.is_hard = routing_result.is_hard
-            result.suspicious_index = routing_result.suspicious_index
+            result.suspicious_index = routing_result.suspicious_index  # 保持 0-indexed
             result.suspicious_char = routing_result.suspicious_char
             result.risk_level = routing_result.risk_level
             result.visual_entropy = routing_result.visual_entropy
@@ -269,6 +409,9 @@ class L2W1Pipeline:
         else:
             # 无 logits 时，使用置信度判断
             result.is_hard = result.agent_a_confidence < 0.8
+        
+        # 更新 router_decision
+        result.router_decision = "route_to_agent_b" if result.is_hard else "pass"
         
         # Step 3: 条件调用 Agent B
         if result.is_hard:
@@ -278,9 +421,10 @@ class L2W1Pipeline:
             result.routed_to_agent_b = True
             self.stats["routed_to_agent_b"] += 1
             
+            # 构建 manifest (使用 0-indexed)
             manifest = {
                 'ocr_text': result.agent_a_text,
-                'suspicious_index': result.suspicious_index,
+                'suspicious_index': result.suspicious_index,  # 0-indexed
                 'suspicious_char': result.suspicious_char,
                 'risk_level': result.risk_level,
             }
@@ -288,6 +432,7 @@ class L2W1Pipeline:
             agent_b_output = self.agent_b.process_hard_sample(image, manifest)
             result.agent_b_text = agent_b_output.get('corrected_text', '')
             result.agent_b_is_corrected = agent_b_output.get('is_corrected', False)
+            result.agent_b_refinement_strategy = agent_b_output.get('strategy', 'explicit_indexing_prompt')
             
             if result.agent_b_is_corrected:
                 self.stats["corrected_by_agent_b"] += 1
@@ -301,10 +446,30 @@ class L2W1Pipeline:
             # 最终文本采用 Agent A 输出
             result.final_text = result.agent_a_text
         
-        result.processing_time = time.time() - start_time
+        # 计算处理时间 (毫秒)
+        result.processing_time_ms = int((time_module.time() - start_time) * 1000)
         self.stats["total_processed"] += 1
         
         return result
+    
+    def _get_environment_info(self) -> str:
+        """获取运行环境信息"""
+        try:
+            import torch
+            if torch.cuda.is_available():
+                gpu_name = torch.cuda.get_device_name(0)
+                # 简化 GPU 名称
+                if "2080" in gpu_name:
+                    return "RTX2080Ti_4bit_quant" if self.config.agent_b_use_4bit else "RTX2080Ti"
+                elif "3090" in gpu_name:
+                    return "RTX3090_4bit_quant" if self.config.agent_b_use_4bit else "RTX3090"
+                elif "4090" in gpu_name:
+                    return "RTX4090_4bit_quant" if self.config.agent_b_use_4bit else "RTX4090"
+                else:
+                    return f"{gpu_name}_4bit_quant" if self.config.agent_b_use_4bit else gpu_name
+            return "CPU"
+        except:
+            return "unknown"
     
     def process_batch(
         self,
