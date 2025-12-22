@@ -75,27 +75,72 @@ except ImportError:
 
 @dataclass
 class DataSample:
-    """数据样本"""
-    id: str                     # 样本 ID
-    image_path: str             # 图像路径
-    ground_truth: str           # 真值文本
-    prediction: str = ""        # 预测文本
-    confidence: float = 0.0     # 置信度
+    """
+    数据样本
+    
+    符合 L2W1 Master Data Protocol v1.0
+    """
+    id: str                     # 样本唯一 ID
+    image_path: str             # 图像路径 (相对或绝对)
+    ground_truth: str           # 真值文本 (gt_text)
+    prediction: str = ""        # Agent A 预测文本
+    confidence: float = 0.0     # Agent A 置信度
     cer: float = 0.0            # 字符错误率
-    error_index: int = -1       # 第一个错误位置
+    error_index: int = -1       # 第一个错误位置 (0-indexed)
     error_char_pred: str = ""   # 预测的错误字符
     error_char_gt: str = ""     # 真值的错误字符
+    
+    # 扩展字段 (来自 Data Protocol v1.0)
+    source: str = ""            # 数据来源 (viscgec, scut, casia 等)
+    error_type: str = ""        # 错误类型 (grammar_omission, similar_char 等)
+    difficulty: str = "normal"  # 难度评估
 
 
 @dataclass
 class SFTConversation:
-    """SFT 对话格式"""
+    """
+    SFT 对话格式 (符合 Data Protocol v1.0)
+    
+    输出结构:
+    {
+        "id": str,
+        "image": str,
+        "gt_text": str,
+        "agent_a": { "text", "suspicious_index", "suspicious_char" },
+        "conversations": [{"from": "user", "value": ...}, {"from": "assistant", "value": ...}],
+        "metadata": { "source", "error_type", "difficulty" }
+    }
+    """
     id: str
     image: str
+    gt_text: str
     conversations: List[Dict[str, str]]
+    agent_a_text: str = ""
+    suspicious_index: int = -1  # 0-indexed
+    suspicious_char: str = ""
+    source: str = ""
+    error_type: str = ""
+    difficulty: str = "normal"
     
     def to_dict(self) -> Dict:
-        return asdict(self)
+        """转换为符合 Data Protocol v1.0 的嵌套结构"""
+        return {
+            "id": self.id,
+            "image": self.image,
+            "gt_text": self.gt_text,
+            "agent_a": {
+                "text": self.agent_a_text,
+                "suspicious_index": self.suspicious_index,  # 0-indexed
+                "suspicious_char": self.suspicious_char,
+            },
+            "conversations": self.conversations,
+            "metadata": {
+                "source": self.source,
+                "error_type": self.error_type,
+                "difficulty": self.difficulty,
+                "gt_char_len": len(self.gt_text),
+            }
+        }
 
 
 @dataclass
@@ -133,18 +178,22 @@ class HCTRDatasetLoader:
     HCTR 数据集加载器
     
     支持多种数据集格式:
+    - L2W1 Protocol: metadata.jsonl (每行包含 id, image, gt_text)  [推荐]
     - SCUT-HCCDoc: image_name.jpg + label.txt
     - CASIA: 类似格式
     - 通用格式: images/ + labels.txt (每行: image_name\ttext)
+    
+    Data Protocol v1.0 (metadata.jsonl) 格式:
+    {"id": "viscgec_001", "image": "images/train/001.png", "gt_text": "真值文本", "source": "viscgec"}
     """
     
-    SUPPORTED_FORMATS = ['scut', 'casia', 'generic', 'auto']
+    SUPPORTED_FORMATS = ['protocol', 'scut', 'casia', 'generic', 'auto']
     
     def __init__(self, data_dir: str, format: str = 'auto'):
         """
         Args:
             data_dir: 数据目录路径
-            format: 数据格式类型
+            format: 数据格式类型 ('protocol', 'scut', 'casia', 'generic', 'auto')
         """
         self.data_dir = Path(data_dir)
         self.format = format
@@ -154,6 +203,11 @@ class HCTRDatasetLoader:
     
     def _detect_format(self) -> str:
         """自动检测数据格式"""
+        # 优先检测 L2W1 Protocol 格式 (metadata.jsonl)
+        for jsonl_name in ['metadata.jsonl', 'data.jsonl', 'samples.jsonl']:
+            if (self.data_dir / jsonl_name).exists():
+                return 'protocol'
+        
         # 检查是否有 labels.txt
         if (self.data_dir / "labels.txt").exists():
             return 'generic'
@@ -183,12 +237,114 @@ class HCTRDatasetLoader:
         if self.format == 'auto':
             self.format = self._detect_format()
         
-        if self.format == 'scut':
+        if self.format == 'protocol':
+            yield from self._load_protocol_format()
+        elif self.format == 'scut':
             yield from self._load_scut_format()
         elif self.format == 'casia':
             yield from self._load_casia_format()
         else:
             yield from self._load_generic_format()
+    
+    def _load_protocol_format(self) -> Generator[DataSample, None, None]:
+        """
+        加载 L2W1 Data Protocol v1.0 格式 (metadata.jsonl)
+        
+        每行格式:
+        {"id": "viscgec_001", "image": "images/001.png", "gt_text": "真值文本", "source": "viscgec", "error_type": "..."}
+        
+        图像路径处理:
+        - 支持相对路径 (相对于 data_dir)
+        - 支持绝对路径
+        - 自动补全缺失的扩展名
+        """
+        # 查找 JSONL 文件
+        jsonl_file = None
+        for name in ['metadata.jsonl', 'data.jsonl', 'samples.jsonl']:
+            if (self.data_dir / name).exists():
+                jsonl_file = self.data_dir / name
+                break
+        
+        if jsonl_file is None:
+            print(f"[Warning] No JSONL file found in {self.data_dir}")
+            return
+        
+        print(f"[INFO] Loading from Protocol format: {jsonl_file}")
+        
+        with open(jsonl_file, 'r', encoding='utf-8') as f:
+            for line_num, line in enumerate(f, 1):
+                line = line.strip()
+                if not line:
+                    continue
+                
+                try:
+                    item = json.loads(line)
+                except json.JSONDecodeError as e:
+                    print(f"[Warning] Line {line_num}: Invalid JSON - {e}")
+                    continue
+                
+                # 解析字段
+                sample_id = item.get('id', f"sample_{line_num:06d}")
+                image_rel_path = item.get('image', '')
+                gt_text = item.get('gt_text', '')
+                source = item.get('source', '')
+                error_type = item.get('error_type', '')
+                difficulty = item.get('difficulty', 'normal')
+                
+                if not image_rel_path or not gt_text:
+                    print(f"[Warning] Line {line_num}: Missing 'image' or 'gt_text'")
+                    continue
+                
+                # 解析图像路径 (处理相对/绝对路径)
+                image_path = self._resolve_image_path(image_rel_path)
+                
+                if image_path is None:
+                    print(f"[Warning] Line {line_num}: Image not found - {image_rel_path}")
+                    continue
+                
+                yield DataSample(
+                    id=sample_id,
+                    image_path=str(image_path),
+                    ground_truth=gt_text,
+                    source=source,
+                    error_type=error_type,
+                    difficulty=difficulty,
+                )
+    
+    def _resolve_image_path(self, image_rel_path: str) -> Optional[Path]:
+        """
+        解析图像路径，支持多种格式
+        
+        Args:
+            image_rel_path: 相对路径或绝对路径
+            
+        Returns:
+            解析后的完整路径，如果不存在则返回 None
+        """
+        # 处理绝对路径
+        if Path(image_rel_path).is_absolute():
+            abs_path = Path(image_rel_path)
+            if abs_path.exists():
+                return abs_path
+            return None
+        
+        # 处理相对路径
+        candidates = [
+            self.data_dir / image_rel_path,
+            self.data_dir / "images" / image_rel_path,
+            self.data_dir / Path(image_rel_path).name,
+        ]
+        
+        # 尝试各种扩展名
+        extensions = ['', '.jpg', '.png', '.jpeg', '.bmp', '.JPG', '.PNG']
+        
+        for candidate in candidates:
+            for ext in extensions:
+                full_path = Path(str(candidate) + ext) if ext else candidate
+                if full_path.exists():
+                    return full_path
+        
+        return None
     
     def _load_generic_format(self) -> Generator[DataSample, None, None]:
         """
@@ -480,13 +636,13 @@ class SFTGenerator:
     
     def generate_conversation(self, sample: DataSample) -> SFTConversation:
         """
-        生成对话格式数据
+        生成对话格式数据 (符合 Data Protocol v1.0)
         
         Args:
             sample: 数据样本
             
         Returns:
-            SFTConversation 对象
+            SFTConversation 对象 (包含嵌套结构)
         """
         prompt = self.format_prompt(sample)
         
@@ -495,10 +651,28 @@ class SFTGenerator:
             {"from": "assistant", "value": sample.ground_truth}
         ]
         
+        # 确定错误类型
+        error_type = sample.error_type
+        if not error_type and sample.error_index >= 0:
+            # 根据错误特征自动推断类型
+            if sample.error_char_pred and sample.error_char_gt:
+                error_type = "similar_char"  # 形近字替换
+            elif sample.error_char_pred and not sample.error_char_gt:
+                error_type = "extra_char"    # 多余字符
+            elif not sample.error_char_pred and sample.error_char_gt:
+                error_type = "missing_char"  # 缺失字符
+        
         return SFTConversation(
             id=sample.id,
             image=sample.image_path,
-            conversations=conversations
+            gt_text=sample.ground_truth,
+            conversations=conversations,
+            agent_a_text=sample.prediction,
+            suspicious_index=sample.error_index,  # 0-indexed
+            suspicious_char=sample.error_char_pred,
+            source=sample.source,
+            error_type=error_type,
+            difficulty=sample.difficulty,
         )
     
     def write_sample(self, sample: DataSample):

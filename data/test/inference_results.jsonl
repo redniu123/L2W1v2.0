@@ -1,9 +1,0 @@
-{"image_path": "./images/001.jpg", "agent_a_text": "在时间的未尾", "final_text": "在时间的末尾", "gt_text": "在时间的末尾", "is_hard": true}
-{"image_path": "./images/002.jpg", "agent_a_text": "中国科学院", "final_text": "中国科学院", "gt_text": "中国科学院", "is_hard": false}
-{"image_path": "./images/003.jpg", "agent_a_text": "深度学习", "final_text": "身度学习", "gt_text": "深度学习", "is_hard": true}
-{"image_path": "./images/004.jpg", "agent_a_text": "计算机视觉", "final_text": "计算机视觉", "gt_text": "计算机视觉", "is_hard": false}
-{"image_path": "./images/005.jpg", "agent_a_text": "自然语言处埋", "final_text": "自然语言处理", "gt_text": "自然语言处理", "is_hard": true}
-{"image_path": "./images/006.jpg", "agent_a_text": "人工智能技术", "final_text": "人工智能技术", "gt_text": "人工智能技术", "is_hard": false}
-{"image_path": "./images/007.jpg", "agent_a_text": "神经网絡优化", "final_text": "神经网络优化", "gt_text": "神经网络优化", "is_hard": true}
-{"image_path": "./images/008.jpg", "agent_a_text": "机器翻译系统", "final_text": "机器翻译系统", "gt_text": "机器翻译系统", "is_hard": false}
-

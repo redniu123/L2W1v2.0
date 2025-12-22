@@ -446,6 +446,7 @@ class EvaluationResult:
     评估结果 (Evaluation Report)
     
     包含三维指标体系：精度-忠实度-效率
+    支持按 error_type 聚合统计 (Data Protocol v1.0)
     """
     # ========== 精度指标 ==========
     cer: float = 0.0               # 系统最终 CER
@@ -474,9 +475,16 @@ class EvaluationResult:
     overcorrected_samples: int = 0
     corrected_samples: int = 0     # 成功纠错的样本数
     
+    # ========== Error Type 聚合 (Data Protocol v1.0) ==========
+    error_type_stats: Dict = None  # 按错误类型聚合的统计
+    
+    def __post_init__(self):
+        if self.error_type_stats is None:
+            self.error_type_stats = {}
+    
     def to_dict(self) -> Dict:
         """转换为字典（用于 JSON 输出）"""
-        return {
+        result = {
             # 核心指标
             "overall_cer": round(self.cer, 4),
             "agent_a_cer": round(self.agent_a_cer, 4),
@@ -506,11 +514,17 @@ class EvaluationResult:
                 "corrected": self.corrected_samples,
             }
         }
+        
+        # 添加 error_type 聚合统计 (如果有)
+        if self.error_type_stats:
+            result["error_type_breakdown"] = self.error_type_stats
+        
+        return result
     
     def print_summary(self):
         """打印评估摘要表"""
         print("\n" + "=" * 65)
-        print("  L2W1 Evaluation Report")
+        print("  L2W1 Evaluation Report (Data Protocol v1.0)")
         print("=" * 65)
         
         print("\n+-------------------------------------------------------------+")
@@ -548,6 +562,22 @@ class EvaluationResult:
             print(f"|  Insertions (I):     {self.total_insertions:>6}                                   |")
             print("+-------------------------------------------------------------+")
         
+        # Error Type Breakdown (Data Protocol v1.0)
+        if self.error_type_stats:
+            print("\n+-------------------------------------------------------------+")
+            print("|  Error Type Breakdown                                       |")
+            print("+-------------------------------------------------------------+")
+            print("|  Type                 Count   CER     OCR-R   Corr.Rate     |")
+            print("|  -----------------------------------------------------------+")
+            for error_type, stats in sorted(self.error_type_stats.items()):
+                type_str = error_type[:18].ljust(18)
+                count = stats.get('count', 0)
+                cer = stats.get('cer', 0)
+                ocr_r = stats.get('ocr_r', 0)
+                corr = stats.get('correction_rate', 0)
+                print(f"|  {type_str}  {count:>5}   {cer:.3f}   {ocr_r:.3f}   {corr:.3f}         |")
+            print("+-------------------------------------------------------------+")
+        
         print("\n" + "=" * 65)
 
 
@@ -556,6 +586,7 @@ def evaluate_batch(
     references: List[str],
     agent_a_texts: List[str] = None,
     is_hard_samples: List[bool] = None,
+    metadata_list: List[Dict] = None,
     verbose: bool = False
 ) -> EvaluationResult:
     """
@@ -671,7 +702,96 @@ def evaluate_batch(
         if actual_hard_samples > 0:
             result.hard_sample_recall = router_detected_hard / actual_hard_samples
     
+    # ========== Error Type 聚合 (Data Protocol v1.0) ==========
+    if metadata_list:
+        error_type_stats = aggregate_by_error_type(
+            predictions=predictions,
+            references=references,
+            agent_a_texts=agent_a_texts,
+            metadata_list=metadata_list
+        )
+        result.error_type_stats = error_type_stats
+    
     return result
+
+
+def aggregate_by_error_type(
+    predictions: List[str],
+    references: List[str],
+    agent_a_texts: List[str],
+    metadata_list: List[Dict]
+) -> Dict:
+    """
+    按 error_type 聚合统计指标
+    
+    Args:
+        predictions: 系统预测列表
+        references: 真值列表
+        agent_a_texts: Agent A 识别结果列表
+        metadata_list: 包含 error_type 的元数据列表
+        
+    Returns:
+        Dict: 按 error_type 分组的统计信息
+        {
+            "similar_char": {"count": 10, "cer": 0.05, "ocr_r": 0.02, "correction_rate": 0.8},
+            "grammar_omission": {"count": 5, "cer": 0.08, ...},
+            ...
+        }
+    """
+    # 按 error_type 分组
+    grouped = defaultdict(lambda: {
+        'predictions': [],
+        'references': [],
+        'agent_a_texts': []
+    })
+    
+    for i, meta in enumerate(metadata_list):
+        error_type = meta.get('error_type', 'unknown') or 'unknown'
+        
+        if i < len(predictions):
+            grouped[error_type]['predictions'].append(predictions[i])
+        if i < len(references):
+            grouped[error_type]['references'].append(references[i])
+        if agent_a_texts and i < len(agent_a_texts):
+            grouped[error_type]['agent_a_texts'].append(agent_a_texts[i])
+    
+    # 计算每个 error_type 的指标
+    stats = {}
+    
+    for error_type, data in grouped.items():
+        preds = data['predictions']
+        refs = data['references']
+        a_texts = data['agent_a_texts']
+        
+        if not refs:
+            continue
+        
+        count = len(refs)
+        
+        # 计算 CER
+        cers = [calculate_cer(p, r) for p, r in zip(preds, refs)]
+        avg_cer = sum(cers) / len(cers) if cers else 0.0
+        
+        # 计算 OCR-R 和 Correction Rate
+        ocr_rs = []
+        corr_rates = []
+        
+        if a_texts:
+            for pred, ref, a_text in zip(preds, refs, a_texts):
+                ocr_r, _ = calculate_ocr_r(a_text, pred, ref)
+                corr_rate, _ = calculate_correction_rate(a_text, pred, ref)
+                ocr_rs.append(ocr_r)
+                corr_rates.append(corr_rate)
+        
+        stats[error_type] = {
+            "count": count,
+            "cer": round(avg_cer, 4),
+            "ocr_r": round(sum(ocr_rs) / len(ocr_rs), 4) if ocr_rs else 0.0,
+            "correction_rate": round(sum(corr_rates) / len(corr_rates), 4) if corr_rates else 0.0,
+            "exact_match": sum(1 for p, r in zip(preds, refs) if p == r),
+        }
+    
+    return stats
 
 
 # =============================================================================
@@ -680,34 +800,44 @@ def evaluate_batch(
 
 @dataclass
 class InferenceRecord:
-    """推理记录"""
+    """
+    推理记录 (符合 Data Protocol v1.0)
+    """
+    id: str = ""
     image_path: str = ""
     agent_a_text: str = ""
+    agent_b_text: str = ""
     final_text: str = ""
     gt_text: str = ""
     is_hard: bool = False
-    router_confidence: float = 0.0
+    router_decision: str = "pass"
+    suspicious_index: int = -1  # 0-indexed
+    error_type: str = ""
+    source: str = ""
+    difficulty: str = "normal"
 
 
-def load_predictions(file_path: str) -> Tuple[List[str], List[str], List[str], List[bool]]:
+def load_predictions(file_path: str) -> Tuple[List[str], List[str], List[str], List[bool], List[Dict]]:
     """
-    加载推理结果文件
+    加载推理结果文件 (支持 Data Protocol v1.0 嵌套格式)
     
-    支持格式 (按照 module5_evaluate_spec.md 规范):
-    - JSONL: 每行一个 JSON，包含:
-        - image_path: 图像路径
-        - agent_a_text: Agent A 的原始输出
-        - final_text: 系统最终输出（经过路由纠错后）
-        - gt_text: 标注真值
-        - is_hard: (可选) Router 标记是否为困难样本
+    支持格式:
+    1. Data Protocol v1.0 (嵌套格式):
+       {
+         "id": str,
+         "image": str,
+         "gt_text": str,
+         "agent_a": {"text": str, ...},
+         "router": {"is_hard": bool, ...},
+         "agent_b": {"text": str, ...},
+         "metadata": {"error_type": str, ...}
+       }
     
-    也支持旧格式兼容:
-    - prediction/pred -> final_text
-    - reference/gt/ground_truth -> gt_text
-    - agent_a/agent_a_text -> agent_a_text
+    2. 扁平格式 (兼容旧版):
+       {"agent_a_text": str, "final_text": str, "gt_text": str, ...}
     
     Returns:
-        (final_texts, gt_texts, agent_a_texts, is_hard_samples)
+        (final_texts, gt_texts, agent_a_texts, is_hard_samples, metadata_list)
     """
     path = Path(file_path)
     
@@ -718,72 +848,119 @@ def load_predictions(file_path: str) -> Tuple[List[str], List[str], List[str], L
     gt_texts = []
     agent_a_texts = []
     is_hard_samples = []
+    metadata_list = []  # 新增: 存储 metadata 用于 error_type 聚合
     
     with open(path, 'r', encoding='utf-8') as f:
         content = f.read().strip()
     
+    def parse_item(item: Dict) -> InferenceRecord:
+        """解析单条记录 (支持嵌套和扁平格式)"""
+        record = InferenceRecord()
+        
+        # 检测是否为嵌套格式 (Data Protocol v1.0)
+        if 'agent_a' in item and isinstance(item['agent_a'], dict):
+            # === 嵌套格式 ===
+            record.id = item.get('id', '')
+            record.image_path = item.get('image', '')
+            record.gt_text = item.get('gt_text', '')
+            
+            # Agent A
+            agent_a = item.get('agent_a', {})
+            record.agent_a_text = agent_a.get('text', '')
+            record.suspicious_index = agent_a.get('suspicious_index', -1)
+            
+            # Router
+            router = item.get('router', {})
+            record.is_hard = router.get('is_hard', False)
+            record.router_decision = router.get('decision', 'pass')
+            
+            # Agent B
+            agent_b = item.get('agent_b', {})
+            record.agent_b_text = agent_b.get('text', '')
+            
+            # Final text: 优先使用 agent_b.text (如果 is_hard)，否则使用 agent_a.text
+            if record.is_hard and record.agent_b_text:
+                record.final_text = record.agent_b_text
+            else:
+                record.final_text = record.agent_a_text
+            
+            # Metadata
+            metadata = item.get('metadata', {})
+            record.error_type = metadata.get('error_type', '')
+            record.source = metadata.get('source', '')
+            record.difficulty = metadata.get('difficulty', 'normal')
+        else:
+            # === 扁平格式 (兼容旧版) ===
+            record.id = item.get('id', '')
+            record.image_path = item.get('image_path', item.get('image', ''))
+            
+            # Final text
+            record.final_text = item.get('final_text', 
+                                item.get('prediction', 
+                                item.get('pred', '')))
+            
+            # GT text
+            record.gt_text = item.get('gt_text',
+                             item.get('reference',
+                             item.get('gt',
+                             item.get('ground_truth', ''))))
+            
+            # Agent A text
+            record.agent_a_text = item.get('agent_a_text',
+                                  item.get('agent_a', ''))
+            
+            # Router
+            record.is_hard = item.get('is_hard', False)
+            
+            # Metadata
+            record.error_type = item.get('error_type', '')
+            record.source = item.get('source', '')
+        
+        return record
+    
+    # 解析内容
+    items = []
+    
     # 尝试 JSON 数组格式
     if content.startswith('['):
-        data = json.loads(content)
-        for item in data:
-            # 规范字段 (module5_evaluate_spec.md)
-            final_text = item.get('final_text', 
-                         item.get('prediction', 
-                         item.get('pred', '')))
-            gt_text = item.get('gt_text',
-                      item.get('reference',
-                      item.get('gt',
-                      item.get('ground_truth', ''))))
-            agent_a = item.get('agent_a_text',
-                      item.get('agent_a', ''))
-            is_hard = item.get('is_hard', False)
-            
-            final_texts.append(final_text)
-            gt_texts.append(gt_text)
-            if agent_a:
-                agent_a_texts.append(agent_a)
-            is_hard_samples.append(is_hard)
-    
+        items = json.loads(content)
     # 尝试 JSONL 格式
     elif content.startswith('{'):
         for line in content.split('\n'):
             line = line.strip()
             if not line:
                 continue
-            
             try:
-                item = json.loads(line)
-                
-                # 规范字段
-                final_text = item.get('final_text', 
-                             item.get('prediction', 
-                             item.get('pred', '')))
-                gt_text = item.get('gt_text',
-                          item.get('reference',
-                          item.get('gt',
-                          item.get('ground_truth', ''))))
-                agent_a = item.get('agent_a_text',
-                          item.get('agent_a', ''))
-                is_hard = item.get('is_hard', False)
-                
-                final_texts.append(final_text)
-                gt_texts.append(gt_text)
-                if agent_a:
-                    agent_a_texts.append(agent_a)
-                is_hard_samples.append(is_hard)
-                
+                items.append(json.loads(line))
             except json.JSONDecodeError as e:
                 print(f"警告: 跳过无效 JSON 行: {e}")
-    
     # TXT 格式 (仅预测)
     else:
         final_texts = [line for line in content.split('\n') if line.strip()]
+        return (final_texts, None, None, None, None)
+    
+    # 解析所有记录
+    for item in items:
+        record = parse_item(item)
+        
+        final_texts.append(record.final_text)
+        gt_texts.append(record.gt_text)
+        agent_a_texts.append(record.agent_a_text)
+        is_hard_samples.append(record.is_hard)
+        metadata_list.append({
+            'id': record.id,
+            'error_type': record.error_type,
+            'source': record.source,
+            'difficulty': record.difficulty,
+            'suspicious_index': record.suspicious_index,
+        })
     
     return (
         final_texts, 
-        gt_texts if gt_texts else None, 
-        agent_a_texts if agent_a_texts else None,
-        is_hard_samples if any(is_hard_samples) else None
+        gt_texts if any(gt_texts) else None, 
+        agent_a_texts if any(agent_a_texts) else None,
+        is_hard_samples if any(is_hard_samples) else None,
+        metadata_list if any(m.get('error_type') for m in metadata_list) else None
     )
 
 
@@ -1023,7 +1200,7 @@ def main():
     
     # 加载数据
     try:
-        final_texts, gt_texts, agent_a_texts, is_hard_samples = load_predictions(args.predictions)
+        final_texts, gt_texts, agent_a_texts, is_hard_samples, metadata_list = load_predictions(args.predictions)
     except Exception as e:
         print(f"加载文件失败: {e}")
         import traceback
@@ -1052,6 +1229,7 @@ def main():
         references=gt_texts,
         agent_a_texts=agent_a_texts,
         is_hard_samples=is_hard_samples,
+        metadata_list=metadata_list,
         verbose=args.verbose
     )
     
