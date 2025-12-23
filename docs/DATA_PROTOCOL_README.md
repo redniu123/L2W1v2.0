@@ -37,6 +37,34 @@ data/raw/[dataset_name]/
 {"id": "viscgec_train_002", "image": "images/train/002.png", "gt_text": "另一行文本", "source": "viscgec"}
 ```
 
+### JSONL 中图像路径的两种写法
+
+**方式 A: 相对于 data_dir 的路径 (推荐)**
+
+```jsonl
+{"id": "001", "image": "images/train/001.png", "gt_text": "文本"}
+```
+
+运行时：
+```bash
+python scripts/data_pipeline.py --data_dir ./data/raw/viscgec --split train
+```
+系统会解析为：`./data/raw/viscgec/images/train/001.png`
+
+**方式 B: 相对于项目根目录的完整路径**
+
+```jsonl
+{"id": "001", "image": "data/raw/viscgec/images/train/001.png", "gt_text": "文本"}
+```
+
+运行时：
+```bash
+python scripts/data_pipeline.py --data_dir ./data/raw/viscgec --split train
+```
+系统会智能检测路径已包含 `data/raw/viscgec`，直接使用完整路径。
+
+> ⚠️ **注意**: 系统已实现智能路径解析，会自动避免重复拼接路径。
+
 ### 加载示例
 
 ```bash

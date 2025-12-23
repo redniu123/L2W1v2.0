@@ -131,6 +131,7 @@ class AgentBSFTDataset(Dataset):
         max_pixels: int = None,
         is_training: bool = True,
         seed: int = 42,
+        data_dir: str = None,
     ):
         """
         Args:
@@ -142,11 +143,13 @@ class AgentBSFTDataset(Dataset):
             max_pixels: 最大像素数（动态分辨率）
             is_training: 是否为训练模式
             seed: 随机种子
+            data_dir: 数据根目录 (用于解析相对路径)
         """
         if not TORCH_AVAILABLE:
             raise ImportError("PyTorch is required for AgentBSFTDataset")
         
         self.data_path = Path(data_path)
+        self.data_dir = Path(data_dir) if data_dir else self.data_path.parent
         self.processor = processor
         self.max_seq_length = max_seq_length
         self.negative_sample_ratio = negative_sample_ratio
@@ -158,6 +161,9 @@ class AgentBSFTDataset(Dataset):
         
         # 设置随机种子
         random.seed(seed)
+        
+        # 路径解析调试计数器
+        self._path_debug_count = 0
         
         # 加载数据
         self.samples = self._load_data()
@@ -171,6 +177,7 @@ class AgentBSFTDataset(Dataset):
         logger.info(f"  - 原始样本: {self.original_size}")
         logger.info(f"  - 负样本: {len(self.samples) - self.original_size}")
         logger.info(f"  - 总样本: {len(self.samples)}")
+        logger.info(f"  - 数据目录: {self.data_dir}")
         logger.info(f"  - 动态分辨率: min={self.min_pixels:,}, max={self.max_pixels:,}")
     
     def _load_data(self) -> List[Dict]:
@@ -310,17 +317,95 @@ class AgentBSFTDataset(Dataset):
         sample = self.samples[idx]
         return self._process_sample(sample)
     
+    def _resolve_image_path(self, image_path: str) -> Optional[Path]:
+        """
+        智能解析图像路径，避免重复拼接
+        
+        解析顺序:
+        1. 直接路径 (相对于 CWD)
+        2. 相对于 data_dir
+        3. 相对于 data_path (JSONL文件) 所在目录
+        4. 仅文件名搜索
+        
+        Args:
+            image_path: 原始图像路径
+            
+        Returns:
+            解析后的完整路径，如果不存在则返回 None
+        """
+        # 标准化路径分隔符
+        image_path = os.path.normpath(image_path)
+        
+        # 绝对路径直接返回
+        if Path(image_path).is_absolute():
+            return Path(image_path) if Path(image_path).exists() else None
+        
+        # 构建候选路径列表
+        candidates = []
+        
+        # 优先级 1: 直接相对于 CWD
+        candidates.append(Path(image_path))
+        
+        # 优先级 2: 避免重复拼接
+        # 检查 image_path 是否已包含 data_dir 的路径段
+        data_dir_str = str(self.data_dir).replace('\\', '/').strip('./')
+        image_path_str = image_path.replace('\\', '/').strip('./')
+        
+        if not image_path_str.startswith(data_dir_str):
+            # 路径不包含 data_dir，尝试拼接
+            candidates.append(self.data_dir / image_path)
+        
+        # 优先级 3: 相对于 JSONL 文件所在目录
+        candidates.append(self.data_path.parent / image_path)
+        
+        # 优先级 4: 仅文件名搜索
+        filename_only = Path(image_path).name
+        candidates.extend([
+            self.data_dir / filename_only,
+            self.data_dir / "images" / filename_only,
+            self.data_path.parent / filename_only,
+        ])
+        
+        # 去重
+        seen = set()
+        unique_candidates = []
+        for c in candidates:
+            c_str = os.path.normpath(str(c))
+            if c_str not in seen:
+                seen.add(c_str)
+                unique_candidates.append(Path(c_str))
+        
+        # 尝试各种扩展名
+        extensions = ['', '.jpg', '.png', '.jpeg', '.bmp', '.JPG', '.PNG']
+        
+        for candidate in unique_candidates:
+            for ext in extensions:
+                full_path = Path(str(candidate) + ext) if ext else candidate
+                if full_path.exists():
+                    return full_path
+        
+        # 调试日志 (仅打印前5个失败)
+        if self._path_debug_count < 5:
+            logger.warning(f"[路径解析失败] 原始: {image_path}")
+            logger.warning(f"  尝试过: {[str(c) for c in unique_candidates[:3]]}")
+            self._path_debug_count += 1
+        
+        return None
+    
     def _load_image(self, image_path: str) -> "Image.Image":
-        """加载图像"""
+        """加载图像 (使用智能路径解析)"""
         if not PIL_AVAILABLE:
             raise ImportError("PIL is required for image loading")
         
-        try:
-            if os.path.exists(image_path):
-                image = Image.open(image_path).convert('RGB')
+        # 使用智能路径解析
+        resolved_path = self._resolve_image_path(image_path)
+        
+        if resolved_path and resolved_path.exists():
+            try:
+                image = Image.open(resolved_path).convert('RGB')
                 return image
-        except Exception as e:
-            logger.debug(f"图像加载失败: {image_path}, {e}")
+            except Exception as e:
+                logger.debug(f"图像加载失败: {resolved_path}, {e}")
         
         # 返回占位图像
         return Image.new('RGB', (320, 48), color=(255, 255, 255))
