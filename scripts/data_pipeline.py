@@ -452,11 +452,11 @@ class HCTRDatasetLoader:
         """
         解析图像路径，支持多种格式
         
-        解析顺序:
+        解析顺序 (智能路径解析，避免重复拼接):
         1. 绝对路径
-        2. 相对于 data_dir
-        3. 相对于 jsonl 文件所在目录
-        4. 相对于 data_dir/images/
+        2. 直接相对于项目根目录 (CWD) - 处理 JSONL 中已包含完整相对路径的情况
+        3. 相对于 data_dir
+        4. 相对于 jsonl 文件所在目录
         5. 仅文件名 (在常见位置搜索)
         
         Args:
@@ -469,32 +469,102 @@ class HCTRDatasetLoader:
         if jsonl_dir is None:
             jsonl_dir = self.data_dir
         
+        # 标准化路径分隔符 (跨平台兼容)
+        image_rel_path = os.path.normpath(image_rel_path)
+        
         # 处理绝对路径
         if Path(image_rel_path).is_absolute():
             abs_path = Path(image_rel_path)
             if abs_path.exists():
                 return abs_path
+            self._log_path_attempt(image_rel_path, [abs_path], "绝对路径不存在")
             return None
         
-        # 构建候选路径列表
-        candidates = [
-            self.data_dir / image_rel_path,              # 相对于 data_dir
-            jsonl_dir / image_rel_path,                  # 相对于 JSONL 目录
-            self.data_dir / "images" / image_rel_path,   # 相对于 images/
-            self.data_dir / Path(image_rel_path).name,   # 仅文件名
-            jsonl_dir / Path(image_rel_path).name,       # 仅文件名 (JSONL 目录)
-        ]
+        # ========== 智能路径解析 ==========
+        # 核心思路: 先尝试直接路径，再尝试拼接路径
+        
+        candidates = []
+        
+        # 优先级 1: 直接相对于 CWD (项目根目录)
+        # 处理 JSONL 中 image 字段已包含完整路径的情况
+        # 例如: "data/raw/viscgec/images/train/001.png"
+        direct_path = Path(image_rel_path)
+        candidates.append(direct_path)
+        
+        # 优先级 2: 检测并避免路径重复拼接
+        # 如果 image_rel_path 已包含 data_dir 的部分路径，则智能提取
+        data_dir_str = str(self.data_dir).replace('\\', '/').strip('./')
+        image_path_str = image_rel_path.replace('\\', '/').strip('./')
+        
+        if image_path_str.startswith(data_dir_str):
+            # 路径已包含 data_dir，直接使用
+            candidates.append(Path(image_rel_path))
+        else:
+            # 路径不包含 data_dir，尝试拼接
+            candidates.append(self.data_dir / image_rel_path)
+        
+        # 优先级 3: 相对于 JSONL 文件所在目录
+        candidates.append(jsonl_dir / image_rel_path)
+        
+        # 优先级 4: 相对于 data_dir/images/
+        candidates.append(self.data_dir / "images" / image_rel_path)
+        
+        # 优先级 5: 仅使用文件名，在常见位置搜索
+        filename_only = Path(image_rel_path).name
+        candidates.extend([
+            self.data_dir / filename_only,
+            self.data_dir / "images" / filename_only,
+            jsonl_dir / filename_only,
+        ])
+        
+        # 去重并保持顺序
+        seen = set()
+        unique_candidates = []
+        for c in candidates:
+            c_normalized = os.path.normpath(str(c))
+            if c_normalized not in seen:
+                seen.add(c_normalized)
+                unique_candidates.append(Path(c_normalized))
         
         # 尝试各种扩展名
         extensions = ['', '.jpg', '.png', '.jpeg', '.bmp', '.JPG', '.PNG', '.JPEG']
         
-        for candidate in candidates:
+        for candidate in unique_candidates:
             for ext in extensions:
                 full_path = Path(str(candidate) + ext) if ext else candidate
                 if full_path.exists():
                     return full_path
         
+        # 失败时记录详细调试信息
+        self._log_path_attempt(image_rel_path, unique_candidates, "所有候选路径均不存在")
         return None
+    
+    def _log_path_attempt(self, original_path: str, candidates: list, reason: str):
+        """
+        记录路径解析失败的调试信息
+        
+        仅在 strict_validation=True 且首次失败时打印详细日志
+        """
+        if not self.strict_validation:
+            return
+        
+        # 限制日志输出，避免刷屏
+        if not hasattr(self, '_path_log_count'):
+            self._path_log_count = 0
+        
+        if self._path_log_count < 5:
+            print(f"\n[DEBUG] 路径解析失败详情:")
+            print(f"  原始路径: {original_path}")
+            print(f"  data_dir: {self.data_dir.absolute()}")
+            print(f"  尝试过的路径:")
+            for i, c in enumerate(candidates[:5], 1):
+                abs_c = Path(c).absolute()
+                print(f"    {i}. {abs_c}")
+            print(f"  失败原因: {reason}")
+            self._path_log_count += 1
+            
+            if self._path_log_count == 5:
+                print("  [后续相同错误将被静默，避免刷屏]")
     
     def _print_stats(self):
         """打印加载统计信息"""
