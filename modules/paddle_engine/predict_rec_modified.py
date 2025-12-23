@@ -33,10 +33,11 @@ from PIL import Image
 from copy import deepcopy
 
 __dir__ = os.path.dirname(os.path.abspath(__file__))
-# 添加 PaddleOCR 根目录到路径
-PADDLEOCR_ROOT = os.path.abspath(os.path.join(__dir__, "../../.."))
-sys.path.insert(0, PADDLEOCR_ROOT)
-sys.path.insert(0, os.path.join(PADDLEOCR_ROOT, "tools/infer"))
+
+# ========== L2W1 关键修改: 使用本地精简版模块 ==========
+# 添加 L2W1 项目根目录到路径，导入本地 tools 和 ppocr 模块
+L2W1_ROOT = os.path.abspath(os.path.join(__dir__, "../.."))
+sys.path.insert(0, L2W1_ROOT)
 
 os.environ["FLAGS_allocator_strategy"] = "auto_growth"
 
@@ -47,6 +48,7 @@ import time
 import traceback
 import paddle
 
+# 从 L2W1 本地模块导入 (不再依赖外部 PaddleOCR 代码库)
 import tools.infer.utility as utility
 from ppocr.postprocess import build_post_process
 from ppocr.utils.logging import get_logger
