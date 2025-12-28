@@ -249,33 +249,53 @@ class BaselineInference:
             Tuple[pred_text, char_confidences, avg_confidence]
         """
         try:
-            # 读取图像
-            img = cv2.imread(str(image_path))
-            if img is None:
+            # 新版 PaddleOCR 直接传入图片路径
+            result = self.ocr.ocr(str(image_path))
+
+            # 调试：打印第一个样本的结果结构
+            if not hasattr(self, "_debug_printed"):
+                self._debug_printed = True
+                print(f"\n[DEBUG] OCR 返回结果类型: {type(result)}")
+                print(
+                    f"[DEBUG] OCR 返回结果内容: {result[:2] if isinstance(result, list) and len(result) > 2 else result}"
+                )
+                print()
+
+            if result is None or len(result) == 0:
                 return "", [], 0.0
 
-            # 运行 OCR
-            result = self.ocr.ocr(img, det=self.use_det, cls=True)
+            # 新版 PaddleOCR 返回格式可能变化，需要适配多种格式
+            # 格式1: [[ [[box], (text, conf)], ... ]]  (旧版)
+            # 格式2: [ {text:..., confidence:..., text_box:...}, ... ]  (新版)
+            # 格式3: {'rec_text': ..., 'rec_score': ...}  (纯识别模式)
 
-            if result is None or len(result) == 0 or result[0] is None:
+            # 检测格式
+            if isinstance(result, dict):
+                # 纯识别模式返回单个字典
+                text = result.get("rec_text", result.get("text", ""))
+                conf = float(
+                    result.get(
+                        "rec_score", result.get("confidence", result.get("score", 0.0))
+                    )
+                )
+                if text:
+                    char_confs = [{"char": c, "score": round(conf, 4)} for c in text]
+                    return text, char_confs, conf
                 return "", [], 0.0
 
-            # 解析结果
-            # PaddleOCR 返回格式: [[[box], (text, confidence)], ...]
-            lines = result[0]
+            # 列表格式
+            lines = (
+                result[0]
+                if (
+                    isinstance(result, list)
+                    and len(result) > 0
+                    and isinstance(result[0], list)
+                )
+                else result
+            )
 
             if not lines:
                 return "", [], 0.0
-
-            # 按纵坐标排序（从上到下）
-            def get_y_coord(item):
-                if isinstance(item, list) and len(item) >= 2:
-                    box = item[0]  # [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
-                    if box and len(box) >= 1:
-                        return box[0][1] if isinstance(box[0], list) else 0
-                return 0
-
-            sorted_lines = sorted(lines, key=get_y_coord)
 
             # 提取文本和置信度
             all_text = ""
@@ -283,16 +303,48 @@ class BaselineInference:
             total_conf = 0.0
             char_count = 0
 
+            # 按纵坐标排序（从上到下）
+            def get_y_coord(item):
+                try:
+                    if isinstance(item, dict):
+                        # 新版格式: {'text': ..., 'confidence': ..., 'text_box': ...}
+                        box = item.get("text_box", item.get("box", []))
+                        if box and len(box) >= 1:
+                            return box[0][1] if isinstance(box[0], (list, tuple)) else 0
+                    elif isinstance(item, (list, tuple)) and len(item) >= 2:
+                        # 旧版格式: [[box], (text, confidence)]
+                        box = item[0]
+                        if box and len(box) >= 1:
+                            return box[0][1] if isinstance(box[0], (list, tuple)) else 0
+                except Exception:
+                    pass
+                return 0
+
+            sorted_lines = sorted(lines, key=get_y_coord)
+
             for line in sorted_lines:
-                if not isinstance(line, list) or len(line) < 2:
-                    continue
+                text = ""
+                conf = 0.0
 
-                text_info = line[1]  # (text, confidence)
-                if not isinstance(text_info, (list, tuple)) or len(text_info) < 2:
-                    continue
-
-                text = text_info[0]
-                conf = float(text_info[1])
+                # 适配新版格式（字典）
+                if isinstance(line, dict):
+                    text = line.get("text", line.get("rec_text", ""))
+                    conf = float(
+                        line.get(
+                            "confidence", line.get("rec_score", line.get("score", 0.0))
+                        )
+                    )
+                # 适配旧版格式（列表）
+                elif isinstance(line, (list, tuple)) and len(line) >= 2:
+                    text_info = line[1]
+                    if isinstance(text_info, dict):
+                        text = text_info.get("text", "")
+                        conf = float(
+                            text_info.get("confidence", text_info.get("score", 0.0))
+                        )
+                    elif isinstance(text_info, (list, tuple)) and len(text_info) >= 2:
+                        text = text_info[0]
+                        conf = float(text_info[1])
 
                 if text:
                     all_text += text
