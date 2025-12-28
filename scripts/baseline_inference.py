@@ -249,10 +249,47 @@ class BaselineInference:
             Tuple[pred_text, char_confidences, avg_confidence]
         """
         try:
-            # 使用新版 API: predict() 代替已废弃的 ocr()
-            result = self.ocr.predict(str(image_path))
+            # ================================================================
+            # 策略 A: 图像加垫 (Padding) - 解决边缘漏读问题
+            # ================================================================
+            img = cv2.imread(str(image_path))
+            if img is None:
+                print(f"[WARNING] 无法读取图像: {image_path}")
+                return "", [], 0.0
 
-            # 调试：打印第一个样本的结果结构（仅一次）
+            original_h, original_w = img.shape[:2]
+
+            # 添加 50 像素白色填充 (上下左右)
+            padding = 50
+            img_padded = cv2.copyMakeBorder(
+                img,
+                top=padding,
+                bottom=padding,
+                left=padding,
+                right=padding,
+                borderType=cv2.BORDER_CONSTANT,
+                value=(255, 255, 255),  # 白色填充
+            )
+
+            padded_h, padded_w = img_padded.shape[:2]
+
+            # 调试：打印前 5 个样本的尺寸信息
+            if not hasattr(self, "_debug_count"):
+                self._debug_count = 0
+
+            if self._debug_count < 5:
+                self._debug_count += 1
+                print(f"\n[DEBUG #{self._debug_count}] 图像: {image_path.name}")
+                print(f"  原始尺寸: {original_w}x{original_h}")
+                print(f"  填充后尺寸: {padded_w}x{padded_h}")
+                print(f"  检测模式: {'启用' if self.use_det else '禁用 (直接识别)'}")
+
+            # ================================================================
+            # 策略 B: 使用 predict() API，传入 numpy 数组
+            # ================================================================
+            result = self.ocr.predict(img_padded)
+
+            # 调试：打印第一个样本的结果结构
             if not hasattr(self, "_debug_printed"):
                 self._debug_printed = True
                 print(f"\n[DEBUG] OCR 返回结果类型: {type(result)}")
