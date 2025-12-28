@@ -158,16 +158,17 @@ class BaselineInference:
         print("=" * 60)
 
         try:
-            # 新版 PaddleOCR API 使用 device 参数代替 use_gpu
-            # 使用 use_textline_orientation 代替已废弃的 use_angle_cls
+            # 新版 PaddleOCR API 参数精简
+            # - device: "gpu" 或 "cpu" (代替 use_gpu)
+            # - use_textline_orientation: 代替已废弃的 use_angle_cls
+            # - 新版移除了 show_log 参数
             device = "gpu" if self.use_gpu else "cpu"
 
             self.ocr = PaddleOCR(
                 ocr_version="PP-OCRv5",
                 lang="ch",
                 device=device,
-                use_textline_orientation=True,  # 使用方向分类器（新API）
-                show_log=False,  # 减少日志输出
+                use_textline_orientation=True,
             )
             print("[INFO] PP-OCRv5 模型初始化成功")
             print(f"[INFO] 设备: {device.upper()}")
