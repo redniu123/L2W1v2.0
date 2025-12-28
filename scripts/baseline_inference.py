@@ -249,41 +249,85 @@ class BaselineInference:
             Tuple[pred_text, char_confidences, avg_confidence]
         """
         try:
-            # 新版 PaddleOCR 直接传入图片路径
-            result = self.ocr.ocr(str(image_path))
+            # 使用新版 API: predict() 代替已废弃的 ocr()
+            result = self.ocr.predict(str(image_path))
 
-            # 调试：打印第一个样本的结果结构
+            # 调试：打印第一个样本的结果结构（仅一次）
             if not hasattr(self, "_debug_printed"):
                 self._debug_printed = True
                 print(f"\n[DEBUG] OCR 返回结果类型: {type(result)}")
-                print(
-                    f"[DEBUG] OCR 返回结果内容: {result[:2] if isinstance(result, list) and len(result) > 2 else result}"
-                )
+                if isinstance(result, list) and len(result) > 0:
+                    print(f"[DEBUG] 第一个元素类型: {type(result[0])}")
+                    if isinstance(result[0], dict):
+                        print(f"[DEBUG] 字典键: {result[0].keys()}")
                 print()
 
             if result is None or len(result) == 0:
                 return "", [], 0.0
 
-            # 新版 PaddleOCR 返回格式可能变化，需要适配多种格式
-            # 格式1: [[ [[box], (text, conf)], ... ]]  (旧版)
-            # 格式2: [ {text:..., confidence:..., text_box:...}, ... ]  (新版)
-            # 格式3: {'rec_text': ..., 'rec_score': ...}  (纯识别模式)
+            # ================================================================
+            # 格式1 (最新版 PaddleOCR/PaddleX):
+            # [{'rec_texts': ['文本1', '文本2'], 'rec_scores': [0.95, 0.87], ...}]
+            # ================================================================
+            if (
+                isinstance(result, list)
+                and len(result) > 0
+                and isinstance(result[0], dict)
+            ):
+                first_item = result[0]
 
-            # 检测格式
-            if isinstance(result, dict):
-                # 纯识别模式返回单个字典
-                text = result.get("rec_text", result.get("text", ""))
-                conf = float(
-                    result.get(
-                        "rec_score", result.get("confidence", result.get("score", 0.0))
+                # 检查是否为最新版格式 (rec_texts / rec_scores)
+                if "rec_texts" in first_item and "rec_scores" in first_item:
+                    rec_texts = first_item.get("rec_texts", [])
+                    rec_scores = first_item.get("rec_scores", [])
+
+                    # 拼接所有文本
+                    all_text = "".join(rec_texts) if rec_texts else ""
+
+                    # 构建字符级置信度列表
+                    all_confidences = []
+                    for text_idx, text in enumerate(rec_texts):
+                        # 获取对应的置信度（如果索引越界则取最后一个或默认值）
+                        score = (
+                            rec_scores[text_idx]
+                            if text_idx < len(rec_scores)
+                            else (rec_scores[-1] if rec_scores else 0.0)
+                        )
+                        score = float(score)
+                        for char in text:
+                            all_confidences.append(
+                                {"char": char, "score": round(score, 4)}
+                            )
+
+                    # 计算平均置信度
+                    avg_conf = (
+                        float(sum(rec_scores) / len(rec_scores)) if rec_scores else 0.0
                     )
-                )
-                if text:
-                    char_confs = [{"char": c, "score": round(conf, 4)} for c in text]
-                    return text, char_confs, conf
-                return "", [], 0.0
 
-            # 列表格式
+                    return all_text, all_confidences, round(avg_conf, 4)
+
+                # 检查单条识别结果格式 (rec_text / rec_score)
+                if "rec_text" in first_item or "text" in first_item:
+                    text = first_item.get("rec_text", first_item.get("text", ""))
+                    conf = float(
+                        first_item.get(
+                            "rec_score",
+                            first_item.get("confidence", first_item.get("score", 0.0)),
+                        )
+                    )
+                    if text:
+                        char_confs = [
+                            {"char": c, "score": round(conf, 4)} for c in text
+                        ]
+                        return text, char_confs, round(conf, 4)
+                    return "", [], 0.0
+
+            # ================================================================
+            # 格式2 (Fallback - 旧版格式):
+            # [[ [[box], (text, conf)], ... ]] 或 [ {text:..., confidence:...}, ... ]
+            # ================================================================
+
+            # 如果是嵌套列表，取第一层
             lines = (
                 result[0]
                 if (
@@ -297,7 +341,6 @@ class BaselineInference:
             if not lines:
                 return "", [], 0.0
 
-            # 提取文本和置信度
             all_text = ""
             all_confidences = []
             total_conf = 0.0
@@ -307,12 +350,12 @@ class BaselineInference:
             def get_y_coord(item):
                 try:
                     if isinstance(item, dict):
-                        # 新版格式: {'text': ..., 'confidence': ..., 'text_box': ...}
-                        box = item.get("text_box", item.get("box", []))
+                        box = item.get(
+                            "text_box", item.get("box", item.get("dt_polys", []))
+                        )
                         if box and len(box) >= 1:
                             return box[0][1] if isinstance(box[0], (list, tuple)) else 0
                     elif isinstance(item, (list, tuple)) and len(item) >= 2:
-                        # 旧版格式: [[box], (text, confidence)]
                         box = item[0]
                         if box and len(box) >= 1:
                             return box[0][1] if isinstance(box[0], (list, tuple)) else 0
@@ -326,7 +369,7 @@ class BaselineInference:
                 text = ""
                 conf = 0.0
 
-                # 适配新版格式（字典）
+                # 字典格式
                 if isinstance(line, dict):
                     text = line.get("text", line.get("rec_text", ""))
                     conf = float(
@@ -334,7 +377,7 @@ class BaselineInference:
                             "confidence", line.get("rec_score", line.get("score", 0.0))
                         )
                     )
-                # 适配旧版格式（列表）
+                # 列表/元组格式: [[box], (text, confidence)]
                 elif isinstance(line, (list, tuple)) and len(line) >= 2:
                     text_info = line[1]
                     if isinstance(text_info, dict):
@@ -343,22 +386,18 @@ class BaselineInference:
                             text_info.get("confidence", text_info.get("score", 0.0))
                         )
                     elif isinstance(text_info, (list, tuple)) and len(text_info) >= 2:
-                        text = text_info[0]
+                        text = str(text_info[0])
                         conf = float(text_info[1])
 
                 if text:
                     all_text += text
-
-                    # 为每个字符分配相同的置信度（行级别）
-                    # 注意: PaddleOCR 默认只提供行级置信度，不提供字符级置信度
                     for char in text:
                         all_confidences.append({"char": char, "score": round(conf, 4)})
                         total_conf += conf
                         char_count += 1
 
             avg_conf = total_conf / char_count if char_count > 0 else 0.0
-
-            return all_text, all_confidences, avg_conf
+            return all_text, all_confidences, round(avg_conf, 4)
 
         except Exception as e:
             print(f"[WARNING] OCR 推理失败 ({image_path}): {e}")
