@@ -186,7 +186,7 @@ class PipelineConfig:
     rec_model_dir: str = "./models/agent_a_ppocr"  # PP-OCRv5 模型目录
     rec_image_shape: str = "3,48,320"
     rec_algorithm: str = "SVTR_LCNet"
-    rec_char_dict_path: str = "./ppocr/utils/ppocr_keys_v1.txt"  # L2W1 本地字典
+    rec_char_dict_path: str = "./ppocr/utils/ppocrv5_dict.txt"  # PP-OCRv5 官方字典
 
     def get_output_filename(self) -> str:
         """获取输出文件名（根据 split 自动生成）"""

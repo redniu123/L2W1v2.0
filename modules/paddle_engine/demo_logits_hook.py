@@ -237,7 +237,7 @@ def main():
     parser.add_argument("--rec_batch_num", type=int, default=6)
     parser.add_argument("--rec_algorithm", type=str, default="SVTR_LCNet")
     parser.add_argument(
-        "--rec_char_dict_path", type=str, default="./ppocr/utils/ppocr_keys_v1.txt"
+        "--rec_char_dict_path", type=str, default="./ppocr/utils/ppocrv5_dict.txt"
     )
     parser.add_argument("--use_space_char", type=bool, default=True)
     parser.add_argument("--max_text_length", type=int, default=25)
