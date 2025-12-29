@@ -12,7 +12,18 @@ Usage:
     python scripts/baseline_inference.py
     python scripts/baseline_inference.py --use_gpu
     python scripts/baseline_inference.py --metadata_path ./data/raw/HWDB_Benchmark/test_metadata.jsonl
+# 方式1: 正常模式 (使用检测器 + 激进 padding)
+python scripts/baseline_inference.py \
+    --metadata_path ./data/raw/HWDB_Benchmark/test_metadata.jsonl \
+    --image_root ./data/raw/HWDB_Benchmark/ \
+    --output_path ./results/baseline_results.jsonl
 
+# 方式2: 直接识别模式 (禁用检测器，适合行文本)
+python scripts/baseline_inference.py \
+    --metadata_path ./data/raw/HWDB_Benchmark/test_metadata.jsonl \
+    --image_root ./data/raw/HWDB_Benchmark/ \
+    --output_path ./results/baseline_results_nodet.jsonl \
+    --no_det
 Author: L2W1 Team
 Date: 2024
 """
@@ -238,19 +249,23 @@ class BaselineInference:
 
         return None
 
-    def _run_ocr(self, image_path: Path) -> Tuple[str, List[Dict[str, Any]], float]:
+    def _run_ocr(
+        self, image_path: Path, gt_text: str = ""
+    ) -> Tuple[str, List[Dict[str, Any]], float]:
         """
         运行 OCR 推理
 
         Args:
             image_path: 图像路径
+            gt_text: 真值文本 (用于长度检查警告)
 
         Returns:
             Tuple[pred_text, char_confidences, avg_confidence]
         """
         try:
             # ================================================================
-            # 策略 A: 图像加垫 (Padding) - 解决边缘漏读问题
+            # 策略 A: 激进图像加垫 (Padding) - 彻底解决边缘漏读问题
+            # 左右 100px, 上下 50px - 专为行文本优化
             # ================================================================
             img = cv2.imread(str(image_path))
             if img is None:
@@ -259,14 +274,15 @@ class BaselineInference:
 
             original_h, original_w = img.shape[:2]
 
-            # 添加 50 像素白色填充 (上下左右)
-            padding = 50
+            # 激进填充：左右 100px，上下 50px
+            padding_tb = 50  # 上下
+            padding_lr = 100  # 左右
             img_padded = cv2.copyMakeBorder(
                 img,
-                top=padding,
-                bottom=padding,
-                left=padding,
-                right=padding,
+                top=padding_tb,
+                bottom=padding_tb,
+                left=padding_lr,
+                right=padding_lr,
                 borderType=cv2.BORDER_CONSTANT,
                 value=(255, 255, 255),  # 白色填充
             )
@@ -281,13 +297,27 @@ class BaselineInference:
                 self._debug_count += 1
                 print(f"\n[DEBUG #{self._debug_count}] 图像: {image_path.name}")
                 print(f"  原始尺寸: {original_w}x{original_h}")
-                print(f"  填充后尺寸: {padded_w}x{padded_h}")
+                print(
+                    f"  填充后尺寸: {padded_w}x{padded_h} (左右+{padding_lr * 2}, 上下+{padding_tb * 2})"
+                )
                 print(f"  检测模式: {'启用' if self.use_det else '禁用 (直接识别)'}")
 
             # ================================================================
-            # 策略 B: 使用 predict() API，传入 numpy 数组
+            # 策略 B: 尝试多种 API 调用方式
             # ================================================================
-            result = self.ocr.predict(img_padded)
+            result = None
+
+            # 方式1: 尝试使用旧版 ocr() API (支持 det 参数)
+            if hasattr(self.ocr, "ocr"):
+                try:
+                    result = self.ocr.ocr(img_padded, det=self.use_det, rec=True)
+                except TypeError:
+                    # 如果 ocr() 不接受这些参数，fallback 到 predict()
+                    pass
+
+            # 方式2: 使用 predict() API
+            if result is None:
+                result = self.ocr.predict(img_padded)
 
             # 调试：打印第一个样本的结果结构
             if not hasattr(self, "_debug_printed"):
@@ -434,6 +464,22 @@ class BaselineInference:
                         char_count += 1
 
             avg_conf = total_conf / char_count if char_count > 0 else 0.0
+
+            # ================================================================
+            # 长度检查警告：识别结果远短于 GT 可能是边缘漏读
+            # ================================================================
+            if gt_text and len(all_text) < len(gt_text) * 0.5:
+                if not hasattr(self, "_short_warn_count"):
+                    self._short_warn_count = 0
+                if self._short_warn_count < 10:  # 只打印前 10 个警告
+                    self._short_warn_count += 1
+                    print(f"\n[警告] 识别过短! {image_path.name}")
+                    print(
+                        f"  GT 长度: {len(gt_text)}, 识别长度: {len(all_text)} ({len(all_text) / len(gt_text) * 100:.1f}%)"
+                    )
+                    print(f"  GT: {gt_text[:30]}...")
+                    print(f"  预测: {all_text[:30]}...")
+
             return all_text, all_confidences, round(avg_conf, 4)
 
         except Exception as e:
@@ -520,8 +566,10 @@ class BaselineInference:
                 self._write_result(result)
                 continue
 
-            # 运行 OCR
-            pred_text, char_confidences, avg_confidence = self._run_ocr(image_path)
+            # 运行 OCR (传入 gt_text 用于长度检查警告)
+            pred_text, char_confidences, avg_confidence = self._run_ocr(
+                image_path, gt_text
+            )
 
             # 计算指标
             edit_distance, cer = self._calculate_metrics(pred_text, gt_text)
