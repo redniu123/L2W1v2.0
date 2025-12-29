@@ -175,15 +175,27 @@ class BaselineInference:
             # - 新版移除了 show_log 参数
             device = "gpu" if self.use_gpu else "cpu"
 
-            self.ocr = PaddleOCR(
-                ocr_version="PP-OCRv5",
-                lang="ch",
-                device=device,
-                use_textline_orientation=True,
-            )
+            # 构建初始化参数
+            ocr_params = {
+                "ocr_version": "PP-OCRv5",
+                "lang": "ch",
+                "device": device,
+                "use_textline_orientation": True,
+                # 增加识别分辨率：宽度从 320 提升到 1024，避免长文本信息丢失
+                "rec_image_shape": [3, 48, 1024],
+            }
+
+            # 如果启用检测，增加 unclip ratio 以捕获边界笔画
+            if self.use_det:
+                ocr_params["det_db_unclip_ratio"] = 2.5
+
+            self.ocr = PaddleOCR(**ocr_params)
             print("[INFO] PP-OCRv5 模型初始化成功")
             print(f"[INFO] 设备: {device.upper()}")
-            print(f"[INFO] 文本检测: {'启用' if self.use_det else '禁用（直接识别）'}")
+            print(f"[INFO] 识别分辨率: 3x48x1024 (长文本优化)")
+            print(
+                f"[INFO] 文本检测: {'启用 (unclip_ratio=2.5)' if self.use_det else '禁用（直接识别）'}"
+            )
             print()
         except Exception as e:
             print(f"[ERROR] 模型初始化失败: {e}")
@@ -264,8 +276,8 @@ class BaselineInference:
         """
         try:
             # ================================================================
-            # 策略 A: 激进图像加垫 (Padding) - 彻底解决边缘漏读问题
-            # 左右 100px, 上下 50px - 专为行文本优化
+            # 策略 A: 智能图像 Padding - 解决边缘字符丢失问题
+            # 四周均匀填充 20px，使用原图平均像素值保证背景一致性
             # ================================================================
             img = cv2.imread(str(image_path))
             if img is None:
@@ -274,17 +286,19 @@ class BaselineInference:
 
             original_h, original_w = img.shape[:2]
 
-            # 左右填充 25px，上下不填充（针对 HWDB 行文本）
-            padding_tb = 0  # 上下不加
-            padding_lr = 25  # 左右各 25px
+            # 计算原图的平均像素值作为填充色（保证背景一致性）
+            mean_pixel = tuple(int(v) for v in cv2.mean(img)[:3])
+
+            # 四周均匀填充 20px
+            padding = 20
             img_padded = cv2.copyMakeBorder(
                 img,
-                top=padding_tb,
-                bottom=padding_tb,
-                left=padding_lr,
-                right=padding_lr,
+                top=padding,
+                bottom=padding,
+                left=padding,
+                right=padding,
                 borderType=cv2.BORDER_CONSTANT,
-                value=(255, 255, 255),  # 白色填充
+                value=mean_pixel,  # 使用平均像素值填充
             )
 
             padded_h, padded_w = img_padded.shape[:2]
@@ -297,7 +311,8 @@ class BaselineInference:
                 self._debug_count += 1
                 print(f"\n[DEBUG #{self._debug_count}] 图像: {image_path.name}")
                 print(f"  原始尺寸: {original_w}x{original_h}")
-                print(f"  填充后尺寸: {padded_w}x{padded_h} (左右各+{padding_lr}px)")
+                print(f"  填充后尺寸: {padded_w}x{padded_h} (四周各+{padding}px)")
+                print(f"  填充颜色: RGB{mean_pixel}")
                 print(f"  检测模式: {'启用' if self.use_det else '禁用 (直接识别)'}")
 
             # ================================================================
@@ -411,24 +426,37 @@ class BaselineInference:
             total_conf = 0.0
             char_count = 0
 
-            # 按纵坐标排序（从上到下）
-            def get_y_coord(item):
+            # 按坐标排序：优先 Y（带阈值容差），然后 X
+            # 适用于倾斜的手写行文本
+            Y_THRESHOLD = 15  # Y 坐标容差阈值（像素）
+
+            def get_box_coords(item):
+                """提取文本框的左上角 (x, y) 坐标"""
                 try:
                     if isinstance(item, dict):
                         box = item.get(
                             "text_box", item.get("box", item.get("dt_polys", []))
                         )
                         if box and len(box) >= 1:
-                            return box[0][1] if isinstance(box[0], (list, tuple)) else 0
+                            if isinstance(box[0], (list, tuple)):
+                                return (box[0][0], box[0][1])  # (x, y)
                     elif isinstance(item, (list, tuple)) and len(item) >= 2:
                         box = item[0]
                         if box and len(box) >= 1:
-                            return box[0][1] if isinstance(box[0], (list, tuple)) else 0
+                            if isinstance(box[0], (list, tuple)):
+                                return (box[0][0], box[0][1])  # (x, y)
                 except Exception:
                     pass
-                return 0
+                return (0, 0)
 
-            sorted_lines = sorted(lines, key=get_y_coord)
+            def sort_key(item):
+                """排序键：Y 坐标量化（按阈值分组），然后 X 坐标"""
+                x, y = get_box_coords(item)
+                # 将 Y 坐标按阈值量化，使得同一行的文本有相同的 Y 排序值
+                y_quantized = int(y // Y_THRESHOLD)
+                return (y_quantized, x)
+
+            sorted_lines = sorted(lines, key=sort_key)
 
             for line in sorted_lines:
                 text = ""
