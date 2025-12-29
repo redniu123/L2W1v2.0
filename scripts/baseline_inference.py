@@ -176,23 +176,22 @@ class BaselineInference:
             device = "gpu" if self.use_gpu else "cpu"
 
             # 构建初始化参数
+            # 注意：新版 PaddleOCR API 精简了参数，rec_image_shape 不再支持
+            # 识别分辨率由模型内部决定，我们通过 padding 策略弥补边界丢失
             ocr_params = {
                 "ocr_version": "PP-OCRv5",
                 "lang": "ch",
                 "device": device,
                 "use_textline_orientation": True,
-                # 增加识别分辨率：宽度从 320 提升到 1024，避免长文本信息丢失
-                "rec_image_shape": [3, 48, 1024],
             }
 
             # 如果启用检测，增加 unclip ratio 以捕获边界笔画
             if self.use_det:
-                ocr_params["det_db_unclip_ratio"] = 2.5
+                ocr_params["text_det_unclip_ratio"] = 2.5  # 新版 API 参数名
 
             self.ocr = PaddleOCR(**ocr_params)
             print("[INFO] PP-OCRv5 模型初始化成功")
             print(f"[INFO] 设备: {device.upper()}")
-            print(f"[INFO] 识别分辨率: 3x48x1024 (长文本优化)")
             print(
                 f"[INFO] 文本检测: {'启用 (unclip_ratio=2.5)' if self.use_det else '禁用（直接识别）'}"
             )
