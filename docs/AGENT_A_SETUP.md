@@ -18,7 +18,7 @@ L2W1/
 │   └── utils/
 │       ├── logging.py          # 日志模块
 │       ├── utility.py          # 工具函数
-│       └── ppocr_keys_v1.txt   # 字符字典
+│       └── ppocrv5_dict.txt    # PP-OCRv5 官方字典
 └── models/
     └── agent_a_ppocr/          # 放置模型文件
 ```
@@ -117,13 +117,15 @@ ls -la models/agent_a_ppocr/
 
 ### Q3: 字符字典找不到？
 
-**默认路径**：`./ppocr/utils/ppocr_keys_v1.txt`
+**默认路径**：`./ppocr/utils/ppocrv5_dict.txt` (PP-OCRv5 官方字典)
 
 **如果需要自定义**：
 
 ```bash
 --rec_char_dict_path ./path/to/your/dict.txt
 ```
+
+> ⚠️ **注意**：使用 PP-OCRv5 模型必须配合 `ppocrv5_dict.txt` 字典，否则会出现字符解码错误！
 
 ---
 

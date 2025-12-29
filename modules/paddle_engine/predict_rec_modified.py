@@ -84,7 +84,7 @@ class TextRecognizerWithLogits(object):
                     f"{model_name} is not supported. Please check if the model is supported by the PaddleOCR wheel."
                 )
 
-            if args.rec_char_dict_path == "./ppocr/utils/ppocr_keys_v1.txt":
+            if args.rec_char_dict_path == "./ppocr/utils/ppocrv5_dict.txt":
                 rec_char_list = model_config.get("PostProcess", {}).get(
                     "character_dict", []
                 )
