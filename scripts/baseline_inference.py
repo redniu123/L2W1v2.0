@@ -12,7 +12,7 @@ Usage:
     python scripts/baseline_inference.py
     python scripts/baseline_inference.py --use_gpu
     python scripts/baseline_inference.py --metadata_path ./data/raw/HWDB_Benchmark/test_metadata.jsonl
-# 方式1: 正常模式 (使用检测器 + 激进 padding)
+# 方式1: 正常模式 (使用检测器 + 左右 25px padding)
 python scripts/baseline_inference.py \
     --metadata_path ./data/raw/HWDB_Benchmark/test_metadata.jsonl \
     --image_root ./data/raw/HWDB_Benchmark/ \
@@ -274,9 +274,9 @@ class BaselineInference:
 
             original_h, original_w = img.shape[:2]
 
-            # 激进填充：左右 100px，上下 50px
-            padding_tb = 50  # 上下
-            padding_lr = 100  # 左右
+            # 左右填充 25px，上下不填充（针对 HWDB 行文本）
+            padding_tb = 0  # 上下不加
+            padding_lr = 25  # 左右各 25px
             img_padded = cv2.copyMakeBorder(
                 img,
                 top=padding_tb,
@@ -297,9 +297,7 @@ class BaselineInference:
                 self._debug_count += 1
                 print(f"\n[DEBUG #{self._debug_count}] 图像: {image_path.name}")
                 print(f"  原始尺寸: {original_w}x{original_h}")
-                print(
-                    f"  填充后尺寸: {padded_w}x{padded_h} (左右+{padding_lr * 2}, 上下+{padding_tb * 2})"
-                )
+                print(f"  填充后尺寸: {padded_w}x{padded_h} (左右各+{padding_lr}px)")
                 print(f"  检测模式: {'启用' if self.use_det else '禁用 (直接识别)'}")
 
             # ================================================================
