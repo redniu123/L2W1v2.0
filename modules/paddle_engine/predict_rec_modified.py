@@ -57,6 +57,166 @@ from ppocr.utils.utility import get_image_file_list, check_and_read
 logger = get_logger()
 
 
+# =============================================================================
+# SH-DA++ v4.0 高性能工具函数
+# =============================================================================
+
+
+def compute_softmax(logits: np.ndarray, axis: int = -1) -> np.ndarray:
+    """
+    数值稳定的 Softmax 计算 (Numerically Stable Softmax)
+
+    实现公式:
+        Softmax(x_i) = exp(x_i - max(x)) / Σ exp(x_j - max(x))
+
+    数值稳定性保证:
+        通过减去最大值避免 exp() 溢出，这是标准的 log-sum-exp trick。
+
+    Args:
+        logits: 原始 logits 张量，形状为 [..., C] 或 [T, C]
+                其中 C 为词表大小 (Vocab Size)
+        axis: 沿哪个轴计算 Softmax，默认为最后一轴 (-1)
+
+    Returns:
+        E: 归一化后的 Emission 矩阵，E ∈ [0,1]^{T×C}
+           满足 Σ_c E[t,c] = 1 对于所有时间步 t
+
+    Complexity:
+        Time: O(T × C)
+        Space: O(T × C) for output matrix
+
+    Example:
+        >>> logits = np.random.randn(80, 6625)  # [Seq_Len, Vocab_Size]
+        >>> E = compute_softmax(logits)
+        >>> assert E.shape == logits.shape
+        >>> assert np.allclose(E.sum(axis=-1), 1.0)
+
+    References:
+        [1] Goodfellow et al., Deep Learning, Section 4.1
+        [2] https://cs231n.github.io/linear-classify/#softmax
+    """
+    # Step 1: 减去最大值以保证数值稳定性 (防止 exp 溢出)
+    logits_max = np.max(logits, axis=axis, keepdims=True)
+    logits_shifted = logits - logits_max
+
+    # Step 2: 计算 exp
+    exp_logits = np.exp(logits_shifted)
+
+    # Step 3: 归一化
+    sum_exp = np.sum(exp_logits, axis=axis, keepdims=True)
+    softmax_output = exp_logits / sum_exp
+
+    return softmax_output
+
+
+def calculate_boundary_stats(
+    E: np.ndarray,
+    blank_id: int,
+    rho: float = 0.1,
+) -> dict:
+    """
+    计算 CTC Emission 矩阵的边界统计量 (Boundary Statistics)
+
+    该函数用于 SH-DA++ v4.0 路由器的边界风险检测，通过分析
+    序列首尾区域的 blank 概率分布来判断是否存在边界字符丢失风险。
+
+    核心假设:
+        如果边界区域的 blank 概率异常高，说明模型可能"跳过"了边界字符。
+
+    边界区域定义 (根据 SH-DA++ v4.0 规范):
+        L = [0, floor(ρ × T)]     # 左边界区域
+        R = [ceil((1-ρ) × T), T]  # 右边界区域
+
+    Args:
+        E: 归一化后的 Emission 矩阵，形状为 [T, C]
+           其中 T 为序列长度，C 为词表大小
+           要求 E ∈ [0,1]^{T×C} 且每行和为 1
+        blank_id: CTC blank 符号的索引，PP-OCR 默认为 0
+        rho: 边界区域比例因子，默认 0.1 (即首尾各 10%)
+             有效范围: (0, 0.5)
+
+    Returns:
+        dict: 包含以下统计量的字典:
+            - blank_mean_L (float): 左边界区域 blank 概率均值
+            - blank_mean_R (float): 右边界区域 blank 概率均值
+            - blank_peak_L (float): 左边界区域 blank 概率峰值
+            - blank_peak_R (float): 右边界区域 blank 概率峰值
+            - T (int): 序列总长度
+            - L_range (tuple): 左边界区域索引范围 [start, end)
+            - R_range (tuple): 右边界区域索引范围 [start, end)
+            - valid (bool): 计算是否有效（T >= 2 时为 True）
+
+    边界情况处理:
+        - T < 2: 返回 valid=False，所有统计量置为 0.0
+        - rho * T < 1: 左/右边界区域至少包含 1 个时间步
+
+    Complexity:
+        Time: O(ρ × T)
+        Space: O(1) 额外空间
+
+    Example:
+        >>> E = compute_softmax(np.random.randn(80, 6625))
+        >>> stats = calculate_boundary_stats(E, blank_id=0, rho=0.1)
+        >>> print(f"Left boundary blank mean: {stats['blank_mean_L']:.4f}")
+        >>> print(f"Right boundary blank peak: {stats['blank_peak_R']:.4f}")
+
+    References:
+        [1] SH-DA++ v4.0 Specification, Stage 0, Section B
+    """
+    T = E.shape[0]
+
+    # ========== 边界情况处理 ==========
+    if T < 2:
+        return {
+            "blank_mean_L": 0.0,
+            "blank_mean_R": 0.0,
+            "blank_peak_L": 0.0,
+            "blank_peak_R": 0.0,
+            "T": T,
+            "L_range": (0, 0),
+            "R_range": (0, 0),
+            "valid": False,
+        }
+
+    # ========== 计算边界区域索引 ==========
+    # L = [0, floor(ρ × T)]
+    L_end = max(1, int(rho * T))  # 至少包含 1 个时间步
+
+    # R = [ceil((1-ρ) × T), T]
+    R_start = min(T - 1, int(np.ceil((1 - rho) * T)))  # 至少包含 1 个时间步
+
+    # 确保 R_start > L_end 以避免区域重叠（当 T 很小时）
+    if R_start <= L_end:
+        # T 太小，左右区域会重叠，采用平分策略
+        mid = T // 2
+        L_end = max(1, mid)
+        R_start = min(T - 1, mid)
+
+    # ========== 提取边界区域的 blank 概率 ==========
+    # 左边界: E[0:L_end, blank_id]
+    blank_probs_L = E[0:L_end, blank_id]
+
+    # 右边界: E[R_start:T, blank_id]
+    blank_probs_R = E[R_start:T, blank_id]
+
+    # ========== 计算统计量 ==========
+    blank_mean_L = float(np.mean(blank_probs_L)) if len(blank_probs_L) > 0 else 0.0
+    blank_mean_R = float(np.mean(blank_probs_R)) if len(blank_probs_R) > 0 else 0.0
+    blank_peak_L = float(np.max(blank_probs_L)) if len(blank_probs_L) > 0 else 0.0
+    blank_peak_R = float(np.max(blank_probs_R)) if len(blank_probs_R) > 0 else 0.0
+
+    return {
+        "blank_mean_L": blank_mean_L,
+        "blank_mean_R": blank_mean_R,
+        "blank_peak_L": blank_peak_L,
+        "blank_peak_R": blank_peak_R,
+        "T": T,
+        "L_range": (0, L_end),
+        "R_range": (R_start, T),
+        "valid": True,
+    }
+
+
 class TextRecognizerWithLogits(object):
     """
     L2W1 增强版文本识别器 - 支持 Logits 导出
@@ -204,6 +364,22 @@ class TextRecognizerWithLogits(object):
             }
         self.postprocess_op = build_post_process(postprocess_params)
         self.postprocess_params = postprocess_params
+        
+        # ========== SH-DA++ v4.0: 保存字符表和 blank_id ==========
+        # 从 postprocess_op 动态获取 blank_id (CTCLabelDecode 约定为 0)
+        self.blank_id = 0  # 默认值
+        if hasattr(self.postprocess_op, 'get_ignored_tokens'):
+            ignored_tokens = self.postprocess_op.get_ignored_tokens()
+            if ignored_tokens and len(ignored_tokens) > 0:
+                self.blank_id = ignored_tokens[0]  # 第一个 ignored token 通常是 blank
+        
+        self.rho = 0.1  # 边界区域比例因子
+        
+        # 从 postprocess_op 获取字符表用于 Top-2 索引转换
+        self.character_list = None
+        if hasattr(self.postprocess_op, 'character'):
+            self.character_list = self.postprocess_op.character
+        # ==========================================================
         (
             self.predictor,
             self.input_tensor,
@@ -635,10 +811,11 @@ class TextRecognizerWithLogits(object):
         indices = np.argsort(np.array(width_list))
         rec_res = [["", 0.0]] * img_num
 
-        # ========== L2W1 关键修改: Logits 存储 ==========
-        # 存储每个样本的原始 logits
-        all_logits = [None] * img_num
-        # ================================================
+        # ========== SH-DA++ v4.0: Emission 矩阵与边界统计量存储 ==========
+        all_boundary_stats = [None] * img_num  # 每个样本的边界统计量
+        all_top2_info = [None] * img_num       # 每个样本的 Top-2 信息
+        lat_router_ms_list = [0.0] * img_num   # 路由器耗时 (毫秒)
+        # ==================================================================
 
         batch_num = self.rec_batch_num
         st = time.time()
@@ -748,10 +925,7 @@ class TextRecognizerWithLogits(object):
             if self.benchmark:
                 self.autolog.times.stamp()
 
-            # ========== L2W1 关键修改: 拦截原始 Logits ==========
-            # 用于存储当前 batch 的原始 logits (CTC Decode 之前)
-            batch_raw_logits = None
-            # ====================================================
+            # ========== SH-DA++ v4.0: 旧的 batch_raw_logits 拦截逻辑已移除 ==========
 
             if self.rec_algorithm == "SRN":
                 encoder_word_pos_list = np.concatenate(encoder_word_pos_list)
@@ -880,14 +1054,15 @@ class TextRecognizerWithLogits(object):
                         self.autolog.times.stamp()
                     preds = outputs
             else:
-                # ========== L2W1 核心修改点: 默认 CTC 算法路径 ==========
+                # ========== SH-DA++ v4.0: 默认 CTC 算法路径 ==========
                 # 这是 PP-OCRv5 使用的主要路径
+                batch_raw_logits = None  # 原始 logits 用于后续处理
+                
                 if self.use_onnx:
                     input_dict = {}
                     input_dict[self.input_tensor.name] = norm_img_batch
                     outputs = self.predictor.run(self.output_tensors, input_dict)
                     preds = outputs[0]
-                    # L2W1: 拦截 ONNX 输出的原始 logits
                     batch_raw_logits = deepcopy(outputs[0])
                 else:
                     self.input_tensor.copy_from_cpu(norm_img_batch)
@@ -900,15 +1075,9 @@ class TextRecognizerWithLogits(object):
                         self.autolog.times.stamp()
                     if len(outputs) != 1:
                         preds = outputs
-                        # L2W1: 多输出情况，取第一个作为 logits
                         batch_raw_logits = deepcopy(outputs[0])
                     else:
                         preds = outputs[0]
-                        # ========================================
-                        # L2W1 关键操作: 在 CTC Decode 之前拦截
-                        # 使用 deepcopy 防止内存复用覆盖
-                        # 形状: [Batch, Seq_Len, Vocab_Size]
-                        # ========================================
                         batch_raw_logits = deepcopy(outputs[0])
                 # =======================================================
 
@@ -927,26 +1096,117 @@ class TextRecognizerWithLogits(object):
             for rno in range(len(rec_result)):
                 rec_res[indices[beg_img_no + rno]] = rec_result[rno]
 
-                # ========== L2W1 关键修改: 按原始顺序存储 logits ==========
-                if batch_raw_logits is not None:
-                    # batch_raw_logits 形状: [Batch, Seq_Len, Vocab_Size]
-                    # 取出当前样本的 logits
-                    all_logits[indices[beg_img_no + rno]] = batch_raw_logits[rno].copy()
-                # =========================================================
+            # ========== SH-DA++ v4.0: Emission 矩阵计算与边界统计量提取 ==========
+            if batch_raw_logits is not None and self.postprocess_params["name"] == "CTCLabelDecode":
+                for rno in range(len(rec_result)):
+                    # 计时开始
+                    router_start = time.perf_counter()
+                    
+                    original_idx = indices[beg_img_no + rno]
+                    
+                    # 提取当前样本的 logits: [Seq_Len, Vocab_Size]
+                    # 使用 .copy() 防止 Paddle 显存复用导致数据被覆盖
+                    sample_logits = batch_raw_logits[rno].copy()
+                    T, C = sample_logits.shape
+                    
+                    # Step 1: 计算 Softmax 得到 Emission 矩阵 E ∈ [0,1]^{T×C}
+                    E = compute_softmax(sample_logits, axis=-1)
+                    
+                    # Step 2: 计算边界统计量
+                    boundary_stats = calculate_boundary_stats(
+                        E, 
+                        blank_id=self.blank_id, 
+                        rho=self.rho
+                    )
+                    all_boundary_stats[original_idx] = boundary_stats
+                    
+                    # Step 3: Top-2 提取 - 每个时间步的最大和次大概率
+                    top2_status = 'available'  # 默认状态
+                    top2_info = None
+                    
+                    try:
+                        # 获取 Top-2 索引和概率
+                        top2_indices = np.argsort(E, axis=-1)[:, -2:][:, ::-1]  # [T, 2]
+                        top2_probs = np.take_along_axis(E, top2_indices, axis=-1)  # [T, 2]
+                        
+                        # 计算 Top-1 和 Top-2 的置信度统计
+                        top1_conf_mean = float(np.mean(top2_probs[:, 0]))
+                        top2_conf_mean = float(np.mean(top2_probs[:, 1]))
+                        conf_gap_mean = float(np.mean(top2_probs[:, 0] - top2_probs[:, 1]))
+                        
+                        # 转换索引为字符 (如果字符表可用)
+                        top1_chars = None
+                        top2_chars = None
+                        if self.character_list is not None and len(self.character_list) > 0:
+                            top1_chars = []
+                            top2_chars = []
+                            for t in range(T):
+                                idx1, idx2 = int(top2_indices[t, 0]), int(top2_indices[t, 1])
+                                # 注意: blank_id 可能对应 '<blank>' 或特殊标记
+                                char1 = self.character_list[idx1] if 0 <= idx1 < len(self.character_list) else '<unk>'
+                                char2 = self.character_list[idx2] if 0 <= idx2 < len(self.character_list) else '<unk>'
+                                top1_chars.append(char1)
+                                top2_chars.append(char2)
+                        else:
+                            # 字符表不可用，但 Top-2 提取本身成功
+                            top2_status = 'available_no_chars'
+                        
+                        # 组装 Top-2 信息
+                        top2_info = {
+                            'top2_status': top2_status,
+                            'T': T,
+                            'C': C,
+                            'top1_conf_mean': top1_conf_mean,
+                            'top2_conf_mean': top2_conf_mean,
+                            'conf_gap_mean': conf_gap_mean,
+                            # 完整序列 (可选，用于详细分析，仅当 T <= 100 时保存)
+                            'top2_indices': top2_indices.tolist() if T <= 100 else None,
+                            'top2_probs': top2_probs.tolist() if T <= 100 else None,
+                            'top1_chars': top1_chars if top2_status == 'available' and T <= 100 else None,
+                            'top2_chars': top2_chars if top2_status == 'available' and T <= 100 else None,
+                        }
+                    except Exception as e:
+                        # Top-2 提取失败，标记为 missing
+                        top2_status = 'missing'
+                        top2_info = {
+                            'top2_status': top2_status,
+                            'T': T,
+                            'C': C,
+                            'top1_conf_mean': 0.0,
+                            'top2_conf_mean': 0.0,
+                            'conf_gap_mean': 0.0,
+                            'error': str(e) if logger else None,
+                        }
+                    
+                    all_top2_info[original_idx] = top2_info
+                    
+                    # 计时结束
+                    router_end = time.perf_counter()
+                    lat_router_ms_list[original_idx] = (router_end - router_start) * 1000.0
+            # ========================================================================
 
             if self.benchmark:
                 self.autolog.times.end(stamp=True)
 
         elapsed_time = time.time() - st
 
-        # ========== L2W1 关键修改: 返回字典格式 ==========
-        # 返回格式变更：从 (rec_res, time) 变更为 dict
+        # ========== SH-DA++ v4.0: 扩展返回格式，包含路由器特征信号 ==========
         return {
+            # 基础识别结果
             "results": rec_res,  # List[Tuple[str, float]] - [(text, conf), ...]
-            "logits": all_logits,  # List[np.ndarray] - 每个样本的原始 logits
             "elapsed_time": elapsed_time,
+            
+            # SH-DA++ v4.0 路由器特征信号
+            "boundary_stats": all_boundary_stats,    # List[dict] - 边界统计量
+            "top2_info": all_top2_info,              # List[dict] - Top-2 信息
+            "lat_router_ms": lat_router_ms_list,     # List[float] - 路由器耗时 (ms)
+            
+            # 配置元信息
+            "router_config": {
+                "blank_id": self.blank_id,
+                "rho": self.rho,
+            },
         }
-        # =================================================
 
 
 def main(args):
