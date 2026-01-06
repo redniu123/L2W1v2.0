@@ -49,15 +49,7 @@ class RouterConfig:
     # 熵计算参数
     epsilon: float = 1e-10  # 防止 log(0)
 
-    # ========== 边界敏感检测配置 (v5.1.0 新增) ==========
-    # 边界字符置信度阈值
-    boundary_confidence_threshold: float = 0.8  # τ_boundary: 首末字符置信度阈值
-    boundary_check_window: int = 2  # 检查首尾多少个字符 (默认首2个 + 末2个)
-
-    # 几何检查配置
-    aspect_ratio_warning: float = 10.0  # 长宽比告警阈值 (W/H > 10)
-    aspect_ratio_critical: float = 15.0  # 长宽比危险阈值 (W/H > 15)
-    char_density_min: float = 0.3  # 最小字符密度 (实际字符数 / 预期字符数)
+    # ========== SH-DA++ v4.0: 边界敏感检测配置已移除 ==========
 
 
 @dataclass
@@ -73,13 +65,7 @@ class RoutingResult:
     semantic_ppl: float  # 语义困惑度
     entropy_sequence: List[float]  # 字符级熵序列
 
-    # ========== 边界敏感检测结果 (v5.1.0 新增) ==========
-    boundary_risk: bool = False  # 是否存在边界风险
-    boundary_reason: str = ""  # 边界风险原因
-    left_boundary_confidence: float = 1.0  # 左边界字符置信度
-    right_boundary_confidence: float = 1.0  # 右边界字符置信度
-    aspect_ratio: float = 0.0  # 图像长宽比
-    char_density: float = 1.0  # 字符密度
+    # ========== SH-DA++ v4.0: 边界敏感检测结果字段已移除 ==========
 
     def to_dict(self) -> Dict:
         """转换为 Manifest Task JSON 格式"""
@@ -96,16 +82,7 @@ class RoutingResult:
             "entropy_sequence": [round(e, 4) for e in self.entropy_sequence],
         }
 
-        # 边界敏感检测结果
-        if self.boundary_risk:
-            result["boundary_analysis"] = {
-                "boundary_risk": self.boundary_risk,
-                "boundary_reason": self.boundary_reason,
-                "left_boundary_confidence": round(self.left_boundary_confidence, 4),
-                "right_boundary_confidence": round(self.right_boundary_confidence, 4),
-                "aspect_ratio": round(self.aspect_ratio, 2),
-                "char_density": round(self.char_density, 4),
-            }
+        # SH-DA++ v4.0: 边界敏感检测结果已移除
 
         return result
 
@@ -623,39 +600,7 @@ class SemanticPPLCalculator:
             print(f"[Warning] PPL calculation failed: {e}")
             return self._calculate_simple_ppl(text)
 
-    def _calculate_simple_ppl(self, text: str) -> float:
-        """
-        简单的 PPL 估计（基于字符频率和 n-gram）
-
-        这是一个占位实现，用于在无 LM 模型时提供基本的语义评估
-        """
-        # 常见中文字符集（高频字）
-        common_chars = set(
-            "的一是不了在人有我他这个们中来上大为和国地到以说时要就出会可也你对生能而子那得于着下自之年过发后作里用道行所然家种事"
-            "成方多经么同面当起与好看学进着种将还等此心前为所以因把第二三四五六七八九十百千万"
-        )
-
-        # 计算非常见字符比例
-        if len(text) == 0:
-            return 1.0
-
-        uncommon_count = sum(
-            1 for c in text if c not in common_chars and "\u4e00" <= c <= "\u9fff"
-        )
-        uncommon_ratio = uncommon_count / len(text)
-
-        # 计算字符重复率（识别错误常导致重复）
-        if len(text) >= 2:
-            repeat_count = sum(1 for i in range(1, len(text)) if text[i] == text[i - 1])
-            repeat_ratio = repeat_count / (len(text) - 1)
-        else:
-            repeat_ratio = 0.0
-
-        # 简单的 PPL 估计公式
-        base_ppl = 50.0
-        ppl = base_ppl * (1 + uncommon_ratio * 5) * (1 + repeat_ratio * 3)
-
-        return min(ppl, 10000.0)
+    # _calculate_simple_ppl 方法已删除 - SH-DA++ v4.0 不再使用
 
 
 class UncertaintyRouter:
@@ -735,141 +680,21 @@ class UncertaintyRouter:
         # 低风险
         return False, RiskLevel.LOW.value
 
-    def check_boundary_sensitivity(
-        self,
-        text: str,
-        char_confidences: List[Dict],
-        image_size: Tuple[int, int] = None,
-    ) -> Tuple[bool, str, float, float, float, float]:
-        """
-        边界敏感置信度检查 (v5.1.0 新增)
-
-        检测首尾边界字符是否存在低置信度风险，以及图像几何是否异常
-
-        Args:
-            text: 识别文本
-            char_confidences: 字符级置信度列表 [{'char': c, 'score': s}, ...]
-            image_size: 图像尺寸 (width, height)
-
-        Returns:
-            Tuple[
-                boundary_risk: 是否存在边界风险,
-                reason: 风险原因描述,
-                left_conf: 左边界平均置信度,
-                right_conf: 右边界平均置信度,
-                aspect_ratio: 图像长宽比,
-                char_density: 字符密度
-            ]
-        """
-        reasons = []
-        boundary_risk = False
-        left_conf = 1.0
-        right_conf = 1.0
-        aspect_ratio = 0.0
-        char_density = 1.0
-
-        τ_boundary = self.config.boundary_confidence_threshold
-        window = self.config.boundary_check_window
-
-        # ========== 检查 1: 边界字符置信度 ==========
-        if char_confidences and len(char_confidences) > 0:
-            n_chars = len(char_confidences)
-
-            # 提取左边界字符置信度 (前 window 个)
-            left_window = min(window, n_chars)
-            left_scores = [c.get("score", 1.0) for c in char_confidences[:left_window]]
-            left_conf = sum(left_scores) / len(left_scores) if left_scores else 1.0
-
-            # 提取右边界字符置信度 (后 window 个)
-            right_window = min(window, n_chars)
-            right_scores = [
-                c.get("score", 1.0) for c in char_confidences[-right_window:]
-            ]
-            right_conf = sum(right_scores) / len(right_scores) if right_scores else 1.0
-
-            # 检查首字符
-            first_char_score = char_confidences[0].get("score", 1.0)
-            if first_char_score < τ_boundary:
-                boundary_risk = True
-                reasons.append(
-                    f"首字符 '{char_confidences[0].get('char', '?')}' 置信度={first_char_score:.3f} < {τ_boundary}"
-                )
-
-            # 检查末字符
-            last_char_score = char_confidences[-1].get("score", 1.0)
-            if last_char_score < τ_boundary:
-                boundary_risk = True
-                reasons.append(
-                    f"末字符 '{char_confidences[-1].get('char', '?')}' 置信度={last_char_score:.3f} < {τ_boundary}"
-                )
-
-            # 检查左边界平均置信度
-            if left_conf < τ_boundary:
-                boundary_risk = True
-                reasons.append(
-                    f"左边界 {left_window} 字符平均置信度={left_conf:.3f} < {τ_boundary}"
-                )
-
-            # 检查右边界平均置信度
-            if right_conf < τ_boundary:
-                boundary_risk = True
-                reasons.append(
-                    f"右边界 {right_window} 字符平均置信度={right_conf:.3f} < {τ_boundary}"
-                )
-
-        # ========== 检查 2: 图像几何检查 ==========
-        if image_size is not None:
-            width, height = image_size
-            if height > 0:
-                aspect_ratio = width / height
-
-                # 极端长宽比警告
-                if aspect_ratio > self.config.aspect_ratio_critical:
-                    boundary_risk = True
-                    reasons.append(
-                        f"极端长宽比 {aspect_ratio:.1f}:1 > {self.config.aspect_ratio_critical}"
-                    )
-                elif aspect_ratio > self.config.aspect_ratio_warning:
-                    reasons.append(
-                        f"高长宽比 {aspect_ratio:.1f}:1 (告警阈值: {self.config.aspect_ratio_warning})"
-                    )
-
-                # 字符密度检查：预期每个字符约占 15-25 像素宽
-                if len(text) > 0 and height > 0:
-                    expected_char_width = 20  # 假设平均字符宽度
-                    expected_chars = width / expected_char_width
-                    actual_chars = len(text)
-                    char_density = (
-                        actual_chars / expected_chars if expected_chars > 0 else 1.0
-                    )
-
-                    if char_density < self.config.char_density_min:
-                        boundary_risk = True
-                        reasons.append(
-                            f"字符密度过低 {char_density:.2f} < {self.config.char_density_min} "
-                            f"(预期 ~{int(expected_chars)} 字符，实际 {actual_chars} 字符)"
-                        )
-
-        reason = "; ".join(reasons) if reasons else ""
-        return boundary_risk, reason, left_conf, right_conf, aspect_ratio, char_density
+    # check_boundary_sensitivity 方法已删除 - SH-DA++ v4.0 不再使用
 
     def route(
         self,
         logits: np.ndarray,
         text: str,
         confidence: float = 1.0,
-        image_size: Tuple[int, int] = None,
-        char_confidences: List[Dict] = None,
     ) -> RoutingResult:
         """
-        完整路由流程 (加固版 + 边界敏感 v5.1.0)
+        完整路由流程 (SH-DA++ v4.0)
 
         Args:
             logits: 原始 logits，形状 [Seq_Len, Vocab_Size]
             text: 识别文本
             confidence: Agent A 的置信度分数
-            image_size: 图像尺寸 (width, height)，用于边界敏感检测
-            char_confidences: 字符级置信度列表 [{'char': c, 'score': s}, ...]
 
         Returns:
             RoutingResult: 路由结果
@@ -887,8 +712,6 @@ class UncertaintyRouter:
                 max_char_entropy=0.0,
                 semantic_ppl=float("inf"),
                 entropy_sequence=[],
-                boundary_risk=True,
-                boundary_reason="空文本识别结果",
             )
 
         # Guard 2: 单字符文本 → 简化处理，跳过复杂对齐
@@ -913,20 +736,7 @@ class UncertaintyRouter:
                 entropy_sequence=[max_entropy],
             )
 
-        # Guard 3: 极端长宽比检测 (>25:1)
-        if image_size is not None:
-            width, height = image_size
-            if height > 0:
-                aspect_ratio = width / height
-                if aspect_ratio > 25.0:
-                    import warnings
-
-                    warnings.warn(
-                        f"[Router] 检测到极端长宽比: {aspect_ratio:.1f}:1 "
-                        f"(image: {width}x{height})。Agent B 的动态分辨率 Padding 将被激活。"
-                    )
-                    # 极端长宽比通常意味着更高的识别风险
-                    confidence *= 0.8  # 降低置信度
+        # SH-DA++ v4.0: 极端长宽比检测已移除
 
         # ========== 正常路由流程 ==========
 
@@ -957,34 +767,7 @@ class UncertaintyRouter:
             risk_level = RiskLevel.MEDIUM.value
             is_hard = True
 
-        # ========== Step 6: 边界敏感检测 (v5.1.0 新增) ==========
-        boundary_risk = False
-        boundary_reason = ""
-        left_conf = 1.0
-        right_conf = 1.0
-        aspect_ratio = 0.0
-        char_density = 1.0
-
-        if char_confidences is not None or image_size is not None:
-            (
-                boundary_risk,
-                boundary_reason,
-                left_conf,
-                right_conf,
-                aspect_ratio,
-                char_density,
-            ) = self.check_boundary_sensitivity(
-                text, char_confidences or [], image_size
-            )
-
-            # 边界风险触发路由升级
-            if boundary_risk:
-                if risk_level == RiskLevel.LOW.value:
-                    risk_level = RiskLevel.MEDIUM.value
-                    is_hard = True
-                elif risk_level == RiskLevel.MEDIUM.value:
-                    risk_level = RiskLevel.HIGH.value
-                    is_hard = True
+        # ========== SH-DA++ v4.0: 边界敏感检测已移除 ==========
 
         return RoutingResult(
             is_hard=is_hard,
@@ -995,13 +778,6 @@ class UncertaintyRouter:
             max_char_entropy=max_entropy,
             semantic_ppl=semantic_ppl,
             entropy_sequence=char_entropies,
-            # 边界敏感检测结果
-            boundary_risk=boundary_risk,
-            boundary_reason=boundary_reason,
-            left_boundary_confidence=left_conf,
-            right_boundary_confidence=right_conf,
-            aspect_ratio=aspect_ratio,
-            char_density=char_density,
         )
 
     def route_batch(
@@ -1043,6 +819,640 @@ class UncertaintyRouter:
             results.append(result)
 
         return results
+
+
+# ==================== SH-DA++ v4.0: RuleOnlyScorer ====================
+
+
+class RouteType(Enum):
+    """分诊类型枚举 (SH-DA++ v4.0)"""
+    
+    NONE = "none"           # 无需路由：s_b < λ 且 s_a < λ
+    BOUNDARY = "boundary"   # 边界风险：s_b ≥ λ 且 s_a < λ
+    AMBIGUITY = "ambiguity" # 识别歧义：s_b < λ 且 s_a ≥ λ
+    BOTH = "both"           # 双重风险：s_b ≥ λ 且 s_a ≥ λ
+
+
+@dataclass
+class RuleScorerConfig:
+    """
+    RuleOnlyScorer 配置类 (SH-DA++ v4.0)
+    
+    Attributes:
+        v_min: v_edge Min-max 归一化下界
+        v_max: v_edge Min-max 归一化上界
+        lambda_threshold: 分诊阈值 λ
+        eta: 综合优先级中 r_d 的权重系数 η
+    """
+    # v_edge 归一化参数
+    v_min: float = 0.0      # 视觉熵下界
+    v_max: float = 5.0      # 视觉熵上界（典型 CTC 熵范围）
+    
+    # 分诊阈值
+    lambda_threshold: float = 0.5  # λ: 判定是否需要路由的阈值
+    
+    # 综合优先级权重
+    eta: float = 0.5        # η: r_d 权重系数
+
+
+@dataclass
+class ScoringResult:
+    """
+    RuleOnlyScorer 评分结果 (SH-DA++ v4.0)
+    
+    Attributes:
+        s_b: 边界风险评分 ∈ [0, 1]
+        s_a: 识别歧义评分 ∈ [0, 1]
+        q: 综合优先级 = max(s_b, s_a) + η·r_d
+        route_type: 分诊类型
+        details: 计算细节（用于调试和审计）
+    """
+    s_b: float              # 边界风险评分
+    s_a: float              # 识别歧义评分
+    q: float                # 综合优先级
+    route_type: RouteType   # 分诊类型
+    details: Dict           # 计算细节
+    
+    def to_dict(self) -> Dict:
+        """转换为 JSON 可序列化格式"""
+        return {
+            "s_b": round(self.s_b, 6),
+            "s_a": round(self.s_a, 6),
+            "q": round(self.q, 6),
+            "route_type": self.route_type.value,
+            "details": self.details,
+        }
+
+
+class RuleOnlyScorer:
+    """
+    SH-DA++ v4.0 规则评分器
+    
+    基于 Stage 0 导出的 Emission 信号，计算边界风险和识别歧义评分。
+    
+    核心公式:
+    1. 边界风险评分: s_b = clip(1/3·(v_edge·b_edge) + 1/3·b_edge + 1/3·drop, 0, 1)
+    2. 识别歧义评分: s_a = clip(1 - min(m_i), 0, 1), where m_i = p_i^(1) - p_i^(2)
+    3. 综合优先级: q = max(s_b, s_a) + η·r_d
+    4. 分诊类型: 基于 s_b, s_a 与 λ 的比较
+    
+    References:
+        - SH-DA++ v4.0 技术规范 Stage 1
+    """
+    
+    def __init__(self, config: RuleScorerConfig = None):
+        """
+        初始化 RuleOnlyScorer
+        
+        Args:
+            config: 评分器配置，默认使用 RuleScorerConfig()
+        """
+        self.config = config or RuleScorerConfig()
+    
+    def _normalize_v_edge(self, v_edge: float) -> float:
+        """
+        对 v_edge 进行 Min-max 归一化
+        
+        公式: v_norm = clip((v_edge - v_min) / (v_max - v_min), 0, 1)
+        
+        Args:
+            v_edge: 原始边界视觉熵值
+            
+        Returns:
+            归一化后的值 ∈ [0, 1]
+        """
+        v_min, v_max = self.config.v_min, self.config.v_max
+        
+        # 防止除零
+        if v_max <= v_min:
+            return 0.5  # 配置无效时返回中间值
+        
+        v_norm = (v_edge - v_min) / (v_max - v_min)
+        return float(np.clip(v_norm, 0.0, 1.0))
+    
+    def compute_boundary_score(
+        self,
+        boundary_stats: Dict,
+        v_edge: float = None,
+        char_count: int = 0,
+        expected_char_count: int = 0,
+    ) -> Tuple[float, Dict]:
+        """
+        计算边界风险评分 s_b
+        
+        公式: s_b = clip(1/3·(v_edge_norm·b_edge) + 1/3·b_edge + 1/3·drop, 0, 1)
+        
+        其中:
+        - v_edge_norm: 归一化后的边界视觉熵
+        - b_edge: 边界 blank 概率（取 L/R 中较大值）
+        - drop: 字符丢失比例指标
+        
+        Args:
+            boundary_stats: Stage 0 导出的边界统计量
+                - blank_mean_L, blank_mean_R: 左右边界 blank 均值
+                - blank_peak_L, blank_peak_R: 左右边界 blank 峰值
+                - valid: 统计是否有效
+            v_edge: 边界区域的视觉熵（可选，若无则从 boundary_stats 推断）
+            char_count: 实际识别字符数
+            expected_char_count: 预期字符数（基于图像宽度估计）
+            
+        Returns:
+            Tuple[s_b, details]: 边界风险评分和计算细节
+        """
+        details = {
+            "v_edge_raw": v_edge,
+            "v_edge_norm": 0.0,
+            "b_edge": 0.0,
+            "drop": 0.0,
+            "valid": False,
+        }
+        
+        # 检查边界统计有效性
+        if not boundary_stats or not boundary_stats.get("valid", False):
+            # 统计无效时，返回中等风险评分
+            details["reason"] = "boundary_stats_invalid"
+            return 0.5, details
+        
+        details["valid"] = True
+        
+        # 1. 计算 b_edge：取左右边界 blank 概率的最大值
+        blank_mean_L = boundary_stats.get("blank_mean_L", 0.0)
+        blank_mean_R = boundary_stats.get("blank_mean_R", 0.0)
+        blank_peak_L = boundary_stats.get("blank_peak_L", 0.0)
+        blank_peak_R = boundary_stats.get("blank_peak_R", 0.0)
+        
+        # 使用均值和峰值的加权组合
+        b_edge_L = 0.6 * blank_mean_L + 0.4 * blank_peak_L
+        b_edge_R = 0.6 * blank_mean_R + 0.4 * blank_peak_R
+        b_edge = max(b_edge_L, b_edge_R)
+        details["b_edge"] = float(b_edge)
+        details["b_edge_L"] = float(b_edge_L)
+        details["b_edge_R"] = float(b_edge_R)
+        
+        # 2. 计算 v_edge_norm：归一化边界视觉熵
+        if v_edge is not None:
+            v_edge_norm = self._normalize_v_edge(v_edge)
+        else:
+            # 若未提供 v_edge，使用 blank 峰值作为代理指标
+            v_edge_proxy = max(blank_peak_L, blank_peak_R) * 5.0  # 映射到 [0, 5] 范围
+            v_edge_norm = self._normalize_v_edge(v_edge_proxy)
+            details["v_edge_proxy"] = float(v_edge_proxy)
+        
+        details["v_edge_norm"] = float(v_edge_norm)
+        
+        # 3. 计算 drop：字符丢失比例
+        if expected_char_count > 0 and char_count >= 0:
+            drop = max(0.0, (expected_char_count - char_count) / expected_char_count)
+        else:
+            drop = 0.0  # 无法计算时假设无丢失
+        
+        details["drop"] = float(drop)
+        details["char_count"] = char_count
+        details["expected_char_count"] = expected_char_count
+        
+        # 4. 计算 s_b
+        # 公式: s_b = clip(1/3·(v_edge_norm·b_edge) + 1/3·b_edge + 1/3·drop, 0, 1)
+        term1 = (1.0 / 3.0) * (v_edge_norm * b_edge)
+        term2 = (1.0 / 3.0) * b_edge
+        term3 = (1.0 / 3.0) * drop
+        
+        s_b_raw = term1 + term2 + term3
+        s_b = float(np.clip(s_b_raw, 0.0, 1.0))
+        
+        details["term1_v_b"] = float(term1)
+        details["term2_b"] = float(term2)
+        details["term3_drop"] = float(term3)
+        details["s_b_raw"] = float(s_b_raw)
+        
+        return s_b, details
+    
+    def compute_ambiguity_score(
+        self,
+        top2_info: Dict,
+    ) -> Tuple[float, Dict]:
+        """
+        计算识别歧义评分 s_a
+        
+        公式:
+        - 若 top2_status == 'available': m_i = p_i^(1) - p_i^(2), s_a = clip(1 - min(m_i), 0, 1)
+        - 若 Top-2 缺失: s_a = clip(1 - min(p_i^(1)), 0, 1)
+        
+        Args:
+            top2_info: Stage 0 导出的 Top-2 信息
+                - top2_status: 'available' | 'available_no_chars' | 'missing'
+                - top1_conf_mean: Top-1 置信度均值
+                - top2_conf_mean: Top-2 置信度均值
+                - conf_gap_mean: 置信度差距均值
+                - top1_probs: Top-1 概率序列 [T]
+                - top2_probs: Top-2 概率序列 [T]
+                
+        Returns:
+            Tuple[s_a, details]: 识别歧义评分和计算细节
+        """
+        details = {
+            "top2_status": "missing",
+            "method": "fallback",
+            "min_margin": None,
+            "min_conf": None,
+        }
+        
+        top2_status = top2_info.get("top2_status", "missing")
+        details["top2_status"] = top2_status
+        
+        if top2_status == "available":
+            # 方法 1: 使用 Top-2 差距
+            top1_probs = top2_info.get("top1_probs")
+            top2_probs = top2_info.get("top2_probs")
+            
+            if top1_probs is not None and top2_probs is not None:
+                top1_probs = np.array(top1_probs)
+                top2_probs = np.array(top2_probs)
+                
+                # m_i = p_i^(1) - p_i^(2)
+                margins = top1_probs - top2_probs
+                min_margin = float(np.min(margins))
+                
+                # s_a = clip(1 - min(m_i), 0, 1)
+                s_a = float(np.clip(1.0 - min_margin, 0.0, 1.0))
+                
+                details["method"] = "top2_margin"
+                details["min_margin"] = min_margin
+                details["mean_margin"] = float(np.mean(margins))
+                details["margins_std"] = float(np.std(margins))
+                
+                return s_a, details
+            
+            # 若概率序列不可用，尝试使用聚合统计
+            conf_gap_mean = top2_info.get("conf_gap_mean")
+            if conf_gap_mean is not None:
+                # 使用均值近似最小值（保守估计）
+                approx_min_margin = max(0.0, conf_gap_mean - 0.1)  # 留 0.1 余量
+                s_a = float(np.clip(1.0 - approx_min_margin, 0.0, 1.0))
+                
+                details["method"] = "top2_margin_approx"
+                details["conf_gap_mean"] = conf_gap_mean
+                details["approx_min_margin"] = approx_min_margin
+                
+                return s_a, details
+        
+        # 方法 2: Top-2 缺失，退化为 1 - min(p_i^(1))
+        top1_probs = top2_info.get("top1_probs")
+        top1_conf_mean = top2_info.get("top1_conf_mean")
+        
+        if top1_probs is not None:
+            top1_probs = np.array(top1_probs)
+            min_conf = float(np.min(top1_probs))
+            s_a = float(np.clip(1.0 - min_conf, 0.0, 1.0))
+            
+            details["method"] = "top1_min"
+            details["min_conf"] = min_conf
+            details["mean_conf"] = float(np.mean(top1_probs))
+            
+            return s_a, details
+        
+        if top1_conf_mean is not None:
+            # 使用均值近似
+            approx_min_conf = max(0.0, top1_conf_mean - 0.15)  # 留 0.15 余量
+            s_a = float(np.clip(1.0 - approx_min_conf, 0.0, 1.0))
+            
+            details["method"] = "top1_mean_approx"
+            details["top1_conf_mean"] = top1_conf_mean
+            details["approx_min_conf"] = approx_min_conf
+            
+            return s_a, details
+        
+        # 完全无信息时，返回高歧义评分（保守策略）
+        details["method"] = "no_info_fallback"
+        return 0.8, details
+    
+    def determine_route_type(
+        self,
+        s_b: float,
+        s_a: float,
+        lambda_threshold: float = None,
+    ) -> RouteType:
+        """
+        根据评分判定分诊类型
+        
+        规则:
+        - NONE: s_b < λ 且 s_a < λ
+        - BOUNDARY: s_b ≥ λ 且 s_a < λ
+        - AMBIGUITY: s_b < λ 且 s_a ≥ λ
+        - BOTH: s_b ≥ λ 且 s_a ≥ λ
+        
+        Args:
+            s_b: 边界风险评分
+            s_a: 识别歧义评分
+            lambda_threshold: 分诊阈值（默认使用配置值）
+            
+        Returns:
+            RouteType: 分诊类型
+        """
+        lam = lambda_threshold if lambda_threshold is not None else self.config.lambda_threshold
+        
+        b_high = s_b >= lam
+        a_high = s_a >= lam
+        
+        if b_high and a_high:
+            return RouteType.BOTH
+        elif b_high:
+            return RouteType.BOUNDARY
+        elif a_high:
+            return RouteType.AMBIGUITY
+        else:
+            return RouteType.NONE
+    
+    def score(
+        self,
+        boundary_stats: Dict,
+        top2_info: Dict,
+        r_d: float = 0.0,
+        v_edge: float = None,
+        char_count: int = 0,
+        expected_char_count: int = 0,
+    ) -> ScoringResult:
+        """
+        综合评分入口
+        
+        计算边界风险、识别歧义、综合优先级，并判定分诊类型。
+        
+        Args:
+            boundary_stats: Stage 0 边界统计量
+            top2_info: Stage 0 Top-2 信息
+            r_d: 额外风险因子（如检测器置信度、几何异常等）
+            v_edge: 边界区域视觉熵（可选）
+            char_count: 实际识别字符数
+            expected_char_count: 预期字符数
+            
+        Returns:
+            ScoringResult: 评分结果
+        """
+        # 1. 计算边界风险评分 s_b
+        s_b, s_b_details = self.compute_boundary_score(
+            boundary_stats=boundary_stats,
+            v_edge=v_edge,
+            char_count=char_count,
+            expected_char_count=expected_char_count,
+        )
+        
+        # 2. 计算识别歧义评分 s_a
+        s_a, s_a_details = self.compute_ambiguity_score(top2_info=top2_info)
+        
+        # 3. 计算综合优先级 q = max(s_b, s_a) + η·r_d
+        eta = self.config.eta
+        q = max(s_b, s_a) + eta * r_d
+        
+        # 4. 判定分诊类型
+        route_type = self.determine_route_type(s_b, s_a)
+        
+        # 5. 汇总详情
+        details = {
+            "boundary_score_details": s_b_details,
+            "ambiguity_score_details": s_a_details,
+            "r_d": float(r_d),
+            "eta": eta,
+            "lambda": self.config.lambda_threshold,
+            "config": {
+                "v_min": self.config.v_min,
+                "v_max": self.config.v_max,
+            },
+        }
+        
+        return ScoringResult(
+            s_b=s_b,
+            s_a=s_a,
+            q=q,
+            route_type=route_type,
+            details=details,
+        )
+
+
+# ==================== SH-DA++ v4.0: OnlineBudgetController ====================
+
+
+@dataclass
+class BudgetControllerConfig:
+    """
+    OnlineBudgetController 配置类 (SH-DA++ v4.0)
+    
+    Attributes:
+        window_size: 滑动窗口大小 W，用于计算实际调用率
+        k: 比例系数，控制阈值更新步长
+        lambda_min: 阈值下界
+        lambda_max: 阈值上界
+        lambda_init: 阈值初始值
+        target_budget: 目标调用率 B ∈ [0, 1]
+    """
+    window_size: int = 200          # W: 滑动窗口大小
+    k: float = 0.05                 # 比例系数
+    lambda_min: float = 0.0         # λ_min
+    lambda_max: float = 2.0         # λ_max
+    lambda_init: float = 0.5        # λ 初始值
+    target_budget: float = 0.2      # B: 目标调用率 (默认 20%)
+
+
+class OnlineBudgetController:
+    """
+    SH-DA++ v4.0 在线预算控制器
+    
+    动态调整分诊阈值 λ，使实际 VLM 调用率逼近目标预算 B。
+    
+    核心公式:
+        λ_{t+1} = clip(λ_t + k(B̄ - B), λ_min, λ_max)
+    
+    其中:
+        - B̄: 过去 W 个样本的实际调用率
+        - B: 目标调用率
+        - k: 比例系数（步长因子）
+    
+    Warmup 机制:
+        - 前 W 行不更新 λ，但记录调用情况
+        - Warmup 期间使用初始阈值 λ_init
+    
+    References:
+        - SH-DA++ v4.0 技术规范 Stage 1
+    """
+    
+    def __init__(self, config: BudgetControllerConfig = None):
+        """
+        初始化 OnlineBudgetController
+        
+        Args:
+            config: 预算控制器配置
+        """
+        self.config = config or BudgetControllerConfig()
+        
+        # 当前阈值
+        self._lambda = self.config.lambda_init
+        
+        # 滑动窗口：记录过去 W 次决策结果 (True=升级, False=不升级)
+        self._history: List[bool] = []
+        
+        # 样本计数器
+        self._sample_count: int = 0
+        
+        # 统计信息
+        self._total_upgrades: int = 0
+        self._lambda_history: List[float] = [self._lambda]
+    
+    @property
+    def current_lambda(self) -> float:
+        """当前阈值 λ"""
+        return self._lambda
+    
+    @property
+    def is_warmup(self) -> bool:
+        """是否处于 warmup 阶段"""
+        return self._sample_count < self.config.window_size
+    
+    @property
+    def actual_budget(self) -> float:
+        """
+        实际调用率 B̄
+        
+        Returns:
+            过去 W 个样本的升级比例，若样本不足则返回当前累计比例
+        """
+        if not self._history:
+            return 0.0
+        return sum(self._history) / len(self._history)
+    
+    @property
+    def total_budget(self) -> float:
+        """
+        总体调用率（从开始到当前）
+        """
+        if self._sample_count == 0:
+            return 0.0
+        return self._total_upgrades / self._sample_count
+    
+    def decide(self, q: float, lambda_override: float = None) -> bool:
+        """
+        决策函数：判断是否需要升级（调用 VLM）
+        
+        Args:
+            q: 综合优先级分数（来自 RuleOnlyScorer.score()）
+            lambda_override: 可选的阈值覆盖值（用于测试）
+            
+        Returns:
+            upgrade: True 表示需要升级（q ≥ λ），False 表示不升级
+        """
+        lam = lambda_override if lambda_override is not None else self._lambda
+        return q >= lam
+    
+    def update(self, upgrade_decision: bool) -> Dict:
+        """
+        更新控制器状态
+        
+        在每次决策后调用，记录决策结果并更新阈值。
+        
+        Args:
+            upgrade_decision: 本次决策结果（True=升级, False=不升级）
+            
+        Returns:
+            Dict: 更新详情，包含 lambda_before, lambda_after, actual_budget 等
+        """
+        # 记录决策
+        self._sample_count += 1
+        if upgrade_decision:
+            self._total_upgrades += 1
+        
+        # 维护滑动窗口
+        self._history.append(upgrade_decision)
+        if len(self._history) > self.config.window_size:
+            self._history.pop(0)  # 移除最旧的记录
+        
+        # 更新详情
+        details = {
+            "sample_count": self._sample_count,
+            "lambda_before": self._lambda,
+            "actual_budget": self.actual_budget,
+            "target_budget": self.config.target_budget,
+            "is_warmup": self.is_warmup,
+            "updated": False,
+        }
+        
+        # Warmup 期间不更新 λ
+        if self.is_warmup:
+            details["lambda_after"] = self._lambda
+            details["reason"] = "warmup"
+            return details
+        
+        # 计算阈值更新
+        # λ_{t+1} = clip(λ_t + k(B̄ - B), λ_min, λ_max)
+        B_bar = self.actual_budget      # 实际调用率
+        B = self.config.target_budget   # 目标调用率
+        k = self.config.k               # 比例系数
+        
+        delta = k * (B_bar - B)
+        lambda_new = self._lambda + delta
+        lambda_new = float(np.clip(lambda_new, self.config.lambda_min, self.config.lambda_max))
+        
+        details["delta"] = delta
+        details["lambda_after"] = lambda_new
+        details["updated"] = True
+        
+        # 更新阈值
+        self._lambda = lambda_new
+        self._lambda_history.append(self._lambda)
+        
+        return details
+    
+    def step(self, q: float) -> Tuple[bool, Dict]:
+        """
+        单步执行：决策 + 更新
+        
+        便捷方法，等价于：
+            upgrade = decide(q)
+            details = update(upgrade)
+        
+        Args:
+            q: 综合优先级分数
+            
+        Returns:
+            Tuple[upgrade, details]: 决策结果和更新详情
+        """
+        upgrade = self.decide(q)
+        details = self.update(upgrade)
+        details["q"] = q
+        details["upgrade"] = upgrade
+        return upgrade, details
+    
+    def reset(self):
+        """
+        重置控制器状态
+        
+        用于开始新的评估 epoch 或测试。
+        """
+        self._lambda = self.config.lambda_init
+        self._history.clear()
+        self._sample_count = 0
+        self._total_upgrades = 0
+        self._lambda_history = [self._lambda]
+    
+    def get_stats(self) -> Dict:
+        """
+        获取统计信息
+        
+        Returns:
+            Dict: 包含 lambda_current, lambda_history, actual_budget, total_budget 等
+        """
+        return {
+            "lambda_current": self._lambda,
+            "lambda_init": self.config.lambda_init,
+            "lambda_min": self.config.lambda_min,
+            "lambda_max": self.config.lambda_max,
+            "lambda_history_len": len(self._lambda_history),
+            "lambda_history_last_10": self._lambda_history[-10:],
+            "sample_count": self._sample_count,
+            "total_upgrades": self._total_upgrades,
+            "actual_budget_window": self.actual_budget,
+            "total_budget": self.total_budget,
+            "target_budget": self.config.target_budget,
+            "is_warmup": self.is_warmup,
+            "window_size": self.config.window_size,
+            "k": self.config.k,
+        }
 
 
 # ==================== 便捷函数 ====================
