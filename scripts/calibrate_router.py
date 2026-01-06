@@ -431,12 +431,59 @@ def update_config_yaml(
     print(f"\n[✓] 配置已更新: {config_path}")
 
 
+def load_config_defaults(config_path: str) -> Dict:
+    """
+    从配置文件加载默认值
+    
+    Args:
+        config_path: 配置文件路径
+        
+    Returns:
+        defaults: 默认参数字典
+    """
+    defaults = {}
+    
+    if not os.path.exists(config_path):
+        return defaults
+    
+    try:
+        import yaml
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f) or {}
+        
+        # 从配置中提取可能的默认值
+        # 注意：router_config.yaml 可能不包含这些字段，这里只是预留接口
+        if 'calibration' in config:
+            calib = config['calibration']
+            defaults['metadata'] = calib.get('metadata_path', '')
+            defaults['image_root'] = calib.get('image_root', '')
+            defaults['eta'] = calib.get('eta', 0.5)
+        
+        # 如果存在 sh_da_v4 配置，读取其中的参数
+        if 'sh_da_v4' in config:
+            sh_da = config['sh_da_v4']
+            if 'rule_scorer' in sh_da:
+                defaults['eta'] = sh_da['rule_scorer'].get('eta', 0.5)
+            if 'budget_controller' in sh_da:
+                defaults['budget'] = sh_da['budget_controller'].get('target_budget', 0.2)
+    
+    except Exception as e:
+        print(f"[Warning] 读取配置文件失败: {e}")
+    
+    return defaults
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='SH-DA++ v4.0 路由器参数校准脚本',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
+    # 使用配置文件
+    python scripts/calibrate_router.py \\
+        --config configs/router_config.yaml \\
+        --target_b 0.2
+
     # 使用 HWDB 训练集校准
     python scripts/calibrate_router.py \\
         --metadata ./data/raw/HWDB_Benchmark/train_metadata.jsonl \\
@@ -452,27 +499,39 @@ def main():
     )
     
     parser.add_argument(
+        '--config', '-c',
+        type=str,
+        default=None,
+        help='配置文件路径（用于读取默认值和更新配置）'
+    )
+    parser.add_argument(
         '--metadata', '-m',
         type=str,
-        default='./data/raw/HWDB_Benchmark/train_metadata.jsonl',
+        default=None,
         help='Metadata JSONL 文件路径'
     )
     parser.add_argument(
         '--image_root', '-i',
         type=str,
-        default='',
+        default=None,
         help='图像根目录（用于拼接相对路径）'
     )
     parser.add_argument(
         '--budget', '-b',
         type=float,
-        default=0.2,
+        default=None,
         help='目标调用率 B (default: 0.2 = 20%%)'
+    )
+    parser.add_argument(
+        '--target_b',
+        type=float,
+        dest='budget',
+        help='目标调用率 B 的别名 (等同于 --budget)'
     )
     parser.add_argument(
         '--eta',
         type=float,
-        default=0.5,
+        default=None,
         help='q 计算中的 η 参数 (default: 0.5)'
     )
     parser.add_argument(
@@ -484,8 +543,8 @@ def main():
     parser.add_argument(
         '--output_config', '-o',
         type=str,
-        default='./configs/router_config.yaml',
-        help='输出配置文件路径'
+        default=None,
+        help='输出配置文件路径（默认使用 --config 指定的路径）'
     )
     parser.add_argument(
         '--output_stats',
@@ -506,14 +565,41 @@ def main():
     
     args = parser.parse_args()
     
+    # 从配置文件加载默认值（如果提供了 --config）
+    config_defaults = {}
+    if args.config:
+        config_defaults = load_config_defaults(args.config)
+        # 如果未指定 output_config，使用 --config 指定的路径
+        if args.output_config is None:
+            args.output_config = args.config
+    
+    # 设置默认值（优先级：命令行参数 > 配置文件 > 硬编码默认值）
+    if args.metadata is None:
+        args.metadata = config_defaults.get('metadata', './data/raw/HWDB_Benchmark/train_metadata.jsonl')
+    
+    if args.image_root is None:
+        args.image_root = config_defaults.get('image_root', '')
+    
+    if args.budget is None:
+        args.budget = config_defaults.get('budget', 0.2)
+    
+    if args.eta is None:
+        args.eta = config_defaults.get('eta', 0.5)
+    
+    if args.output_config is None:
+        args.output_config = './configs/router_config.yaml'
+    
     print("=" * 70)
     print("  SH-DA++ v4.0 路由器参数校准")
     print("=" * 70)
+    if args.config:
+        print(f"  配置文件: {args.config}")
     print(f"  Metadata: {args.metadata}")
     print(f"  Image Root: {args.image_root or '(使用绝对路径)'}")
     print(f"  目标调用率 B: {args.budget:.1%}")
     print(f"  η 参数: {args.eta}")
     print(f"  样本限制: {args.limit or '无限制'}")
+    print(f"  输出配置: {args.output_config}")
     print("=" * 70)
     
     # 1. 加载 metadata
