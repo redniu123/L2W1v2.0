@@ -143,9 +143,97 @@ def load_metadata(metadata_path: str, limit: int = None) -> List[Dict]:
     return samples
 
 
+def infer_image_root(metadata_path: str) -> str:
+    """
+    从 metadata 路径自动推断 image_root
+    
+    例如：metadata_path = "./data/raw/HWDB_Benchmark/train_metadata.jsonl"
+         → image_root = "./data/raw/HWDB_Benchmark/"
+    
+    Args:
+        metadata_path: metadata 文件路径
+        
+    Returns:
+        image_root: 推断的图像根目录
+    """
+    metadata_path_obj = Path(metadata_path)
+    # 返回 metadata 文件所在目录
+    return str(metadata_path_obj.parent)
+
+
+def resolve_image_path(image_path_str: str, image_root: str = None, metadata_dir: str = None) -> Optional[str]:
+    """
+    智能解析图像路径，支持多种格式
+    
+    解析顺序：
+    1. 绝对路径（直接检查）
+    2. 相对于 image_root
+    3. 相对于 metadata 文件所在目录
+    4. 相对于当前工作目录
+    5. 仅文件名（在 image_root 中搜索）
+    
+    Args:
+        image_path_str: 图像路径字符串（来自 metadata）
+        image_root: 图像根目录
+        metadata_dir: metadata 文件所在目录
+        
+    Returns:
+        解析后的完整路径，如果不存在则返回 None
+    """
+    # 标准化路径
+    image_path_str = os.path.normpath(image_path_str)
+    
+    # 候选路径列表
+    candidates = []
+    
+    # 优先级 1: 绝对路径
+    if os.path.isabs(image_path_str):
+        candidates.append(image_path_str)
+    
+    # 优先级 2: 相对于 image_root
+    if image_root:
+        image_root_path = Path(image_root)
+        # 检查是否已经包含 image_root（避免重复拼接）
+        image_path_normalized = image_path_str.replace("\\", "/").strip("./")
+        image_root_normalized = str(image_root_path).replace("\\", "/").strip("./")
+        
+        if not image_path_normalized.startswith(image_root_normalized):
+            # 未包含，尝试拼接
+            candidates.append(str(image_root_path / image_path_str))
+        else:
+            # 已包含，直接使用
+            candidates.append(image_path_str)
+        
+        # 仅文件名情况
+        filename_only = Path(image_path_str).name
+        candidates.append(str(image_root_path / filename_only))
+        candidates.append(str(image_root_path / "images" / filename_only))
+    
+    # 优先级 3: 相对于 metadata 文件所在目录
+    if metadata_dir:
+        metadata_dir_path = Path(metadata_dir)
+        candidates.append(str(metadata_dir_path / image_path_str))
+        candidates.append(str(metadata_dir_path / Path(image_path_str).name))
+        candidates.append(str(metadata_dir_path / "images" / Path(image_path_str).name))
+    
+    # 优先级 4: 相对于当前工作目录
+    candidates.append(image_path_str)
+    candidates.append(str(Path(image_path_str).name))
+    
+    # 尝试每个候选路径
+    for candidate in candidates:
+        candidate_path = Path(candidate)
+        if candidate_path.exists() and candidate_path.is_file():
+            return str(candidate_path.resolve())
+    
+    # 所有候选路径都不存在
+    return None
+
+
 def process_samples_with_engine(
     samples: List[Dict],
     image_root: str,
+    metadata_dir: str = None,
     eta: float = 0.5,
     verbose: bool = False,
 ) -> Tuple[List[float], List[float], List[str], List[Dict]]:
@@ -155,6 +243,7 @@ def process_samples_with_engine(
     Args:
         samples: 样本列表
         image_root: 图像根目录
+        metadata_dir: metadata 文件所在目录（用于路径解析）
         eta: q 计算中的 η 参数
         verbose: 是否打印详细日志
         
@@ -193,22 +282,48 @@ def process_samples_with_engine(
         use_engine = False
         scorer = None
     
+    # 统计信息
+    failed_count = 0
+    success_count = 0
+    
     # 处理样本
     for i, sample in enumerate(samples):
         if verbose and (i + 1) % 100 == 0:
-            print(f"[Progress] 处理中: {i+1}/{len(samples)}")
+            print(f"[Progress] 处理中: {i+1}/{len(samples)} (成功: {success_count}, 失败: {failed_count})")
         
         try:
-            # 获取图像路径
-            image_path = sample.get('image_path', sample.get('image', ''))
-            if image_root and not os.path.isabs(image_path):
-                image_path = os.path.join(image_root, image_path)
+            # 获取图像路径（支持 'image' 和 'image_path' 字段）
+            image_path_str = sample.get('image_path', sample.get('image', ''))
+            
+            if not image_path_str:
+                failed_count += 1
+                if verbose:
+                    print(f"[Warning] 样本 {i+1} 缺少图像路径字段")
+                continue
+            
+            # 使用智能路径解析
+            resolved_path = resolve_image_path(
+                image_path_str=image_path_str,
+                image_root=image_root,
+                metadata_dir=metadata_dir,
+            )
+            
+            if resolved_path is None:
+                failed_count += 1
+                if verbose or i < 5:  # 前5个失败时总是打印
+                    print(f"[Warning] 无法解析图像路径 (样本 {i+1}): {image_path_str}")
+                    if image_root:
+                        print(f"  尝试的根目录: {image_root}")
+                    if metadata_dir:
+                        print(f"  Metadata 目录: {metadata_dir}")
+                continue
             
             # 读取图像
-            image = cv2.imread(image_path)
+            image = cv2.imread(resolved_path)
             if image is None:
-                if verbose:
-                    print(f"[Warning] 无法读取图像: {image_path}")
+                failed_count += 1
+                if verbose or i < 5:
+                    print(f"[Warning] 无法读取图像 (样本 {i+1}): {resolved_path}")
                 continue
             
             # 1. 计算 v_edge (Sobel 边缘响应)
@@ -275,10 +390,18 @@ def process_samples_with_engine(
                 "q": q,
                 "route_type": route_type,
             })
+            success_count += 1
             
         except Exception as e:
+            failed_count += 1
             if verbose:
-                print(f"[Error] 处理样本 {i} 失败: {e}")
+                print(f"[Error] 处理样本 {i+1} 失败: {e}")
+            import traceback
+            if verbose:
+                traceback.print_exc()
+    
+    if verbose or failed_count > 0:
+        print(f"\n[统计] 处理完成: 成功 {success_count}, 失败 {failed_count}, 总计 {len(samples)}")
     
     return v_edges, q_scores, route_types, details
 
@@ -579,6 +702,11 @@ def main():
     
     if args.image_root is None:
         args.image_root = config_defaults.get('image_root', '')
+        # 如果仍为空，从 metadata 路径自动推断
+        if not args.image_root:
+            args.image_root = infer_image_root(args.metadata)
+            if args.image_root:
+                print(f"[Info] 自动推断 Image Root: {args.image_root}")
     
     if args.budget is None:
         args.budget = config_defaults.get('budget', 0.2)
@@ -595,7 +723,8 @@ def main():
     if args.config:
         print(f"  配置文件: {args.config}")
     print(f"  Metadata: {args.metadata}")
-    print(f"  Image Root: {args.image_root or '(使用绝对路径)'}")
+    print(f"  Image Root: {args.image_root or '(自动推断或使用绝对路径)'}")
+    print(f"  Metadata 目录: {Path(args.metadata).parent}")
     print(f"  目标调用率 B: {args.budget:.1%}")
     print(f"  η 参数: {args.eta}")
     print(f"  样本限制: {args.limit or '无限制'}")
@@ -621,10 +750,14 @@ def main():
     # 2. 处理样本，提取信号
     print("\n[Step 2] 提取 v_edge 和计算 q 分数...")
     
+    # 获取 metadata 文件所在目录
+    metadata_dir = str(Path(args.metadata).parent)
+    
     start_time = time.time()
     v_edges, q_scores, route_types, details = process_samples_with_engine(
         samples=samples,
         image_root=args.image_root,
+        metadata_dir=metadata_dir,
         eta=args.eta,
         verbose=args.verbose,
     )
