@@ -88,6 +88,7 @@ class PipelineConfig:
     agent_b_model_path: str = "Qwen/Qwen2.5-VL-3B-Instruct"
     agent_b_use_4bit: bool = True
     agent_b_use_flash_attention: bool = True
+    skip_agent_b: bool = False      # 是否完全跳过 Agent B（Stage 1 数据采集模式）
     
     # 流水线配置
     use_mock: bool = False          # 是否使用模拟模式
@@ -594,48 +595,59 @@ class L2W1Pipeline:
         
         # Step 4: 条件调用 Agent B (异步 + 超时回退)
         if upgrade:
-            if self.config.verbose:
-                print("[Pipeline] Step 4: 异步调用 Agent B...")
-            
             result.routed_to_agent_b = True
             self.stats["routed_to_agent_b"] += 1
             self.stats["upgrade_count"] += 1
             
-            # 构建 manifest
-            manifest = {
-                'ocr_text': result.agent_a_text,
-                'suspicious_index': result.suspicious_index,
-                'suspicious_char': result.suspicious_char,
-                'risk_level': result.risk_level,
-                'route_type': result.route_type,
-                's_b': result.s_b,
-                's_a': result.s_a,
-            }
-            
-            # 异步调用 Agent B，支持超时回退
-            agent_b_text, b_timeout, b_fallback = self._call_agent_b_async(
-                image, manifest, result.agent_a_text
-            )
-            
-            result.agent_b_text = agent_b_text
-            result.b_timeout = b_timeout
-            result.b_fallback = b_fallback
-            
-            if b_timeout:
-                self.stats["b_timeout_count"] += 1
-            if b_fallback:
-                self.stats["b_fallback_count"] += 1
-            
-            # 判断是否有修正
-            result.agent_b_is_corrected = (
-                not b_fallback and agent_b_text != result.agent_a_text
-            )
-            
-            if result.agent_b_is_corrected:
-                self.stats["corrected_by_agent_b"] += 1
-            
-            # 最终文本：fallback 时使用 Agent A，否则使用 Agent B
-            result.final_text = result.agent_a_text if b_fallback else result.agent_b_text
+            # 检查是否跳过 Agent B（Stage 1 数据采集模式）
+            if self.config.skip_agent_b:
+                if self.config.verbose:
+                    print("[Pipeline] Step 4: 跳过 Agent B (skip_agent_b=True)")
+                
+                # Stage 1 模式：只记录路由决策，不实际调用 Agent B
+                result.agent_b_text = ""
+                result.b_timeout = False
+                result.b_fallback = True  # 标记为回退
+                result.final_text = result.agent_a_text
+            else:
+                if self.config.verbose:
+                    print("[Pipeline] Step 4: 异步调用 Agent B...")
+                
+                # 构建 manifest
+                manifest = {
+                    'ocr_text': result.agent_a_text,
+                    'suspicious_index': result.suspicious_index,
+                    'suspicious_char': result.suspicious_char,
+                    'risk_level': result.risk_level,
+                    'route_type': result.route_type,
+                    's_b': result.s_b,
+                    's_a': result.s_a,
+                }
+                
+                # 异步调用 Agent B，支持超时回退
+                agent_b_text, b_timeout, b_fallback = self._call_agent_b_async(
+                    image, manifest, result.agent_a_text
+                )
+                
+                result.agent_b_text = agent_b_text
+                result.b_timeout = b_timeout
+                result.b_fallback = b_fallback
+                
+                if b_timeout:
+                    self.stats["b_timeout_count"] += 1
+                if b_fallback:
+                    self.stats["b_fallback_count"] += 1
+                
+                # 判断是否有修正
+                result.agent_b_is_corrected = (
+                    not b_fallback and agent_b_text != result.agent_a_text
+                )
+                
+                if result.agent_b_is_corrected:
+                    self.stats["corrected_by_agent_b"] += 1
+                
+                # 最终文本：fallback 时使用 Agent A，否则使用 Agent B
+                result.final_text = result.agent_a_text if b_fallback else result.agent_b_text
         else:
             if self.config.verbose:
                 print("[Pipeline] Step 4: 跳过 Agent B (upgrade=False)")

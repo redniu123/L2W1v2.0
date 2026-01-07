@@ -314,8 +314,8 @@ def run_stage1_collection(
         verbose=verbose,
         router_features_log=str(output_dir_path / "router_features.jsonl"),
         
-        # Agent B 配置（Stage 1 可跳过）
-        agent_b_timeout_ms=500 if not skip_agent_b else 10,  # 跳过时设置极短超时
+        # Agent B 配置（Stage 1 完全跳过 Agent B）
+        skip_agent_b=skip_agent_b,  # 完全跳过 Agent B，不加载模型
     )
     
     pipeline = L2W1Pipeline(pipeline_config)
