@@ -367,11 +367,17 @@ class TextRecognizerWithLogits(object):
         
         # ========== SH-DA++ v4.0: 保存字符表和 blank_id ==========
         # 从 postprocess_op 动态获取 blank_id (CTCLabelDecode 约定为 0)
-        self.blank_id = 0  # 默认值
+        # 严格遵循 CTCLabelDecode.get_ignored_tokens() 的约定
+        self.blank_id = 0  # 默认值，CTCLabelDecode 的 blank token 固定为 0
         if hasattr(self.postprocess_op, 'get_ignored_tokens'):
-            ignored_tokens = self.postprocess_op.get_ignored_tokens()
-            if ignored_tokens and len(ignored_tokens) > 0:
-                self.blank_id = ignored_tokens[0]  # 第一个 ignored token 通常是 blank
+            try:
+                ignored_tokens = self.postprocess_op.get_ignored_tokens()
+                if ignored_tokens and len(ignored_tokens) > 0:
+                    # CTCLabelDecode.get_ignored_tokens() 返回 [0]
+                    self.blank_id = int(ignored_tokens[0])
+            except Exception as e:
+                logger.warning(f"Failed to get ignored_tokens from postprocess_op: {e}. Using default blank_id=0")
+                self.blank_id = 0
         
         self.rho = 0.1  # 边界区域比例因子
         
@@ -1247,32 +1253,79 @@ def main(args):
         valid_image_file_list.append(image_file)
         img_list.append(img)
     try:
-        # L2W1: 获取增强返回值
+        # SH-DA++ v4.0: 获取增强返回值
         output = text_recognizer(img_list)
         rec_res = output["results"]
-        logits_list = output["logits"]
+        boundary_stats_list = output.get("boundary_stats", [])
+        top2_info_list = output.get("top2_info", [])
+        lat_router_ms_list = output.get("lat_router_ms", [])
+        router_config = output.get("router_config", {})
         elapsed = output["elapsed_time"]
+        
+        logger.info(f"[SH-DA++ v4.0] Router Config: blank_id={router_config.get('blank_id', 'N/A')}, rho={router_config.get('rho', 'N/A')}")
 
     except Exception as E:
         logger.info(traceback.format_exc())
         logger.info(E)
         exit()
 
+    # 打印识别结果和特征
     for ino in range(len(img_list)):
         logger.info(
             "Predicts of {}:{}".format(valid_image_file_list[ino], rec_res[ino])
         )
-        # L2W1: 打印 logits 形状信息
-        if logits_list[ino] is not None:
-            logger.info(
-                "  -> Logits shape: {} (Seq_Len={}, Vocab_Size={})".format(
-                    logits_list[ino].shape,
-                    logits_list[ino].shape[0],
-                    logits_list[ino].shape[1],
+        
+        # SH-DA++ v4.0: 打印边界统计量
+        if ino < len(boundary_stats_list) and boundary_stats_list[ino] is not None:
+            bs = boundary_stats_list[ino]
+            if bs.get('valid', False):
+                logger.info(
+                    "  -> Boundary Stats: "
+                    f"blank_mean_L={bs.get('blank_mean_L', 0):.4f}, "
+                    f"blank_mean_R={bs.get('blank_mean_R', 0):.4f}, "
+                    f"blank_peak_L={bs.get('blank_peak_L', 0):.4f}, "
+                    f"blank_peak_R={bs.get('blank_peak_R', 0):.4f}, "
+                    f"T={bs.get('T', 0)}"
                 )
+            else:
+                logger.info("  -> Boundary Stats: invalid (T < 2)")
+        
+        # SH-DA++ v4.0: 打印 Top-2 信息
+        if ino < len(top2_info_list) and top2_info_list[ino] is not None:
+            top2 = top2_info_list[ino]
+            status = top2.get('top2_status', 'unknown')
+            logger.info(
+                f"  -> Top-2 Info: status={status}, "
+                f"T={top2.get('T', 0)}, C={top2.get('C', 0)}, "
+                f"top1_conf_mean={top2.get('top1_conf_mean', 0):.4f}, "
+                f"conf_gap_mean={top2.get('conf_gap_mean', 0):.4f}"
             )
+            if status == 'missing':
+                error_msg = top2.get('error', 'Unknown error')
+                logger.warning(f"    Top-2 extraction failed: {error_msg}")
+        
+        # SH-DA++ v4.0: 打印路由器耗时
+        if ino < len(lat_router_ms_list):
+            logger.info(f"  -> Router Latency: {lat_router_ms_list[ino]:.2f} ms")
 
     logger.info(f"Total elapsed time: {elapsed:.3f}s")
+    
+    # SH-DA++ v4.0: 统计信息汇总
+    valid_boundary_stats = [bs for bs in boundary_stats_list if bs and bs.get('valid', False)]
+    if valid_boundary_stats:
+        avg_blank_mean_L = np.mean([bs.get('blank_mean_L', 0) for bs in valid_boundary_stats])
+        avg_blank_mean_R = np.mean([bs.get('blank_mean_R', 0) for bs in valid_boundary_stats])
+        logger.info(
+            f"[Summary] Valid boundary stats samples: {len(valid_boundary_stats)}/{len(img_list)}, "
+            f"avg blank_mean_L={avg_blank_mean_L:.4f}, avg blank_mean_R={avg_blank_mean_R:.4f}"
+        )
+    
+    if lat_router_ms_list:
+        avg_router_lat = np.mean([lat for lat in lat_router_ms_list if lat > 0])
+        max_router_lat = max(lat_router_ms_list) if lat_router_ms_list else 0
+        logger.info(
+            f"[Summary] Router latency: avg={avg_router_lat:.2f} ms, max={max_router_lat:.2f} ms"
+        )
 
     if args.benchmark:
         text_recognizer.autolog.report()
