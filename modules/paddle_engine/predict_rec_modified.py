@@ -69,66 +69,67 @@ def compute_softmax(
     debug: bool = False,
 ) -> np.ndarray:
     """
-    带温度参数的数值稳定 Softmax 计算 (Temperature-scaled Numerically Stable Softmax)
+    智能 Softmax 计算 (Smart Softmax with Auto-Detection)
 
-    实现公式:
+    关键特性：
+        - 自动检测输入是否已经是概率（PP-OCRv5 输出的就是概率，不是原始 logits）
+        - 如果输入已是概率（范围 [0, 1]），直接返回，跳过 Softmax
+        - 如果输入是原始 logits，才进行 Softmax + 温度缩放
+
+    PP-OCRv5 特性：
+        PaddleOCR 的 CTC Head 已经内置了 Softmax 层，模型输出的 `outputs[0]` 
+        已经是概率分布（每行和为 1），而不是原始 logits。因此不应再次应用 Softmax。
+
+    实现公式 (仅当输入是原始 logits 时):
         Softmax(x_i / T) = exp((x_i - max(x)) / T) / Σ exp((x_j - max(x)) / T)
 
-    温度参数作用:
-        - T < 1.0: 放大概率差异，使分布更"尖锐" (用于 logits 值范围较小的情况)
-        - T = 1.0: 标准 Softmax
-        - T > 1.0: 平滑概率分布，使分布更"平坦"
-
-    SH-DA++ v4.0 关键修复:
-        当原始 logits 值范围过小（如 [-1, 1]）时，标准 Softmax 会导致概率趋于均匀。
-        通过设置 T=0.1 可以有效放大差异，恢复真实的置信度分布。
-
-    数值稳定性保证:
-        通过减去最大值避免 exp() 溢出，这是标准的 log-sum-exp trick。
-
     Args:
-        logits: 原始 logits 张量，形状为 [..., C] 或 [T, C]
-                其中 C 为词表大小 (Vocab Size)
+        logits: 输入张量，可能是：
+                - 原始 logits (范围可能 < 0 或 > 1)
+                - 已是概率 (范围 [0, 1]，每行和为 1)
         axis: 沿哪个轴计算 Softmax，默认为最后一轴 (-1)
-        temperature: 温度参数 T，默认 1.0
-                     - 当 logits 范围较小时建议使用 T=0.1
-                     - 有效范围: (0, +∞)，但 T ≤ 0.01 可能导致数值不稳定
-        debug: 是否打印调试信息（logits 范围统计）
+        temperature: 温度参数 T，默认 1.0（仅对原始 logits 有效）
+        debug: 是否打印调试信息
 
     Returns:
         E: 归一化后的 Emission 矩阵，E ∈ [0,1]^{T×C}
            满足 Σ_c E[t,c] = 1 对于所有时间步 t
-
-    Complexity:
-        Time: O(T × C)
-        Space: O(T × C) for output matrix
-
-    Example:
-        >>> logits = np.random.randn(80, 6625) * 0.5  # 小范围 logits
-        >>> E_standard = compute_softmax(logits, temperature=1.0)
-        >>> E_sharpened = compute_softmax(logits, temperature=0.1)
-        >>> # E_sharpened 将有更明显的峰值
-
-    References:
-        [1] Goodfellow et al., Deep Learning, Section 4.1
-        [2] Hinton et al., Distilling the Knowledge in a Neural Network (2015)
-        [3] https://cs231n.github.io/linear-classify/#softmax
     """
+    # 检测输入是否已经是概率分布
+    # PP-OCRv5 的输出已经是 Softmax 后的概率
+    input_min = logits.min()
+    input_max = logits.max()
+    
+    # 计算每行的和，检查是否接近 1（概率分布的特征）
+    row_sums = np.sum(logits, axis=axis)
+    is_probability = (
+        input_min >= -0.001 and  # 概率最小值应 >= 0
+        input_max <= 1.001 and   # 概率最大值应 <= 1
+        np.allclose(row_sums, 1.0, atol=0.01)  # 每行和应接近 1
+    )
+    
+    if debug:
+        print(f"[compute_softmax] 输入范围: min={input_min:.4f}, max={input_max:.4f}, "
+              f"row_sum_mean={row_sums.mean():.4f}")
+        if is_probability:
+            print(f"[compute_softmax] ✓ 检测到输入已是概率分布，跳过 Softmax")
+        else:
+            print(f"[compute_softmax] ✓ 检测到输入是原始 logits，应用 Softmax (T={temperature})")
+    
+    # 如果输入已经是概率，直接返回
+    if is_probability:
+        return logits
+    
+    # 以下是原始 logits 的处理逻辑
     # 温度参数验证
     if temperature <= 0:
         raise ValueError(f"Temperature must be positive, got {temperature}")
-    
-    # 调试：打印 logits 范围统计
-    if debug:
-        print(f"[compute_softmax] logits 范围: min={logits.min():.4f}, max={logits.max():.4f}, "
-              f"mean={logits.mean():.4f}, std={logits.std():.4f}, temperature={temperature}")
     
     # Step 1: 减去最大值以保证数值稳定性 (防止 exp 溢出)
     logits_max = np.max(logits, axis=axis, keepdims=True)
     logits_shifted = logits - logits_max
 
     # Step 2: 应用温度缩放 (Temperature Scaling)
-    # 当 T < 1 时，放大差异；当 T > 1 时，平滑分布
     logits_scaled = logits_shifted / temperature
 
     # Step 3: 计算 exp

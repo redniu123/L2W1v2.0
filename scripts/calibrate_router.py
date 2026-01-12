@@ -417,6 +417,18 @@ def process_samples_with_engine(
 
             # 2. 获取 Stage 0 信号并计算 q（严格模式：真实推理）
             output = engine([image])
+            
+            # 提取识别结果
+            results_list = output.get("results", [])
+            rec_text = ""
+            rec_conf = 0.0
+            if results_list and len(results_list) > 0:
+                if isinstance(results_list[0], (list, tuple)) and len(results_list[0]) >= 2:
+                    rec_text, rec_conf = results_list[0][0], results_list[0][1]
+                elif isinstance(results_list[0], dict):
+                    rec_text = results_list[0].get("text", "")
+                    rec_conf = results_list[0].get("confidence", 0.0)
+            
             boundary_stats = (
                 output.get("boundary_stats", [{}])[0]
                 if output.get("boundary_stats")
@@ -436,6 +448,12 @@ def process_samples_with_engine(
 
             q = result.q
             route_type = result.route_type.value
+            
+            # ========== 实时打印识别结果（每 100 个样本 + 前 5 个） ==========
+            if (i + 1) <= 5 or (i + 1) % 100 == 0:
+                display_text = rec_text[:25] + "..." if len(rec_text) > 25 else rec_text
+                sample_id = sample.get("id", f"sample_{i}")
+                print(f"  [{sample_id}] '{display_text}' | conf={rec_conf:.2%} | q={q:.4f} | v_edge={v_edge:.2f}")
 
             v_edges.append(v_edge)
             q_scores.append(q)
@@ -443,6 +461,8 @@ def process_samples_with_engine(
             details.append(
                 {
                     "id": sample.get("id", f"sample_{i}"),
+                    "text": rec_text,
+                    "confidence": rec_conf,
                     "v_edge": v_edge,
                     "q": q,
                     "route_type": route_type,
