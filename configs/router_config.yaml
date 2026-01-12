@@ -1,92 +1,150 @@
-# L2W1 路由器配置文件
-# Router Configuration for Uncertainty-based Routing
+# =============================================================================
+# SH-DA++ v4.0 Router Configuration
+# 三层路由架构：Layer1(风险评分) -> Layer2(战略分诊) -> Layer3(预算控制)
+# =============================================================================
 
 # =============================================================================
-# 视觉不确定性阈值 (Visual Entropy Thresholds)
+# Stage 0: 信号提取参数 (Signal Extraction)
 # =============================================================================
-# 基于 CTC Logits 的 Shannon Entropy 计算
-# 理论最大熵 = log(vocab_size) ≈ log(6625) ≈ 8.8
 
-visual:
-  # 低熵阈值：低于此值视为高置信度识别
-  # 典型值: 2.0-3.0 (清晰文字)
-  entropy_threshold_low: 2.0
+stage0:
+  # CTC Emission 相关
+  blank_id: 0                    # Blank token ID (PaddleOCR 默认为 0)
+  rho: 0.1                       # 边界窗口比例 ρ，L=[1,⌊ρT⌋], R=[⌈(1-ρ)T⌉,T]
   
-  # 高熵阈值：高于此值视为低置信度识别
-  # 典型值: 4.0-5.0 (模糊/复杂文字)
-  entropy_threshold_high: 4.0
+  # Top-2 信号
+  top2_enabled: true             # 是否启用 Top-2 概率提取
+  top2_fallback: "char_conf"     # Top-2 缺失时的降级策略: "char_conf" 或 "skip"
   
-  # CTC blank 符号索引 (PaddleOCR 默认为 0)
-  blank_idx: 0
-  
-  # 防止 log(0) 的小常数
-  epsilon: 1.0e-10
+  # 抽样调试
+  debug_sample_rate: 1000        # 每 N 行抽样保存 E_blank 序列
+  save_edge_probe_debug: false   # 是否保存边缘探针可视化
 
 # =============================================================================
-# 语义不确定性阈值 (Semantic PPL Thresholds)
+# Layer 1: 风险评分参数 (Risk Scorers) - RuleOnlyScorer
 # =============================================================================
-# 基于语言模型的困惑度评估
 
-semantic:
-  # 低 PPL 阈值：低于此值视为流畅文本
-  # 典型值: 30-80 (标准中文文本)
-  ppl_threshold_low: 50.0
+sh_da_v4:
+  rule_scorer:
+    # EdgeProbe 归一化参数 (通过 calibrate_router.py 自动校准)
+    v_min: 0.0                   # v_edge 的 1% 分位数
+    v_max: 5.0                   # v_edge 的 99% 分位数
+    
+    # 边界风险 s_b 系数: s_b = clip(a1*(v_edge*b_edge) + a2*b_edge + a3*drop, 0, 1)
+    a1: 0.333                    # v_edge * b_edge 权重
+    a2: 0.333                    # b_edge 权重
+    a3: 0.333                    # drop 权重
+    
+    # 置信度陡降检测
+    K: 2                         # 边界字符窗口大小
+    
+    # 综合优先级 q = max(s_b, s_a) + η * r_d
+    eta: 0.5                     # 语义风险权重 η
+    
+    # 分诊阈值 λ (初始值，通过 calibrate_router.py 校准)
+    lambda_threshold: 0.5        # 初始 λ_0，建议取验证集 q 的 (1-B) 分位数
+    
+  budget_controller:
+    # 在线预算控制器参数 (P-control)
+    window_size: 200             # 滑动窗口 W
+    k: 0.05                      # 比例系数 k
+    lambda_min: 0.0              # λ 下界
+    lambda_max: 2.0              # λ 上界
+    lambda_init: 0.5             # λ 初始值 (会被 calibrate_router.py 覆盖)
+    target_budget: 0.2           # 目标调用率 B (20%)
+    warmup_samples: 200          # 前 W 行不更新 λ
+
+# =============================================================================
+# Layer 2: 战略分诊参数 (Strategic Triage)
+# =============================================================================
+
+triage:
+  # RoI 裁剪参数
+  boundary_roi_ratio: 0.15       # BOUNDARY 路径裁取左右各 15% 宽度
+  ambiguity_context_chars: 1     # AMBIGUITY 路径以 idx_susp 为中心扩展的字符数
   
-  # 高 PPL 阈值：高于此值视为异常文本
-  # 典型值: 150-300 (可能有识别错误)
-  ppl_threshold_high: 200.0
+  # 是否启用 RoI 裁剪 (Stage 3 启用)
+  enable_roi_crop: false
   
-  # 语言模型路径 (留空则使用简单估计)
-  # 推荐: Qwen2.5-0.5B 或 ChatGLM3-6B
-  model_path: ""
+  # y 方向协议
+  keep_full_height: true         # 保留全高，避免截笔画
+  y_padding_ratio: 0.05          # 上下各保留 5% padding (备选方案)
+
+# =============================================================================
+# Layer 3: 回填与拒改规则 (Backfill & Rejection)
+# =============================================================================
+
+backfill:
+  # 严格回填规则
+  strict_mode: true              # 启用严格回填 (BOUNDARY 只许首尾, AMBIGUITY 只许单点)
   
-  # 是否使用 GPU
+  # 全局拒改阈值
+  max_edit_distance: 2           # ED > 2 则拒改
+  max_length_change_ratio: 0.2   # 长度变化 > 20% 则拒改
+  
+  # 安全红线
+  cvr_threshold: 0.3             # CVR > 30% 触发熔断
+  aer_threshold: 0.2             # AER < 20% 表示升级无效
+
+# =============================================================================
+# Agent 配置
+# =============================================================================
+
+agent_a:
+  model_dir: "./models/ppocrv5_rec"
+  rec_image_shape: "3, 48, 320"
+  rec_char_dict_path: "./ppocr/utils/ppocr_keys_v1.txt"
+  rec_algorithm: "SVTR_LCNet"
+  use_space_char: true
+  batch_size: 6
   use_gpu: true
+  gpu_mem: 500
+
+agent_b:
+  # Stage 1 默认跳过 Agent B
+  skip: true                     # Stage 1 设为 true，Stage 2+ 设为 false
+  model_name: "Qwen/Qwen2.5-VL-3B-Instruct"
+  timeout_ms: 500                # 超时阈值 (ms)
+  max_queue_size: 10             # 异步队列最大长度
 
 # =============================================================================
-# 路由策略 (Routing Strategy)
-# =============================================================================
-
-routing:
-  # 风险等级定义
-  risk_levels:
-    low: "Agent A 结果可信，无需 Agent B"
-    medium: "单一指标超阈值，建议 Agent B 验证"
-    high: "多指标超阈值，必须 Agent B 处理"
-    critical: "严重不确定性，需人工复核"
-  
-  # 置信度权重
-  # Agent A 置信度 < 此值时，提升风险等级
-  confidence_threshold: 0.8
-  
-  # 批量处理时的并行数
-  batch_size: 32
-
-# =============================================================================
-# 输出格式 (Output Format)
+# 输出与日志 (Output & Logging)
 # =============================================================================
 
 output:
-  # Manifest JSON 格式
-  # 用于 Agent B 的显式索引提示 (EIP)
-  manifest_format:
-    - is_hard          # bool: 是否需要 Agent B
-    - suspicious_index # int: 存疑字符位置 (0-indexed)
-    - suspicious_char  # str: 存疑字符内容
-    - risk_level       # str: 风险等级
-    - metrics          # dict: 详细指标
+  results_dir: "./results"
+  
+  # Stage 0/1 核心日志文件
+  router_features_log: "router_features.jsonl"
+  backfill_log: "backfill_log.jsonl"
+  metrics_summary: "metrics_summary.json"
+  
+  # 抽样调试文件
+  edge_probe_debug_dir: "./results/debug/edge_probe/"
+  blank_curve_debug_dir: "./results/debug/blank_curves/"
 
 # =============================================================================
 # 调试选项 (Debug Options)
 # =============================================================================
 
 debug:
-  # 是否打印详细日志
   verbose: false
-  
-  # 是否保存熵序列可视化
   save_entropy_plot: false
-  
-  # 可视化保存路径
   plot_save_dir: "./outputs/entropy_plots/"
+
+# =============================================================================
+# 旧版兼容 (Legacy Compatibility) - 逐步废弃
+# =============================================================================
+
+visual:
+  entropy_threshold_low: 2.0
+  entropy_threshold_high: 4.0
+  blank_idx: 0
+  epsilon: 1.0e-10
+
+semantic:
+  ppl_threshold_low: 50.0
+  ppl_threshold_high: 200.0
+  model_path: ""
+  use_gpu: true
 
