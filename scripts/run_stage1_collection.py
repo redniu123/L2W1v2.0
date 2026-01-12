@@ -311,29 +311,35 @@ def run_stage1_collection(
         sys.exit(1)
 
     # 检查 params 文件（inference.pdiparams 或 model.pdiparams）
-    has_params = (model_dir_path / "inference.pdiparams").exists() or (model_dir_path / "model.pdiparams").exists()
-    
+    has_params = (model_dir_path / "inference.pdiparams").exists() or (
+        model_dir_path / "model.pdiparams"
+    ).exists()
+
     # 检查 model 文件（.pdmodel 或 .json，PP-OCRv5 使用 .json）
     has_model = (
-        (model_dir_path / "inference.pdmodel").exists() or 
-        (model_dir_path / "inference.json").exists() or
-        (model_dir_path / "model.pdmodel").exists() or
-        (model_dir_path / "model.json").exists()
+        (model_dir_path / "inference.pdmodel").exists()
+        or (model_dir_path / "inference.json").exists()
+        or (model_dir_path / "model.pdmodel").exists()
+        or (model_dir_path / "model.json").exists()
     )
-    
+
     if not has_params:
         print(f"[FATAL] 模型参数文件缺失: {model_dir}")
         print("  需要 inference.pdiparams 或 model.pdiparams")
         print("\n  请下载 PP-OCRv5 识别模型:")
-        print("  wget https://paddle-model-ecology.bj.bcebos.com/model/ocr/PP-OCRv5/ch_PP-OCRv5_rec_infer.tar")
+        print(
+            "  wget https://paddle-model-ecology.bj.bcebos.com/model/ocr/PP-OCRv5/ch_PP-OCRv5_rec_infer.tar"
+        )
         print("  tar -xf ch_PP-OCRv5_rec_infer.tar")
         sys.exit(1)
-    
+
     if not has_model:
         print(f"[FATAL] 模型定义文件缺失: {model_dir}")
-        print("  需要以下之一: inference.pdmodel, inference.json, model.pdmodel, model.json")
+        print(
+            "  需要以下之一: inference.pdmodel, inference.json, model.pdmodel, model.json"
+        )
         sys.exit(1)
-    
+
     print(f"  ✓ 模型文件检查通过: {model_dir}")
 
     from modules.pipeline import L2W1Pipeline, PipelineConfig
@@ -378,7 +384,7 @@ def run_stage1_collection(
 
     start_time = time.time()
 
-    for idx, sample in enumerate(tqdm(samples, desc="Processing")):
+    for idx, sample in enumerate(tqdm(samples, desc="Processing", miniters=1000)):
         try:
             # 解析图像路径
             image_path_raw = sample.get("image_path", sample.get("image", ""))

@@ -562,7 +562,7 @@ class BaselineInference:
 
         # 逐个处理样本
         print("\n[推理进度]")
-        for item in tqdm(samples, desc="OCR 推理"):
+        for item in tqdm(samples, desc="OCR 推理", miniters=1000):
             sample_id = item.get(
                 "id", item.get("sample_id", f"sample_{len(results):06d}")
             )

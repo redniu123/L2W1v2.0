@@ -327,7 +327,7 @@ def process_samples_stream(
             success_count += 1
             
             # 进度输出
-            if (i + 1) % 100 == 0:
+            if (i + 1) % 1000 == 0:
                 elapsed = time.time() - start_time
                 rate = (i + 1) / elapsed if elapsed > 0 else 0
                 stats = controller.get_stats()
