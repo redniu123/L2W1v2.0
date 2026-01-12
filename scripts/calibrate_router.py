@@ -309,17 +309,31 @@ def process_samples_with_engine(
                 print("\n或使用 --model_dir 指定模型路径")
                 sys.exit(1)
 
-        # 检查模型文件是否存在
+        # 检查模型文件是否存在（兼容 PP-OCRv5 新格式）
         model_path = Path(args.rec_model_dir)
-        required_files = ["inference.pdiparams", "inference.pdmodel"]
-        missing_files = [f for f in required_files if not (model_path / f).exists()]
-        if missing_files:
-            print(f"[FATAL] 模型文件缺失: {args.rec_model_dir}")
-            print(f"  缺失文件: {', '.join(missing_files)}")
-            print("\n请确保模型目录包含以下文件:")
-            for f in required_files:
-                print(f"  - {f}")
+        
+        # 检查 params 文件（inference.pdiparams 或 model.pdiparams）
+        has_params = (model_path / "inference.pdiparams").exists() or (model_path / "model.pdiparams").exists()
+        
+        # 检查 model 文件（.pdmodel 或 .json，PP-OCRv5 使用 .json）
+        has_model = (
+            (model_path / "inference.pdmodel").exists() or 
+            (model_path / "inference.json").exists() or
+            (model_path / "model.pdmodel").exists() or
+            (model_path / "model.json").exists()
+        )
+        
+        if not has_params:
+            print(f"[FATAL] 模型参数文件缺失: {args.rec_model_dir}")
+            print("  需要 inference.pdiparams 或 model.pdiparams")
             sys.exit(1)
+        
+        if not has_model:
+            print(f"[FATAL] 模型定义文件缺失: {args.rec_model_dir}")
+            print("  需要以下之一: inference.pdmodel, inference.json, model.pdmodel, model.json")
+            sys.exit(1)
+        
+        print(f"[✓] 模型文件检查通过: {args.rec_model_dir}")
 
         # 设置其他必要参数
         args.rec_batch_num = 1

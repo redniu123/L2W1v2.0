@@ -12,19 +12,23 @@
 
 ```bash
 # 检查 PP-OCRv5 模型是否存在
-ls -la ./models/ppocrv5_rec/
+ls -la ./models/agent_a_ppocr/PP-OCRv5_server_rec_infer/
 
-# 应该看到：
+# 应该看到（PP-OCRv5 新格式）：
+# - inference.pdiparams (必须)
+# - inference.json (PP-OCRv5 使用 .json 而非 .pdmodel)
+# - inference.yml (可选)
+# - ppocr_keys.txt (可选)
+
+# 或者旧格式：
 # - inference.pdiparams
 # - inference.pdmodel
-# - inference.pdiparams.info (可选)
 
 # 如果不存在，请下载：
 mkdir -p ./models
 cd ./models
 wget https://paddle-model-ecology.bj.bcebos.com/model/ocr/PP-OCRv5/ch_PP-OCRv5_rec_infer.tar
 tar -xf ch_PP-OCRv5_rec_infer.tar
-mv ch_PP-OCRv5_rec_infer ppocrv5_rec
 cd ..
 ```
 
