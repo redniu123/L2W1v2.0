@@ -263,28 +263,85 @@ def process_samples_with_engine(
     route_types = []
     details = []
 
-    # 尝试导入 Engine
+    # 导入必要模块（严格模式：失败则退出）
     try:
         from modules.paddle_engine.predict_rec_modified import TextRecognizerWithLogits
         from modules.router.uncertainty_router import RuleOnlyScorer, RuleScorerConfig
-
-        # 初始化 RuleOnlyScorer（使用默认配置，后续校准）
-        scorer_config = RuleScorerConfig(
-            v_min=0.0,
-            v_max=100.0,  # 初始宽范围
-            lambda_threshold=0.5,
-            eta=eta,
-        )
-        scorer = RuleOnlyScorer(config=scorer_config)
-
-        use_engine = True
-        engine = None  # 延迟初始化
-
     except ImportError as e:
-        print(f"[Warning] 无法加载 TextRecognizerWithLogits: {e}")
-        print("[Info] 将使用模拟模式进行校准")
-        use_engine = False
-        scorer = None
+        print(f"[FATAL] 无法导入必要模块: {e}")
+        print("\n请确保以下模块可用:")
+        print("  - modules.paddle_engine.predict_rec_modified.TextRecognizerWithLogits")
+        print("  - modules.router.uncertainty_router.RuleOnlyScorer")
+        sys.exit(1)
+
+    # 初始化 RuleOnlyScorer（使用默认配置，后续校准）
+    scorer_config = RuleScorerConfig(
+        v_min=0.0,
+        v_max=100.0,  # 初始宽范围
+        lambda_threshold=0.5,
+        eta=eta,
+    )
+    scorer = RuleOnlyScorer(config=scorer_config)
+
+    # 初始化 Engine（严格模式：失败则退出）
+    engine = None
+    try:
+        import tools.infer.utility as utility
+
+        # 正确初始化 args：先创建 parser，再 parse_args
+        parser = utility.init_args()
+        args = parser.parse_args([])  # 使用默认参数
+
+        # 设置模型路径
+        if model_dir:
+            args.rec_model_dir = model_dir
+        else:
+            # 尝试从默认路径读取
+            default_model_dir = "./models/ppocrv5_rec"
+            if os.path.exists(default_model_dir):
+                args.rec_model_dir = default_model_dir
+            else:
+                print(f"[FATAL] 模型目录不存在: {default_model_dir}")
+                print("\n请下载 PP-OCRv5 识别模型:")
+                print("  wget https://paddle-model-ecology.bj.bcebos.com/model/ocr/PP-OCRv5/ch_PP-OCRv5_rec_infer.tar")
+                print("  tar -xf ch_PP-OCRv5_rec_infer.tar")
+                print("  mv ch_PP-OCRv5_rec_infer ./models/ppocrv5_rec")
+                print("\n或使用 --model_dir 指定模型路径")
+                sys.exit(1)
+
+        # 检查模型文件是否存在
+        model_path = Path(args.rec_model_dir)
+        required_files = ["inference.pdiparams", "inference.pdmodel"]
+        missing_files = [f for f in required_files if not (model_path / f).exists()]
+        if missing_files:
+            print(f"[FATAL] 模型文件缺失: {args.rec_model_dir}")
+            print(f"  缺失文件: {', '.join(missing_files)}")
+            print("\n请确保模型目录包含以下文件:")
+            for f in required_files:
+                print(f"  - {f}")
+            sys.exit(1)
+
+        # 设置其他必要参数
+        args.rec_batch_num = 1
+        args.rec_image_shape = "3, 48, 320"
+        args.use_gpu = True
+        args.warmup = False
+        args.benchmark = False
+        args.use_onnx = False
+        args.return_word_box = False
+
+        engine = TextRecognizerWithLogits(args)
+        print(f"[✓] Agent A 初始化成功: {args.rec_model_dir}")
+
+    except Exception as e:
+        print(f"[FATAL] Agent A 初始化失败: {e}")
+        import traceback
+        traceback.print_exc()
+        print("\n请检查:")
+        print("  1. 模型文件是否完整")
+        print("  2. PaddlePaddle 是否正确安装")
+        print("  3. GPU/CUDA 是否可用")
+        sys.exit(1)
 
     # 统计信息
     failed_count = 0
@@ -292,7 +349,7 @@ def process_samples_with_engine(
 
     # 处理样本
     for i, sample in enumerate(samples):
-        if verbose and (i + 1) % 100 == 0:
+        if (i + 1) % 100 == 0 or verbose:
             print(
                 f"[Progress] 处理中: {i + 1}/{len(samples)} (成功: {success_count}, 失败: {failed_count})"
             )
@@ -337,98 +394,29 @@ def process_samples_with_engine(
             # 1. 计算 v_edge (Sobel 边缘响应)
             v_edge = compute_sobel_edge_strength(image)
 
-            # 2. 获取 Stage 0 信号并计算 q
-            if use_engine and engine is None:
-                # 延迟初始化 engine（首次使用时）
-                try:
-                    import tools.infer.utility as utility
+            # 2. 获取 Stage 0 信号并计算 q（严格模式：真实推理）
+            output = engine([image])
+            boundary_stats = (
+                output.get("boundary_stats", [{}])[0]
+                if output.get("boundary_stats")
+                else {}
+            )
+            top2_info = (
+                output.get("top2_info", [{}])[0]
+                if output.get("top2_info")
+                else {}
+            )
 
-                    # 正确初始化 args：先创建 parser，再 parse_args
-                    parser = utility.init_args()
-                    args = parser.parse_args([])  # 使用默认参数
+            # 计算 q 分数
+            result = scorer.score(
+                boundary_stats=boundary_stats,
+                top2_info=top2_info,
+                r_d=0.0,
+                v_edge=v_edge,
+            )
 
-                    # 设置模型路径（如果提供）
-                    if model_dir:
-                        args.rec_model_dir = model_dir
-                    else:
-                        # 尝试从默认路径读取
-                        default_model_dir = "./models/ppocrv5_rec"
-                        if os.path.exists(default_model_dir):
-                            args.rec_model_dir = default_model_dir
-                        else:
-                            raise ValueError(
-                                f"模型目录不存在: {default_model_dir}，请使用 --model_dir 指定"
-                            )
-
-                    # 设置其他必要参数
-                    args.rec_batch_num = 1
-                    args.rec_image_shape = "3, 48, 320"
-                    args.use_gpu = True
-                    args.warmup = False
-                    args.benchmark = False
-                    args.use_onnx = False
-                    args.return_word_box = False
-
-                    engine = TextRecognizerWithLogits(args)
-                    if verbose:
-                        print(f"[Info] Engine 初始化成功: {args.rec_model_dir}")
-                except Exception as e:
-                    print(f"[Warning] Engine 初始化失败: {e}")
-                    if verbose:
-                        import traceback
-
-                        traceback.print_exc()
-                    print("[Info] 将使用模拟模式进行校准（仅基于 v_edge 估计 q）")
-                    use_engine = False
-
-            if use_engine and engine is not None:
-                # 实际推理
-                try:
-                    output = engine([image])
-                    boundary_stats = (
-                        output.get("boundary_stats", [{}])[0]
-                        if output.get("boundary_stats")
-                        else {}
-                    )
-                    top2_info = (
-                        output.get("top2_info", [{}])[0]
-                        if output.get("top2_info")
-                        else {}
-                    )
-
-                    # 计算 q 分数
-                    result = scorer.score(
-                        boundary_stats=boundary_stats,
-                        top2_info=top2_info,
-                        r_d=0.0,
-                        v_edge=v_edge,
-                    )
-
-                    q = result.q
-                    route_type = result.route_type.value
-
-                except Exception as e:
-                    if verbose:
-                        print(f"[Warning] 推理失败: {e}")
-                    # 使用模拟值
-                    q = np.random.uniform(0.1, 0.8)
-                    route_type = "none"
-            else:
-                # 模拟模式：基于 v_edge 和随机因素生成 q
-                # 简化公式模拟
-                s_b_sim = np.clip(v_edge / 100.0, 0.0, 1.0)
-                s_a_sim = np.random.uniform(0.1, 0.6)
-                q = max(s_b_sim, s_a_sim) + eta * 0.0
-
-                # 模拟 route_type
-                if s_b_sim >= 0.5 and s_a_sim >= 0.5:
-                    route_type = "both"
-                elif s_b_sim >= 0.5:
-                    route_type = "boundary"
-                elif s_a_sim >= 0.5:
-                    route_type = "ambiguity"
-                else:
-                    route_type = "none"
+            q = result.q
+            route_type = result.route_type.value
 
             v_edges.append(v_edge)
             q_scores.append(q)
