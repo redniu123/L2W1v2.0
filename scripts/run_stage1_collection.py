@@ -310,20 +310,30 @@ def run_stage1_collection(
         print(f"[FATAL] 模型目录不存在: {model_dir}")
         sys.exit(1)
 
-    required_files = ["inference.pdiparams", "inference.pdmodel"]
-    missing_files = [f for f in required_files if not (model_dir_path / f).exists()]
-
-    if missing_files:
-        print(f"[FATAL] Agent A 模型文件缺失: {model_dir}")
-        print(f"  缺失文件: {', '.join(missing_files)}")
+    # 检查 params 文件（inference.pdiparams 或 model.pdiparams）
+    has_params = (model_dir_path / "inference.pdiparams").exists() or (model_dir_path / "model.pdiparams").exists()
+    
+    # 检查 model 文件（.pdmodel 或 .json，PP-OCRv5 使用 .json）
+    has_model = (
+        (model_dir_path / "inference.pdmodel").exists() or 
+        (model_dir_path / "inference.json").exists() or
+        (model_dir_path / "model.pdmodel").exists() or
+        (model_dir_path / "model.json").exists()
+    )
+    
+    if not has_params:
+        print(f"[FATAL] 模型参数文件缺失: {model_dir}")
+        print("  需要 inference.pdiparams 或 model.pdiparams")
         print("\n  请下载 PP-OCRv5 识别模型:")
-        print(
-            "  wget https://paddle-model-ecology.bj.bcebos.com/model/ocr/PP-OCRv5/ch_PP-OCRv5_rec_infer.tar"
-        )
+        print("  wget https://paddle-model-ecology.bj.bcebos.com/model/ocr/PP-OCRv5/ch_PP-OCRv5_rec_infer.tar")
         print("  tar -xf ch_PP-OCRv5_rec_infer.tar")
-        print("  mv ch_PP-OCRv5_rec_infer ./models/ppocrv5_rec")
         sys.exit(1)
-
+    
+    if not has_model:
+        print(f"[FATAL] 模型定义文件缺失: {model_dir}")
+        print("  需要以下之一: inference.pdmodel, inference.json, model.pdmodel, model.json")
+        sys.exit(1)
+    
     print(f"  ✓ 模型文件检查通过: {model_dir}")
 
     from modules.pipeline import L2W1Pipeline, PipelineConfig

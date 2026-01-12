@@ -412,13 +412,28 @@ class L2W1Pipeline:
                 "  mv ch_PP-OCRv5_rec_infer ./models/ppocrv5_rec"
             )
         
-        # 检查模型文件是否完整
-        required_files = ["inference.pdiparams", "inference.pdmodel"]
-        missing_files = [f for f in required_files if not (model_path / f).exists()]
-        if missing_files:
+        # 检查模型文件是否完整（兼容 PP-OCRv5 新格式）
+        # params 文件：inference.pdiparams 或 model.pdiparams
+        has_params = (model_path / "inference.pdiparams").exists() or (model_path / "model.pdiparams").exists()
+        
+        # model 文件：.pdmodel 或 .json（PP-OCRv5 使用 .json）
+        has_model = (
+            (model_path / "inference.pdmodel").exists() or 
+            (model_path / "inference.json").exists() or
+            (model_path / "model.pdmodel").exists() or
+            (model_path / "model.json").exists()
+        )
+        
+        if not has_params:
             raise FileNotFoundError(
-                f"[FATAL] 模型文件缺失: {self.config.agent_a_model_dir}\n"
-                f"缺失文件: {', '.join(missing_files)}"
+                f"[FATAL] 模型参数文件缺失: {self.config.agent_a_model_dir}\n"
+                "需要 inference.pdiparams 或 model.pdiparams"
+            )
+        
+        if not has_model:
+            raise FileNotFoundError(
+                f"[FATAL] 模型定义文件缺失: {self.config.agent_a_model_dir}\n"
+                "需要以下之一: inference.pdmodel, inference.json, model.pdmodel, model.json"
             )
         
         try:
