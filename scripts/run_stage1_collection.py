@@ -228,24 +228,22 @@ def run_stage1_collection(
     metadata_path: str,
     config_path: str,
     output_dir: str,
-    model_dir: str = None,
+    model_dir: str,
     image_root: str = None,
     limit: int = None,
-    use_mock: bool = False,
     verbose: bool = False,
     skip_agent_b: bool = True,
 ) -> CollectionStats:
     """
-    执行 Stage 0/1 数据采集
+    执行 Stage 0/1 数据采集（严格模式：不支持模拟）
 
     Args:
         metadata_path: metadata 文件路径
         config_path: 配置文件路径
         output_dir: 输出目录
-        model_dir: Agent A 模型目录
+        model_dir: Agent A 模型目录（必须提供）
         image_root: 图像根目录
         limit: 最大样本数
-        use_mock: 是否使用 Mock 模式
         verbose: 是否打印详细日志
         skip_agent_b: 是否跳过 Agent B（Stage 1 仅需 Agent A）
 
@@ -292,45 +290,47 @@ def run_stage1_collection(
     else:
         print(f"  - 指定 image_root: {image_root}")
 
-    # 初始化 Pipeline
-    print(f"\n[3/5] 初始化 L2W1Pipeline...")
+    # 初始化 Pipeline（严格模式：必须提供真实模型）
+    print("\n[3/5] 初始化 L2W1Pipeline...")
 
-    # 非 Mock 模式下检查模型文件是否存在
-    if not use_mock:
-        if not model_dir:
-            print("[Error] 真实模式需要指定 --model_dir 参数")
-            print("  示例: --model_dir ./models/ppocrv5_rec")
-            print("  或使用 Mock 模式: --use_mock")
-            return CollectionStats()
+    # 检查模型目录
+    if not model_dir:
+        print("[FATAL] 必须指定 --model_dir 参数")
+        print("  示例: --model_dir ./models/ppocrv5_rec")
+        print("\n  请下载 PP-OCRv5 识别模型:")
+        print(
+            "  wget https://paddle-model-ecology.bj.bcebos.com/model/ocr/PP-OCRv5/ch_PP-OCRv5_rec_infer.tar"
+        )
+        print("  tar -xf ch_PP-OCRv5_rec_infer.tar")
+        print("  mv ch_PP-OCRv5_rec_infer ./models/ppocrv5_rec")
+        sys.exit(1)
 
-        model_dir_path = Path(model_dir)
-        required_files = ["inference.pdiparams", "inference.pdmodel"]
-        missing_files = []
+    model_dir_path = Path(model_dir)
+    if not model_dir_path.exists():
+        print(f"[FATAL] 模型目录不存在: {model_dir}")
+        sys.exit(1)
 
-        for file_name in required_files:
-            file_path = model_dir_path / file_name
-            if not file_path.exists():
-                missing_files.append(file_name)
+    required_files = ["inference.pdiparams", "inference.pdmodel"]
+    missing_files = [f for f in required_files if not (model_dir_path / f).exists()]
 
-        if missing_files:
-            print(f"[Error] Agent A 模型文件缺失: {model_dir}")
-            print(f"  缺失文件: {', '.join(missing_files)}")
-            print("\n  请下载 PP-OCRv5 识别模型:")
-            print(
-                "  wget https://paddle-model-ecology.bj.bcebos.com/model/ocr/PP-OCRv5/ch_PP-OCRv5_rec_infer.tar"
-            )
-            print("  tar -xf ch_PP-OCRv5_rec_infer.tar")
-            print("  mv ch_PP-OCRv5_rec_infer ./models/ppocrv5_rec")
-            print("\n  或使用 Mock 模式进行测试: --use_mock")
-            return CollectionStats()
-        else:
-            print(f"  ✓ 模型文件检查通过: {model_dir}")
+    if missing_files:
+        print(f"[FATAL] Agent A 模型文件缺失: {model_dir}")
+        print(f"  缺失文件: {', '.join(missing_files)}")
+        print("\n  请下载 PP-OCRv5 识别模型:")
+        print(
+            "  wget https://paddle-model-ecology.bj.bcebos.com/model/ocr/PP-OCRv5/ch_PP-OCRv5_rec_infer.tar"
+        )
+        print("  tar -xf ch_PP-OCRv5_rec_infer.tar")
+        print("  mv ch_PP-OCRv5_rec_infer ./models/ppocrv5_rec")
+        sys.exit(1)
+
+    print(f"  ✓ 模型文件检查通过: {model_dir}")
 
     from modules.pipeline import L2W1Pipeline, PipelineConfig
 
     pipeline_config = PipelineConfig(
         # Agent A 配置
-        agent_a_model_dir=model_dir or "",
+        agent_a_model_dir=model_dir,
         agent_a_batch_size=6,
         rec_image_shape="3, 48, 320",
         use_gpu=True,
@@ -346,19 +346,14 @@ def run_stage1_collection(
         budget_lambda_max=budget_config.get("lambda_max", 2.0),
         budget_target=budget_config.get("target_budget", 0.2),
         # 流水线配置
-        use_mock=use_mock,
         verbose=verbose,
         router_features_log=str(output_dir_path / "router_features.jsonl"),
         # Agent B 配置（Stage 1 完全跳过 Agent B）
-        skip_agent_b=skip_agent_b,  # 完全跳过 Agent B，不加载模型
+        skip_agent_b=skip_agent_b,
     )
 
     pipeline = L2W1Pipeline(pipeline_config)
-
-    if use_mock:
-        print("  - 模式: Mock (模拟)")
-    else:
-        print("  - 模式: Real (真实 Agent A)")
+    print("  - 模式: Real (真实 Agent A)")
 
     # 清空之前的 router_features.jsonl
     features_log_path = output_dir_path / "router_features.jsonl"
@@ -573,15 +568,16 @@ def parse_args():
         --model_dir ./models/ppocrv5_rec \
         --output_dir ./results
     
-    # 快速测试 (Mock 模式)
+    # 快速测试 (限制样本数)
     python scripts/run_stage1_collection.py \
         --metadata ./data/raw/HWDB_Benchmark/test_metadata.jsonl \
-        --use_mock \
+        --model_dir ./models/ppocrv5_rec \
         --limit 100
     
     # 指定图像根目录
     python scripts/run_stage1_collection.py \
         --metadata ./data/raw/HWDB_Benchmark/test_metadata.jsonl \
+        --model_dir ./models/ppocrv5_rec \
         --image_root ./data/raw/HWDB_Benchmark/test \
         --output_dir ./results
         """,
@@ -600,7 +596,7 @@ def parse_args():
         help="配置文件路径",
     )
     parser.add_argument(
-        "--model_dir", type=str, default="", help="Agent A 模型目录路径"
+        "--model_dir", type=str, required=True, help="Agent A 模型目录路径（必须提供）"
     )
     parser.add_argument(
         "--image_root",
@@ -611,9 +607,6 @@ def parse_args():
     parser.add_argument("--output_dir", type=str, default="./results", help="输出目录")
     parser.add_argument(
         "--limit", type=int, default=None, help="最大处理样本数（用于测试）"
-    )
-    parser.add_argument(
-        "--use_mock", action="store_true", help="使用 Mock 模式（不加载真实模型）"
     )
     parser.add_argument("--verbose", "-v", action="store_true", help="打印详细日志")
     parser.add_argument(
@@ -635,7 +628,7 @@ def main():
         print(f"[Error] metadata 文件不存在: {args.metadata}")
         return
 
-    # 执行采集
+    # 执行采集（严格模式：必须使用真实模型）
     stats = run_stage1_collection(
         metadata_path=args.metadata,
         config_path=args.config,
@@ -643,7 +636,6 @@ def main():
         model_dir=args.model_dir,
         image_root=args.image_root,
         limit=args.limit,
-        use_mock=args.use_mock,
         verbose=args.verbose,
         skip_agent_b=args.skip_agent_b,
     )

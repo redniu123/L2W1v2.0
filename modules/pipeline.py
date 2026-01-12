@@ -91,7 +91,6 @@ class PipelineConfig:
     skip_agent_b: bool = False      # 是否完全跳过 Agent B（Stage 1 数据采集模式）
     
     # 流水线配置
-    use_mock: bool = False          # 是否使用模拟模式
     verbose: bool = False           # 是否打印详细日志
     
     # ========== 日志配置 ==========
@@ -393,16 +392,34 @@ class L2W1Pipeline:
         return self._agent_b
     
     def _init_agent_a(self):
-        """初始化 Agent A (PP-OCRv5 TextRecognizerWithLogits)"""
-        if self.config.use_mock:
-            self._agent_a = MockAgentA()
-            return
-        
+        """初始化 Agent A (PP-OCRv5 TextRecognizerWithLogits) - 严格模式"""
         # 检查模型目录是否配置
         if not self.config.agent_a_model_dir:
-            print("[Warning] agent_a_model_dir 未配置，使用模拟模式")
-            self._agent_a = MockAgentA()
-            return
+            raise ValueError(
+                "[FATAL] agent_a_model_dir 未配置\n"
+                "请在 PipelineConfig 中指定 agent_a_model_dir 参数"
+            )
+        
+        # 检查模型目录是否存在
+        from pathlib import Path
+        model_path = Path(self.config.agent_a_model_dir)
+        if not model_path.exists():
+            raise FileNotFoundError(
+                f"[FATAL] 模型目录不存在: {self.config.agent_a_model_dir}\n"
+                "请下载 PP-OCRv5 识别模型:\n"
+                "  wget https://paddle-model-ecology.bj.bcebos.com/model/ocr/PP-OCRv5/ch_PP-OCRv5_rec_infer.tar\n"
+                "  tar -xf ch_PP-OCRv5_rec_infer.tar\n"
+                "  mv ch_PP-OCRv5_rec_infer ./models/ppocrv5_rec"
+            )
+        
+        # 检查模型文件是否完整
+        required_files = ["inference.pdiparams", "inference.pdmodel"]
+        missing_files = [f for f in required_files if not (model_path / f).exists()]
+        if missing_files:
+            raise FileNotFoundError(
+                f"[FATAL] 模型文件缺失: {self.config.agent_a_model_dir}\n"
+                f"缺失文件: {', '.join(missing_files)}"
+            )
         
         try:
             from modules.paddle_engine.predict_rec_modified import TextRecognizerWithLogits
@@ -433,13 +450,20 @@ class L2W1Pipeline:
                 print(f"[Pipeline] Agent A 已初始化: {self.config.agent_a_model_dir}")
             
         except ImportError as e:
-            print(f"[Warning] 无法导入 Agent A 模块: {e}，使用模拟模式")
-            self._agent_a = MockAgentA()
+            raise ImportError(
+                f"[FATAL] 无法导入 Agent A 模块: {e}\n"
+                "请确保 modules.paddle_engine.predict_rec_modified 模块可用"
+            )
         except Exception as e:
-            print(f"[Warning] Agent A 初始化失败: {e}，使用模拟模式")
             import traceback
             traceback.print_exc()
-            self._agent_a = MockAgentA()
+            raise RuntimeError(
+                f"[FATAL] Agent A 初始化失败: {e}\n"
+                "请检查:\n"
+                "  1. 模型文件是否完整\n"
+                "  2. PaddlePaddle 是否正确安装\n"
+                "  3. GPU/CUDA 是否可用"
+            )
     
     def _init_router(self):
         """初始化 Router (旧版，保留兼容)"""
@@ -475,24 +499,30 @@ class L2W1Pipeline:
         self._budget_controller = OnlineBudgetController(config=budget_config)
     
     def _init_agent_b(self):
-        """初始化 Agent B"""
-        if self.config.use_mock:
-            from modules.vlm_expert import AgentBExpertMock
-            self._agent_b = AgentBExpertMock()
-        else:
-            try:
-                from modules.vlm_expert import AgentBExpert, AgentBConfig
+        """初始化 Agent B - 严格模式"""
+        try:
+            from modules.vlm_expert import AgentBExpert, AgentBConfig
+            
+            agent_b_config = AgentBConfig(
+                model_path=self.config.agent_b_model_path,
+                use_4bit=self.config.agent_b_use_4bit,
+                use_flash_attention=self.config.agent_b_use_flash_attention,
+            )
+            self._agent_b = AgentBExpert(config=agent_b_config)
+            
+            if self.config.verbose:
+                print(f"[Pipeline] Agent B 已初始化: {self.config.agent_b_model_path}")
                 
-                agent_b_config = AgentBConfig(
-                    model_path=self.config.agent_b_model_path,
-                    use_4bit=self.config.agent_b_use_4bit,
-                    use_flash_attention=self.config.agent_b_use_flash_attention,
-                )
-                self._agent_b = AgentBExpert(config=agent_b_config)
-            except Exception as e:
-                print(f"[Warning] 无法加载 Agent B: {e}，使用模拟模式")
-                from modules.vlm_expert import AgentBExpertMock
-                self._agent_b = AgentBExpertMock()
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            raise RuntimeError(
+                f"[FATAL] Agent B 初始化失败: {e}\n"
+                "请检查:\n"
+                "  1. Qwen2.5-VL 模型是否已下载\n"
+                "  2. transformers 版本是否兼容\n"
+                "  3. GPU 显存是否足够"
+            )
     
     def process(
         self,
@@ -1099,10 +1129,38 @@ if __name__ == "__main__":
     print("=" * 60)
     print("L2W1 完整推理流水线测试")
     print("=" * 60)
+    print("\n[注意] 此模块需要真实的模型文件才能运行")
+    print("请确保已下载 PP-OCRv5 模型:")
+    print("  wget https://paddle-model-ecology.bj.bcebos.com/model/ocr/PP-OCRv5/ch_PP-OCRv5_rec_infer.tar")
+    print("  tar -xf ch_PP-OCRv5_rec_infer.tar")
+    print("  mv ch_PP-OCRv5_rec_infer ./models/ppocrv5_rec")
+    print("\n使用示例:")
+    print("""
+    from modules.pipeline import L2W1Pipeline, PipelineConfig
     
-    # 配置
     config = PipelineConfig(
-        use_mock=True,  # 使用模拟模式
+        agent_a_model_dir="./models/ppocrv5_rec",
+        skip_agent_b=True,  # Stage 1 跳过 Agent B
+        verbose=True,
+    )
+    
+    pipeline = L2W1Pipeline(config)
+    result = pipeline.process("./test_image.jpg")
+    print(f"识别结果: {result.agent_a_text}")
+    """)
+    
+    # 检查模型是否存在
+    import os
+    model_dir = "./models/ppocrv5_rec"
+    if not os.path.exists(model_dir):
+        print(f"\n[FATAL] 模型目录不存在: {model_dir}")
+        print("请先下载模型后再运行测试")
+        exit(1)
+    
+    # 配置（严格模式：必须提供真实模型）
+    config = PipelineConfig(
+        agent_a_model_dir=model_dir,
+        skip_agent_b=True,  # Stage 1 跳过 Agent B
         verbose=True,
     )
     
@@ -1110,23 +1168,33 @@ if __name__ == "__main__":
     pipeline = L2W1Pipeline(config)
     
     # 测试单张图像
-    print("\n[测试] 处理单张图像...")
-    result = pipeline.process("./test_image.jpg")
+    test_image = "./test_image.jpg"
+    if os.path.exists(test_image):
+        print(f"\n[测试] 处理图像: {test_image}")
+        result = pipeline.process(test_image)
+        
+        print(f"\n[结果]")
+        print(f"  Agent A 输出: '{result.agent_a_text}' (置信度: {result.agent_a_confidence:.2%})")
+        print(f"  Router 决策: is_hard={result.is_hard}, risk_level={result.risk_level}")
+        
+        if result.routed_to_agent_b:
+            print(f"  Agent B 输出: '{result.agent_b_text}' (已修正: {result.agent_b_is_corrected})")
+        
+        print(f"  最终文本: '{result.final_text}'")
+        print(f"  处理时间: {result.processing_time_ms} ms")
+        
+        # SH-DA++ v4.0 新增字段
+        print(f"  s_b={result.s_b:.4f}, s_a={result.s_a:.4f}, q={result.q:.4f}")
+        print(f"  route_type={result.route_type}, lambda_t={result.lambda_t:.4f}, upgrade={result.upgrade}")
+    else:
+        print(f"\n[跳过] 测试图像不存在: {test_image}")
     
-    print(f"\n[结果]")
-    print(f"  Agent A 输出: '{result.agent_a_text}' (置信度: {result.agent_a_confidence:.2%})")
-    print(f"  Router 决策: is_hard={result.is_hard}, risk_level={result.risk_level}")
+    # 关闭流水线
+    pipeline.shutdown()
+    print("\n[完成] 流水线测试结束")
     
-    if result.routed_to_agent_b:
-        print(f"  Agent B 输出: '{result.agent_b_text}' (已修正: {result.agent_b_is_corrected})")
-    
-    print(f"  最终文本: '{result.final_text}'")
-    print(f"  处理时间: {result.processing_time_ms} ms")
-    
-    # SH-DA++ v4.0 新增字段
-    print(f"  s_b={result.s_b:.4f}, s_a={result.s_a:.4f}, q={result.q:.4f}")
-    print(f"  route_type={result.route_type}, lambda_t={result.lambda_t:.4f}, upgrade={result.upgrade}")
-    
+    # 以下代码仅作为示例，不实际执行
+    """
     # 测试批量处理
     print("\n[测试] 批量处理...")
     images = ["./img1.jpg", "./img2.jpg", "./img3.jpg"]
