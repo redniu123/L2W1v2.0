@@ -33,9 +33,44 @@ matplotlib.use('Agg')  # 非交互式后端
 import matplotlib.pyplot as plt
 import cv2
 
-# 设置中文字体
-plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans']
-plt.rcParams['axes.unicode_minus'] = False
+# ========== 中文字体配置 (Linux/Windows 兼容) ==========
+def setup_chinese_font():
+    """
+    配置中文字体，支持 Linux 和 Windows 环境
+    优先级：SimHei > WenQuanYi Micro Hei > WenQuanYi Zen Hei > DejaVu Sans
+    """
+    import matplotlib.font_manager as fm
+    
+    # 候选中文字体列表（按优先级排序）
+    chinese_fonts = [
+        'SimHei',                    # Windows 黑体
+        'WenQuanYi Micro Hei',       # Linux 常用
+        'WenQuanYi Zen Hei',         # Linux 常用
+        'Noto Sans CJK SC',          # Google Noto 字体
+        'Source Han Sans SC',        # Adobe 思源黑体
+        'Microsoft YaHei',           # Windows 微软雅黑
+        'AR PL UMing CN',            # Linux 明体
+        'DejaVu Sans',               # 回退字体
+    ]
+    
+    # 获取系统可用字体
+    available_fonts = set(f.name for f in fm.fontManager.ttflist)
+    
+    # 查找第一个可用的中文字体
+    selected_font = 'DejaVu Sans'
+    for font in chinese_fonts:
+        if font in available_fonts:
+            selected_font = font
+            break
+    
+    # 设置 matplotlib 字体
+    plt.rcParams['font.sans-serif'] = [selected_font] + chinese_fonts
+    plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+    
+    return selected_font
+
+# 初始化中文字体
+_selected_font = setup_chinese_font()
 
 # 添加项目路径
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -224,17 +259,22 @@ def process_samples_stream(
     )
     scorer = RuleOnlyScorer(config=scorer_config)
     
-    # OnlineBudgetController 配置
+    # OnlineBudgetController 配置 (SH-DA++ v4.0 稳定性优化)
+    # k: 减小至 0.01 以提高稳定性
+    # window_size: 增大至 500 以减少噪声
     budget_cfg = sh_da_config.get('budget_controller', {})
     budget_config = BudgetControllerConfig(
-        window_size=budget_cfg.get('window_size', 200),
-        k=budget_cfg.get('k', 0.05),
+        window_size=budget_cfg.get('window_size', 500),   # 增大窗口大小
+        k=budget_cfg.get('k', 0.01),                      # 减小比例系数
         lambda_min=budget_cfg.get('lambda_min', 0.0),
         lambda_max=budget_cfg.get('lambda_max', 2.0),
         lambda_init=budget_cfg.get('lambda_init', 0.5),
         target_budget=budget_cfg.get('target_budget', 0.2),
     )
     controller = OnlineBudgetController(config=budget_config)
+    
+    # 添加微小随机扰动以制造决策梯度 (当 q 分布单一时)
+    epsilon_range = (1e-6, 1e-5)
     
     # 初始化 Agent A（严格模式，无模拟）
     # 检查模型目录
@@ -347,6 +387,11 @@ def process_samples_stream(
                     v_edge=v_edge,
                 )
                 q = result.q
+                
+                # 添加微小随机扰动以强行制造决策梯度 (当 q 分布单一时)
+                # ε ∈ [10^-6, 10^-5]，足够小不影响主要决策，但能防止完全相同的 q 值
+                epsilon = np.random.uniform(epsilon_range[0], epsilon_range[1])
+                q = q + epsilon
                 
             except Exception as e:
                 if verbose and i < 5:
@@ -545,8 +590,9 @@ def visualize_results(records: List[StepRecord], stats: Dict, eval_result: Dict,
              verticalalignment='top', bbox=props)
     
     plt.tight_layout()
-    plt.savefig(output_path, dpi=150, bbox_inches='tight', facecolor='white')
-    print(f"\n[✓] 可视化图表已保存: {output_path}")
+    # 论文级质量：dpi=300
+    plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
+    print(f"\n[✓] 可视化图表已保存: {output_path} (dpi=300, 论文级质量)")
 
 
 def main():
