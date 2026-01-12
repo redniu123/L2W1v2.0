@@ -62,12 +62,26 @@ logger = get_logger()
 # =============================================================================
 
 
-def compute_softmax(logits: np.ndarray, axis: int = -1) -> np.ndarray:
+def compute_softmax(
+    logits: np.ndarray, 
+    axis: int = -1, 
+    temperature: float = 1.0,
+    debug: bool = False,
+) -> np.ndarray:
     """
-    数值稳定的 Softmax 计算 (Numerically Stable Softmax)
+    带温度参数的数值稳定 Softmax 计算 (Temperature-scaled Numerically Stable Softmax)
 
     实现公式:
-        Softmax(x_i) = exp(x_i - max(x)) / Σ exp(x_j - max(x))
+        Softmax(x_i / T) = exp((x_i - max(x)) / T) / Σ exp((x_j - max(x)) / T)
+
+    温度参数作用:
+        - T < 1.0: 放大概率差异，使分布更"尖锐" (用于 logits 值范围较小的情况)
+        - T = 1.0: 标准 Softmax
+        - T > 1.0: 平滑概率分布，使分布更"平坦"
+
+    SH-DA++ v4.0 关键修复:
+        当原始 logits 值范围过小（如 [-1, 1]）时，标准 Softmax 会导致概率趋于均匀。
+        通过设置 T=0.1 可以有效放大差异，恢复真实的置信度分布。
 
     数值稳定性保证:
         通过减去最大值避免 exp() 溢出，这是标准的 log-sum-exp trick。
@@ -76,6 +90,10 @@ def compute_softmax(logits: np.ndarray, axis: int = -1) -> np.ndarray:
         logits: 原始 logits 张量，形状为 [..., C] 或 [T, C]
                 其中 C 为词表大小 (Vocab Size)
         axis: 沿哪个轴计算 Softmax，默认为最后一轴 (-1)
+        temperature: 温度参数 T，默认 1.0
+                     - 当 logits 范围较小时建议使用 T=0.1
+                     - 有效范围: (0, +∞)，但 T ≤ 0.01 可能导致数值不稳定
+        debug: 是否打印调试信息（logits 范围统计）
 
     Returns:
         E: 归一化后的 Emission 矩阵，E ∈ [0,1]^{T×C}
@@ -86,23 +104,37 @@ def compute_softmax(logits: np.ndarray, axis: int = -1) -> np.ndarray:
         Space: O(T × C) for output matrix
 
     Example:
-        >>> logits = np.random.randn(80, 6625)  # [Seq_Len, Vocab_Size]
-        >>> E = compute_softmax(logits)
-        >>> assert E.shape == logits.shape
-        >>> assert np.allclose(E.sum(axis=-1), 1.0)
+        >>> logits = np.random.randn(80, 6625) * 0.5  # 小范围 logits
+        >>> E_standard = compute_softmax(logits, temperature=1.0)
+        >>> E_sharpened = compute_softmax(logits, temperature=0.1)
+        >>> # E_sharpened 将有更明显的峰值
 
     References:
         [1] Goodfellow et al., Deep Learning, Section 4.1
-        [2] https://cs231n.github.io/linear-classify/#softmax
+        [2] Hinton et al., Distilling the Knowledge in a Neural Network (2015)
+        [3] https://cs231n.github.io/linear-classify/#softmax
     """
+    # 温度参数验证
+    if temperature <= 0:
+        raise ValueError(f"Temperature must be positive, got {temperature}")
+    
+    # 调试：打印 logits 范围统计
+    if debug:
+        print(f"[compute_softmax] logits 范围: min={logits.min():.4f}, max={logits.max():.4f}, "
+              f"mean={logits.mean():.4f}, std={logits.std():.4f}, temperature={temperature}")
+    
     # Step 1: 减去最大值以保证数值稳定性 (防止 exp 溢出)
     logits_max = np.max(logits, axis=axis, keepdims=True)
     logits_shifted = logits - logits_max
 
-    # Step 2: 计算 exp
-    exp_logits = np.exp(logits_shifted)
+    # Step 2: 应用温度缩放 (Temperature Scaling)
+    # 当 T < 1 时，放大差异；当 T > 1 时，平滑分布
+    logits_scaled = logits_shifted / temperature
 
-    # Step 3: 归一化
+    # Step 3: 计算 exp
+    exp_logits = np.exp(logits_scaled)
+
+    # Step 4: 归一化
     sum_exp = np.sum(exp_logits, axis=axis, keepdims=True)
     softmax_output = exp_logits / sum_exp
 
@@ -380,6 +412,12 @@ class TextRecognizerWithLogits(object):
                 self.blank_id = 0
         
         self.rho = 0.1  # 边界区域比例因子
+        
+        # SH-DA++ v4.0: 温度参数用于 Softmax 缩放
+        # 当 logits 值范围较小时（如 [-1, 1]），标准 Softmax 会导致概率趋于均匀
+        # 通过设置 T < 1 可以有效放大差异，恢复真实的置信度分布
+        # 默认值 0.1 适用于 PP-OCRv5 的 logits 范围
+        self.softmax_temperature = getattr(args, 'softmax_temperature', 0.1)
         
         # 从 postprocess_op 获取字符表用于 Top-2 索引转换
         self.character_list = None
@@ -1116,7 +1154,13 @@ class TextRecognizerWithLogits(object):
                     T, C = sample_logits.shape
                     
                     # Step 1: 计算 Softmax 得到 Emission 矩阵 E ∈ [0,1]^{T×C}
-                    E = compute_softmax(sample_logits, axis=-1)
+                    # 使用温度缩放来放大 logits 差异（当原始值范围较小时）
+                    E = compute_softmax(
+                        sample_logits, 
+                        axis=-1, 
+                        temperature=self.softmax_temperature,
+                        debug=(rno == 0 and beg_img_no == 0),  # 只在第一个样本打印调试信息
+                    )
                     
                     # Step 2: 计算边界统计量
                     boundary_stats = calculate_boundary_stats(
@@ -1211,6 +1255,7 @@ class TextRecognizerWithLogits(object):
             "router_config": {
                 "blank_id": self.blank_id,
                 "rho": self.rho,
+                "softmax_temperature": self.softmax_temperature,
             },
         }
 

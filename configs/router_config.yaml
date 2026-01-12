@@ -12,6 +12,11 @@ stage0:
   blank_id: 0                    # Blank token ID (PaddleOCR 默认为 0)
   rho: 0.1                       # 边界窗口比例 ρ，L=[1,⌊ρT⌋], R=[⌈(1-ρ)T⌉,T]
   
+  # Softmax 温度参数 (SH-DA++ v4.0 关键修复)
+  # 当 logits 值范围较小时（如 [-1, 1]），标准 Softmax 会导致概率趋于均匀
+  # 通过设置 T < 1 可以有效放大差异，恢复真实的置信度分布
+  softmax_temperature: 0.1       # 温度参数 T，建议值 0.1 (PP-OCRv5)
+  
   # Top-2 信号
   top2_enabled: true             # 是否启用 Top-2 概率提取
   top2_fallback: "char_conf"     # Top-2 缺失时的降级策略: "char_conf" 或 "skip"
@@ -46,13 +51,14 @@ sh_da_v4:
     
   budget_controller:
     # 在线预算控制器参数 (P-control)
-    window_size: 200             # 滑动窗口 W
-    k: 0.05                      # 比例系数 k
+    # SH-DA++ v4.0 稳定性优化: 增大 W, 减小 k
+    window_size: 500             # 滑动窗口 W (增大以减少噪声)
+    k: 0.01                      # 比例系数 k (减小以提高稳定性)
     lambda_min: 0.0              # λ 下界
     lambda_max: 2.0              # λ 上界
     lambda_init: 0.5             # λ 初始值 (会被 calibrate_router.py 覆盖)
     target_budget: 0.2           # 目标调用率 B (20%)
-    warmup_samples: 200          # 前 W 行不更新 λ
+    warmup_samples: 500          # 前 W 行不更新 λ (与 window_size 一致)
 
 # =============================================================================
 # Layer 2: 战略分诊参数 (Strategic Triage)
