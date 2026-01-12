@@ -181,11 +181,21 @@ def process_samples_stream(
     image_root: str,
     metadata_dir: str,
     config: Dict,
+    model_dir: str,
     limit: int = None,
     verbose: bool = False,
 ) -> Tuple[List[StepRecord], Dict]:
     """
     流式处理样本，记录每一步的决策和状态
+    
+    Args:
+        samples: 样本列表
+        image_root: 图像根目录
+        metadata_dir: metadata 目录
+        config: 配置字典
+        model_dir: Agent A 模型目录
+        limit: 最大样本数
+        verbose: 是否打印详细日志
     
     Returns:
         Tuple[records, stats]: 记录列表和统计信息
@@ -226,17 +236,58 @@ def process_samples_stream(
     )
     controller = OnlineBudgetController(config=budget_config)
     
-    # 初始化 Agent A
+    # 初始化 Agent A（严格模式，无模拟）
+    # 检查模型目录
+    model_path = Path(model_dir)
+    if not model_path.exists():
+        print(f"[FATAL] 模型目录不存在: {model_dir}")
+        sys.exit(1)
+    
+    # 检查模型文件（兼容 PP-OCRv5 新格式）
+    has_params = (model_path / "inference.pdiparams").exists() or (model_path / "model.pdiparams").exists()
+    has_model = (
+        (model_path / "inference.pdmodel").exists() or 
+        (model_path / "inference.json").exists() or
+        (model_path / "model.pdmodel").exists() or
+        (model_path / "model.json").exists()
+    )
+    
+    if not has_params or not has_model:
+        print(f"[FATAL] 模型文件缺失: {model_dir}")
+        print("  需要 inference.pdiparams 和 (inference.pdmodel 或 inference.json)")
+        sys.exit(1)
+    
     try:
-        from tools.infer.utility import init_args
-        args = init_args()
+        import tools.infer.utility as utility
+        parser = utility.init_args()
+        args = parser.parse_args([])
+        
+        # 设置模型路径
+        args.rec_model_dir = model_dir
+        args.rec_batch_num = 1
+        args.rec_image_shape = "3, 48, 320"
+        args.use_gpu = True
+        args.warmup = False
+        args.benchmark = False
+        args.use_onnx = False
+        args.return_word_box = False
+        
+        # 从配置读取字典路径
+        agent_a_cfg = config.get('agent_a', {})
+        args.rec_char_dict_path = agent_a_cfg.get('rec_char_dict_path', './ppocr/utils/ppocr_keys_v1.txt')
+        
         engine = TextRecognizerWithLogits(args)
-        use_engine = True
+        print(f"[✓] Agent A 初始化成功: {model_dir}")
+        
     except Exception as e:
-        print(f"[Error] Engine 初始化失败: {e}")
-        print("[Warning] 将使用模拟模式（随机 q 值）")
-        use_engine = False
-        engine = None
+        import traceback
+        traceback.print_exc()
+        print(f"[FATAL] Agent A 初始化失败: {e}")
+        print("\n请检查:")
+        print("  1. 模型文件是否完整")
+        print("  2. PaddlePaddle 是否正确安装")
+        print("  3. GPU/CUDA 是否可用")
+        sys.exit(1)
     
     # 2. 流式处理
     records = []
@@ -282,30 +333,26 @@ def process_samples_stream(
                 continue
             
             # 计算 q 分数
-            if use_engine and engine is not None:
-                try:
-                    output = engine([image])
-                    boundary_stats = output.get('boundary_stats', [{}])[0] if output.get('boundary_stats') else {}
-                    top2_info = output.get('top2_info', [{}])[0] if output.get('top2_info') else {}
-                    
-                    v_edge = compute_sobel_edge_strength(image)
-                    
-                    result = scorer.score(
-                        boundary_stats=boundary_stats,
-                        top2_info=top2_info,
-                        r_d=0.0,
-                        v_edge=v_edge,
-                    )
-                    q = result.q
-                    
-                except Exception as e:
-                    if verbose and i < 5:
-                        print(f"[Warning] 推理失败 (样本 {i+1}): {e}")
-                    # 使用模拟值
-                    q = np.random.uniform(0.1, 0.8)
-            else:
-                # 模拟模式
-                q = np.random.uniform(0.1, 0.8)
+            try:
+                output = engine([image])
+                boundary_stats = output.get('boundary_stats', [{}])[0] if output.get('boundary_stats') else {}
+                top2_info = output.get('top2_info', [{}])[0] if output.get('top2_info') else {}
+                
+                v_edge = compute_sobel_edge_strength(image)
+                
+                result = scorer.score(
+                    boundary_stats=boundary_stats,
+                    top2_info=top2_info,
+                    r_d=0.0,
+                    v_edge=v_edge,
+                )
+                q = result.q
+                
+            except Exception as e:
+                if verbose and i < 5:
+                    print(f"[Warning] 推理失败 (样本 {i+1}): {e}")
+                failed_count += 1
+                continue
             
             # 使用 OnlineBudgetController 进行决策
             upgrade, details = controller.step(q)
@@ -543,6 +590,12 @@ def main():
         action='store_true',
         help='打印详细日志'
     )
+    parser.add_argument(
+        '--model_dir',
+        type=str,
+        default='./models/agent_a_ppocr/PP-OCRv5_server_rec_infer/',
+        help='Agent A 模型目录路径'
+    )
     
     args = parser.parse_args()
     
@@ -581,6 +634,7 @@ def main():
         image_root=args.image_root,
         metadata_dir=metadata_dir,
         config=config,
+        model_dir=args.model_dir,
         limit=args.limit,
         verbose=args.verbose,
     )
