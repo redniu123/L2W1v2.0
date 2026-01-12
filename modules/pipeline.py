@@ -596,7 +596,9 @@ class L2W1Pipeline:
             self.stats["total_processed"] % self.config.verbose_interval == 0
         )
         if should_log:
-            print(f"[Pipeline] 样本 {self.stats['total_processed']+1}: Step 1-4 处理中...")
+            print(
+                f"[Pipeline] 样本 {self.stats['total_processed'] + 1}: Step 1-4 处理中..."
+            )
 
         agent_a_output = self.agent_a.recognize(image)
         result.agent_a_text = agent_a_output.get("text", "")
@@ -658,14 +660,12 @@ class L2W1Pipeline:
 
             # 检查是否跳过 Agent B（Stage 1 数据采集模式）
             if self.config.skip_agent_b:
-
                 # Stage 1 模式：只记录路由决策，不实际调用 Agent B
                 result.agent_b_text = ""
                 result.b_timeout = False
                 result.b_fallback = True  # 标记为回退
                 result.final_text = result.agent_a_text
             else:
-
                 # 构建 manifest
                 manifest = {
                     "ocr_text": result.agent_a_text,
@@ -1119,56 +1119,10 @@ class AgentAAdapter:
         return output_list
 
 
-class MockAgentA:
-    """Agent A 模拟版本 (SH-DA++ v4.0 兼容)"""
-
-    def recognize(self, image: Union[str, np.ndarray]) -> Dict:
-        """模拟识别，返回 SH-DA++ v4.0 格式的输出"""
-        import random
-
-        # 模拟识别结果
-        sample_texts = [
-            "中国科学院计算技术研究所",
-            "在时间的未尾",
-            "深度学习模型训练",
-            "自然语言处理技术",
-        ]
-
-        text = random.choice(sample_texts)
-        seq_len = 80
-
-        # 模拟边界统计量
-        boundary_stats = {
-            "blank_mean_L": random.uniform(0.01, 0.1),
-            "blank_mean_R": random.uniform(0.01, 0.1),
-            "blank_peak_L": random.uniform(0.05, 0.2),
-            "blank_peak_R": random.uniform(0.05, 0.2),
-            "T": seq_len,
-            "L_range": (0, 8),
-            "R_range": (72, 80),
-            "valid": True,
-        }
-
-        # 模拟 Top-2 信息
-        top2_info = {
-            "top2_status": "available",
-            "T": seq_len,
-            "C": 6625,
-            "top1_conf_mean": random.uniform(0.7, 0.95),
-            "top2_conf_mean": random.uniform(0.01, 0.1),
-            "conf_gap_mean": random.uniform(0.6, 0.9),
-            "top2_indices": None,
-            "top2_probs": None,
-        }
-
-        return {
-            "text": text,
-            "confidence": random.uniform(0.7, 0.95),
-            "logits": None,
-            "boundary_stats": boundary_stats,
-            "top2_info": top2_info,
-            "lat_router_ms": random.uniform(0.5, 3.0),
-        }
+# =============================================================================
+# 注意：MockAgentA 类已被彻底删除
+# SH-DA++ v4.0 必须使用真实的 PP-OCRv5 推理，以获得真实的 Logits 梯度
+# =============================================================================
 
 
 # =============================================================================

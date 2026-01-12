@@ -32,8 +32,6 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 import time
-from datetime import datetime
-
 import numpy as np
 from tqdm import tqdm
 
@@ -371,14 +369,24 @@ def run_stage1_collection(
     pipeline = L2W1Pipeline(pipeline_config)
     print("  - 模式: Real (真实 Agent A)")
 
-    # 清空之前的 router_features.jsonl
+    # ========== 任务 4: 数据清洁 - 备份或删除旧数据 ==========
     features_log_path = output_dir_path / "router_features.jsonl"
     if features_log_path.exists():
-        print(f"  - 清空旧日志: {features_log_path}")
-        features_log_path.unlink()
+        # 备份旧数据
+        from datetime import datetime
+
+        backup_name = (
+            f"router_features_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jsonl"
+        )
+        backup_path = output_dir_path / backup_name
+        print(f"  - 备份旧日志: {features_log_path} -> {backup_path}")
+        features_log_path.rename(backup_path)
+        print("  [!] 已备份旧数据，避免被随机噪声污染")
 
     # 开始采集
     print("\n[4/5] 开始数据采集...")
+    print("  [实时抽检模式] 每 500 个样本打印 1 条识别结果")
+    print("  格式: ID | 识别文本 | q分数 | top1_conf | s_b | s_a")
     stats = CollectionStats()
     stats.total_samples = len(samples)
 
@@ -431,8 +439,19 @@ def run_stage1_collection(
             if result.b_fallback:
                 stats.b_fallback_count += 1
 
-            # 从 pipeline 内部获取 lat_router_ms (如果有)
-            # 由于 pipeline.process() 内部会记录到 jsonl，这里从统计中获取
+            # ========== 任务 2: 实时输出识别文本供 PI 抽检 ==========
+            # 每 500 个样本打印一次，方便随时检查识别质量
+            if (idx + 1) % 500 == 0 or idx < 5:
+                # 截断过长的文本
+                display_text = (
+                    result.agent_a_text[:20] + "..."
+                    if len(result.agent_a_text) > 20
+                    else result.agent_a_text
+                )
+                print(
+                    f"  [{sample_id}] '{display_text}' | q={result.q:.4f} | "
+                    f"conf={result.agent_a_confidence:.2%} | s_b={result.s_b:.4f} | s_a={result.s_a:.4f}"
+                )
 
         except Exception as e:
             if verbose:
