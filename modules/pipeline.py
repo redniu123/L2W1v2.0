@@ -93,6 +93,7 @@ class PipelineConfig:
 
     # 流水线配置
     verbose: bool = False  # 是否打印详细日志
+    verbose_interval: int = 1000  # 详细日志输出间隔（每 N 个样本输出一次）
 
     # ========== 日志配置 ==========
     router_features_log: str = "results/router_features.jsonl"  # 路由特征日志路径
@@ -590,8 +591,12 @@ class L2W1Pipeline:
         )
 
         # Step 1: Agent A 推理
-        if self.config.verbose:
-            print("[Pipeline] Step 1: Agent A 推理...")
+        # 控制 verbose 输出频率
+        should_log = self.config.verbose and (
+            self.stats["total_processed"] % self.config.verbose_interval == 0
+        )
+        if should_log:
+            print(f"[Pipeline] 样本 {self.stats['total_processed']+1}: Step 1-4 处理中...")
 
         agent_a_output = self.agent_a.recognize(image)
         result.agent_a_text = agent_a_output.get("text", "")
@@ -616,8 +621,6 @@ class L2W1Pipeline:
             )
 
         # Step 2: SH-DA++ v4.0 RuleOnlyScorer 评分
-        if self.config.verbose:
-            print("[Pipeline] Step 2: RuleOnlyScorer 评分...")
 
         char_count = len(result.agent_a_text)
         if expected_char_count <= 0:
@@ -638,8 +641,6 @@ class L2W1Pipeline:
         result.route_type = scoring_result.route_type.value
 
         # Step 3: OnlineBudgetController 决策
-        if self.config.verbose:
-            print("[Pipeline] Step 3: OnlineBudgetController 决策...")
 
         result.lambda_t = self.budget_controller.current_lambda
         upgrade, budget_details = self.budget_controller.step(result.q)
@@ -657,8 +658,6 @@ class L2W1Pipeline:
 
             # 检查是否跳过 Agent B（Stage 1 数据采集模式）
             if self.config.skip_agent_b:
-                if self.config.verbose:
-                    print("[Pipeline] Step 4: 跳过 Agent B (skip_agent_b=True)")
 
                 # Stage 1 模式：只记录路由决策，不实际调用 Agent B
                 result.agent_b_text = ""
@@ -666,8 +665,6 @@ class L2W1Pipeline:
                 result.b_fallback = True  # 标记为回退
                 result.final_text = result.agent_a_text
             else:
-                if self.config.verbose:
-                    print("[Pipeline] Step 4: 异步调用 Agent B...")
 
                 # 构建 manifest
                 manifest = {
@@ -707,9 +704,6 @@ class L2W1Pipeline:
                     result.agent_a_text if b_fallback else result.agent_b_text
                 )
         else:
-            if self.config.verbose:
-                print("[Pipeline] Step 4: 跳过 Agent B (upgrade=False)")
-
             result.final_text = result.agent_a_text
 
         # 计算处理时间 (毫秒)
