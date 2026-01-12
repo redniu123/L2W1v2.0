@@ -303,7 +303,9 @@ def process_samples_with_engine(
             else:
                 print(f"[FATAL] 模型目录不存在: {default_model_dir}")
                 print("\n请下载 PP-OCRv5 识别模型:")
-                print("  wget https://paddle-model-ecology.bj.bcebos.com/model/ocr/PP-OCRv5/ch_PP-OCRv5_rec_infer.tar")
+                print(
+                    "  wget https://paddle-model-ecology.bj.bcebos.com/model/ocr/PP-OCRv5/ch_PP-OCRv5_rec_infer.tar"
+                )
                 print("  tar -xf ch_PP-OCRv5_rec_infer.tar")
                 print("  mv ch_PP-OCRv5_rec_infer ./models/ppocrv5_rec")
                 print("\n或使用 --model_dir 指定模型路径")
@@ -311,28 +313,32 @@ def process_samples_with_engine(
 
         # 检查模型文件是否存在（兼容 PP-OCRv5 新格式）
         model_path = Path(args.rec_model_dir)
-        
+
         # 检查 params 文件（inference.pdiparams 或 model.pdiparams）
-        has_params = (model_path / "inference.pdiparams").exists() or (model_path / "model.pdiparams").exists()
-        
+        has_params = (model_path / "inference.pdiparams").exists() or (
+            model_path / "model.pdiparams"
+        ).exists()
+
         # 检查 model 文件（.pdmodel 或 .json，PP-OCRv5 使用 .json）
         has_model = (
-            (model_path / "inference.pdmodel").exists() or 
-            (model_path / "inference.json").exists() or
-            (model_path / "model.pdmodel").exists() or
-            (model_path / "model.json").exists()
+            (model_path / "inference.pdmodel").exists()
+            or (model_path / "inference.json").exists()
+            or (model_path / "model.pdmodel").exists()
+            or (model_path / "model.json").exists()
         )
-        
+
         if not has_params:
             print(f"[FATAL] 模型参数文件缺失: {args.rec_model_dir}")
             print("  需要 inference.pdiparams 或 model.pdiparams")
             sys.exit(1)
-        
+
         if not has_model:
             print(f"[FATAL] 模型定义文件缺失: {args.rec_model_dir}")
-            print("  需要以下之一: inference.pdmodel, inference.json, model.pdmodel, model.json")
+            print(
+                "  需要以下之一: inference.pdmodel, inference.json, model.pdmodel, model.json"
+            )
             sys.exit(1)
-        
+
         print(f"[✓] 模型文件检查通过: {args.rec_model_dir}")
 
         # 设置其他必要参数
@@ -350,6 +356,7 @@ def process_samples_with_engine(
     except Exception as e:
         print(f"[FATAL] Agent A 初始化失败: {e}")
         import traceback
+
         traceback.print_exc()
         print("\n请检查:")
         print("  1. 模型文件是否完整")
@@ -363,7 +370,7 @@ def process_samples_with_engine(
 
     # 处理样本
     for i, sample in enumerate(samples):
-        if (i + 1) % 100 == 0 or verbose:
+        if (i + 1) % 1000 == 0:
             print(
                 f"[Progress] 处理中: {i + 1}/{len(samples)} (成功: {success_count}, 失败: {failed_count})"
             )
@@ -416,9 +423,7 @@ def process_samples_with_engine(
                 else {}
             )
             top2_info = (
-                output.get("top2_info", [{}])[0]
-                if output.get("top2_info")
-                else {}
+                output.get("top2_info", [{}])[0] if output.get("top2_info") else {}
             )
 
             # 计算 q 分数

@@ -545,7 +545,7 @@ class L2W1Pipeline:
         self.stats = PipelineStats()
         self.stats.total_samples = len(samples)
 
-        iterator = tqdm(samples, desc="L2W1 Pipeline") if show_progress else samples
+        iterator = tqdm(samples, desc="L2W1 Pipeline", miniters=1000) if show_progress else samples
 
         for sample in iterator:
             try:

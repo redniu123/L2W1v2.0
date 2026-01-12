@@ -1286,7 +1286,7 @@ class DataPipeline:
         print("[2/4] 运行 Agent A 推理...")
         batch_size = self.config.batch_size
 
-        for i in tqdm(range(0, len(all_samples), batch_size), desc="推理进度"):
+        for i in tqdm(range(0, len(all_samples), batch_size), desc="推理进度", miniters=100):
             batch = all_samples[i : i + batch_size]
 
             # 推理
