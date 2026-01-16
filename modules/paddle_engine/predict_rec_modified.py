@@ -425,6 +425,8 @@ class TextRecognizerWithLogits(object):
         # 通过设置 T < 1 可以有效放大差异，恢复真实的置信度分布
         # 默认值 0.1 适用于 PP-OCRv5 的 logits 范围
         self.softmax_temperature = getattr(args, "softmax_temperature", 0.1)
+        # 控制 compute_softmax 的调试输出频率（全局样本计数）
+        self._softmax_debug_counter = 0
 
         # 从 postprocess_op 获取字符表用于 Top-2 索引转换
         self.character_list = None
@@ -1166,13 +1168,14 @@ class TextRecognizerWithLogits(object):
                     # Step 1: 计算 Softmax 得到 Emission 矩阵 E ∈ [0,1]^{T×C}
                     # 使用温度缩放来放大 logits 差异（当原始值范围较小时）
                     # debug 参数：只在全局第 0, 1000, 2000... 个样本打印调试信息
-                    global_sample_idx = beg_img_no + rno
+                    global_sample_idx = self._softmax_debug_counter
                     E = compute_softmax(
                         sample_logits,
                         axis=-1,
                         temperature=self.softmax_temperature,
                         debug=(global_sample_idx % 1000 == 0),  # 每 1000 个样本打印一次
                     )
+                    self._softmax_debug_counter += 1
 
                     # Step 2: 计算边界统计量
                     boundary_stats = calculate_boundary_stats(
