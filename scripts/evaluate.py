@@ -1467,6 +1467,23 @@ def main():
         print("错误: 未找到真值数据 (gt_text)")
         print("请确保预测文件包含 'gt_text' 字段，或使用 --references 指定真值文件")
         return
+
+    # 空值检查（防止“空对空”导致幻觉指标）
+    empty_agent_a = sum(1 for t in agent_a_texts if not t)
+    empty_gt = sum(1 for t in gt_texts if not t)
+    if empty_agent_a > 0 or empty_gt > 0:
+        print(
+            f"[Warning] 空文本检测: agent_a_text 为空 {empty_agent_a}/{len(agent_a_texts)}, "
+            f"gt_text 为空 {empty_gt}/{len(gt_texts)}"
+        )
+
+    # 打印前 5 个样本对比 (Agent A vs GT)
+    print("\n[Sample Check] A_text | GT_text | CER (first 5)")
+    for i in range(min(5, len(gt_texts))):
+        cer = calculate_cer(agent_a_texts[i], gt_texts[i])
+        a_text = agent_a_texts[i]
+        g_text = gt_texts[i]
+        print(f"  [{i}] A='{a_text}' | GT='{g_text}' | CER={cer:.4f}")
     
     if len(final_texts) != len(gt_texts):
         print(f"错误: 预测数量 ({len(final_texts)}) 与真值数量 ({len(gt_texts)}) 不匹配")

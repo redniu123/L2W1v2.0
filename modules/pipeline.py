@@ -816,6 +816,10 @@ class L2W1Pipeline:
             # ===== Agent A 识别结果 =====
             "agent_a_text": result.agent_a_text,
             "agent_a_confidence": round(result.agent_a_confidence, 6),
+            # ===== 文本字段（评估必需） =====
+            "agent_b_text": result.agent_b_text,
+            "final_text": result.final_text,
+            "gt_text": result.gt_text,
             # ===== 物理信号 =====
             "v_edge_raw": scoring_result.details.get("boundary_score_details", {}).get(
                 "v_edge_raw"
