@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 import time
+from datetime import datetime
 import numpy as np
 from tqdm import tqdm
 import cv2
@@ -397,8 +398,6 @@ def run_stage1_collection(
     features_log_path = output_dir_path / "router_features.jsonl"
     if features_log_path.exists():
         # 备份旧数据
-        from datetime import datetime
-
         backup_name = (
             f"router_features_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jsonl"
         )
