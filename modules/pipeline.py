@@ -811,6 +811,9 @@ class L2W1Pipeline:
             "id": result.id,
             "img_path": result.image_path,
             "timestamp": time_module.time(),
+            # ===== Agent A 识别结果 =====
+            "agent_a_text": result.agent_a_text,
+            "agent_a_confidence": round(result.agent_a_confidence, 6),
             # ===== Stage 0: 边界统计量 =====
             "blank_id": bs.get("blank_id", 0),
             "rho": bs.get("rho", 0.1),
