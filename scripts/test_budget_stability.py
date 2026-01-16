@@ -263,6 +263,9 @@ def process_samples_stream(
     # k: 减小至 0.01 以提高稳定性
     # window_size: 增大至 500 以减少噪声
     budget_cfg = sh_da_config.get('budget_controller', {})
+    if args.budget is not None:
+        budget_cfg = dict(budget_cfg)
+        budget_cfg['target_budget'] = args.budget
     budget_config = BudgetControllerConfig(
         window_size=budget_cfg.get('window_size', 500),   # 增大窗口大小
         k=budget_cfg.get('k', 0.01),                      # 减小比例系数
@@ -624,6 +627,18 @@ def main():
         type=int,
         default=None,
         help='最大样本数（用于快速测试）'
+    )
+    parser.add_argument(
+        '--budget',
+        type=float,
+        default=None,
+        help='目标调用率 B（覆盖配置文件）'
+    )
+    parser.add_argument(
+        '--target_b',
+        type=float,
+        dest='budget',
+        help='目标调用率 B 的别名 (等同于 --budget)'
     )
     parser.add_argument(
         '--output', '-o',
