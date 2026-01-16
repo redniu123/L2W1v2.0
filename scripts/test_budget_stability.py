@@ -217,6 +217,7 @@ def process_samples_stream(
     metadata_dir: str,
     config: Dict,
     model_dir: str,
+    target_budget: float = None,
     limit: int = None,
     verbose: bool = False,
 ) -> Tuple[List[StepRecord], Dict]:
@@ -263,9 +264,9 @@ def process_samples_stream(
     # k: 减小至 0.01 以提高稳定性
     # window_size: 增大至 500 以减少噪声
     budget_cfg = sh_da_config.get('budget_controller', {})
-    if args.budget is not None:
+    if target_budget is not None:
         budget_cfg = dict(budget_cfg)
-        budget_cfg['target_budget'] = args.budget
+        budget_cfg['target_budget'] = target_budget
     budget_config = BudgetControllerConfig(
         window_size=budget_cfg.get('window_size', 500),   # 增大窗口大小
         k=budget_cfg.get('k', 0.01),                      # 减小比例系数
@@ -696,6 +697,7 @@ def main():
         metadata_dir=metadata_dir,
         config=config,
         model_dir=args.model_dir,
+        target_budget=args.budget,
         limit=args.limit,
         verbose=args.verbose,
     )
