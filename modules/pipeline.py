@@ -558,6 +558,7 @@ class L2W1Pipeline:
         boundary_stats: Dict = None,
         top2_info: Dict = None,
         r_d: float = 0.0,
+        v_edge: float = None,
         expected_char_count: int = 0,
     ) -> PipelineResult:
         """
@@ -633,6 +634,7 @@ class L2W1Pipeline:
             boundary_stats=boundary_stats or {},
             top2_info=top2_info or {},
             r_d=r_d,
+            v_edge=v_edge,
             char_count=char_count,
             expected_char_count=expected_char_count,
         )
@@ -814,6 +816,13 @@ class L2W1Pipeline:
             # ===== Agent A 识别结果 =====
             "agent_a_text": result.agent_a_text,
             "agent_a_confidence": round(result.agent_a_confidence, 6),
+            # ===== 物理信号 =====
+            "v_edge_raw": scoring_result.details.get("boundary_score_details", {}).get(
+                "v_edge_raw"
+            ),
+            "v_edge_norm": scoring_result.details.get("boundary_score_details", {}).get(
+                "v_edge_norm"
+            ),
             # ===== Stage 0: 边界统计量 =====
             "blank_id": bs.get("blank_id", 0),
             "rho": bs.get("rho", 0.1),

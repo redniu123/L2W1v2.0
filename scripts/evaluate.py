@@ -1414,6 +1414,19 @@ def generate_evaluation_report(result: EvaluationResult, output_path: str):
     print(f"\n评估报告已保存至: {output_path}")
 
 
+def write_metrics_summary(result: EvaluationResult, output_path: str):
+    """生成 metrics_summary.json（Stage 1 交付必需）"""
+    summary = result.to_dict()
+    from datetime import datetime
+    summary["timestamp"] = datetime.now().isoformat()
+    summary["version"] = "SH-DA++ v4.0"
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(summary, f, ensure_ascii=False, indent=2)
+
+    print(f"\nmetrics_summary.json 已保存至: {output_path}")
+
+
 def main():
     """主函数"""
     args = parse_args()
@@ -1477,6 +1490,10 @@ def main():
     
     # 打印评估报告
     result.print_summary()
+    
+    # 写出 metrics_summary.json（固定输出）
+    metrics_output = Path(args.predictions).parent / "metrics_summary.json"
+    write_metrics_summary(result, str(metrics_output))
     
     # 保存评估报告
     if args.output:

@@ -261,15 +261,17 @@ def process_samples_stream(
     scorer = RuleOnlyScorer(config=scorer_config)
     
     # OnlineBudgetController 配置 (SH-DA++ v4.0 稳定性优化)
-    # k: 减小至 0.01 以提高稳定性
-    # window_size: 增大至 500 以减少噪声
-    budget_cfg = sh_da_config.get('budget_controller', {})
+    # k: 减小至 0.005 以提高稳定性
+    # window_size: 增大至 800 以减少噪声
+    budget_cfg = dict(sh_da_config.get('budget_controller', {}))
+    # 强制稳定性调优参数
+    budget_cfg['window_size'] = 800
+    budget_cfg['k'] = 0.005
     if target_budget is not None:
-        budget_cfg = dict(budget_cfg)
         budget_cfg['target_budget'] = target_budget
     budget_config = BudgetControllerConfig(
-        window_size=budget_cfg.get('window_size', 500),   # 增大窗口大小
-        k=budget_cfg.get('k', 0.01),                      # 减小比例系数
+        window_size=budget_cfg.get('window_size', 800),   # 增大窗口大小
+        k=budget_cfg.get('k', 0.005),                     # 减小比例系数
         lambda_min=budget_cfg.get('lambda_min', 0.0),
         lambda_max=budget_cfg.get('lambda_max', 2.0),
         lambda_init=budget_cfg.get('lambda_init', 0.5),
@@ -534,25 +536,25 @@ def visualize_results(records: List[StepRecord], stats: Dict, eval_result: Dict,
     
     # 子图 1: λ 阈值调整曲线
     ax1 = axes[0]
-    ax1.plot(sample_indices, lambda_values, 'b-', linewidth=1.5, label='λ (阈值)')
-    ax1.axhline(y=stats.get('lambda_init', 0.5), color='gray', linestyle='--', alpha=0.5, label='λ₀ (初始值)')
-    ax1.set_xlabel('样本索引', fontsize=12)
-    ax1.set_ylabel('阈值 λ', fontsize=12)
-    ax1.set_title('阈值 λ 随样本流动的调整曲线', fontsize=14, fontweight='bold')
+    ax1.plot(sample_indices, lambda_values, 'b-', linewidth=1.5, label='Lambda (Threshold)')
+    ax1.axhline(y=stats.get('lambda_init', 0.5), color='gray', linestyle='--', alpha=0.5, label='Lambda0 (Init)')
+    ax1.set_xlabel('Sample Index', fontsize=12)
+    ax1.set_ylabel('Lambda', fontsize=12)
+    ax1.set_title('Lambda Adaptation Over Samples', fontsize=14, fontweight='bold')
     ax1.legend(loc='best')
     ax1.grid(True, alpha=0.3)
     
     # 标记 warmup 结束
     warmup_end = stats.get('window_size', 200)
     if len(sample_indices) > warmup_end:
-        ax1.axvline(x=warmup_end, color='orange', linestyle='--', alpha=0.5, label='Warmup 结束')
+        ax1.axvline(x=warmup_end, color='orange', linestyle='--', alpha=0.5, label='Warmup End')
         ax1.legend(loc='best')
     
     # 子图 2: 实际调用率曲线
     ax2 = axes[1]
-    ax2.plot(sample_indices, budget_window, 'g-', linewidth=1.5, alpha=0.7, label='B̄_window (滑动窗口)')
-    ax2.plot(sample_indices, budget_total, 'r-', linewidth=1.5, alpha=0.7, label='B̄_total (总体)')
-    ax2.axhline(y=target_budget, color='blue', linestyle='-', linewidth=2, label=f'目标 B = {target_budget:.1%}')
+    ax2.plot(sample_indices, budget_window, 'g-', linewidth=1.5, alpha=0.7, label='B̄_window (Sliding)')
+    ax2.plot(sample_indices, budget_total, 'r-', linewidth=1.5, alpha=0.7, label='B̄_total (Overall)')
+    ax2.axhline(y=target_budget, color='blue', linestyle='-', linewidth=2, label=f'Target B = {target_budget:.1%}')
     
     # 绘制约束区域
     hard_threshold = 0.005  # 0.5%
@@ -560,17 +562,17 @@ def visualize_results(records: List[StepRecord], stats: Dict, eval_result: Dict,
     ax2.axhspan(
         target_budget - hard_threshold,
         target_budget + hard_threshold,
-        alpha=0.2, color='green', label='硬约束区域 (±0.5%)'
+        alpha=0.2, color='green', label='Hard Constraint (±0.5%)'
     )
     ax2.axhspan(
         target_budget - oscillation_threshold,
         target_budget + oscillation_threshold,
-        alpha=0.1, color='yellow', label='震荡检查区域 (±3%)'
+        alpha=0.1, color='yellow', label='Oscillation Band (±3%)'
     )
     
-    ax2.set_xlabel('样本索引', fontsize=12)
-    ax2.set_ylabel('调用率', fontsize=12)
-    ax2.set_title('实际调用率随样本流动的变化', fontsize=14, fontweight='bold')
+    ax2.set_xlabel('Sample Index', fontsize=12)
+    ax2.set_ylabel('Call Rate', fontsize=12)
+    ax2.set_title('Call Rate Over Samples', fontsize=14, fontweight='bold')
     ax2.legend(loc='best')
     ax2.grid(True, alpha=0.3)
     ax2.set_ylim([max(0, target_budget - 0.1), min(1, target_budget + 0.1)])
@@ -581,13 +583,13 @@ def visualize_results(records: List[StepRecord], stats: Dict, eval_result: Dict,
     
     # 添加评估结果文本
     textstr = (
-        f"最终统计:\n"
+        f"Final Stats:\n"
         f"  B̄_total = {stats['final_budget_total']:.4f} ({stats['final_budget_total']:.2%})\n"
         f"  B̄_window = {stats['final_budget_window']:.4f} ({stats['final_budget_window']:.2%})\n"
-        f"  误差 |B̄ - B| = {eval_result['error_total']:.4f} ({eval_result['error_total']*100:.2f}%)\n"
-        f"  最大震荡 = {eval_result['max_oscillation']:.4f} ({eval_result['max_oscillation']*100:.2f}%)\n"
-        f"  硬约束: {'✓ 通过' if eval_result['hard_constraint_pass'] else '✗ 失败'}\n"
-        f"  震荡检查: {'✓ 通过' if eval_result['oscillation_pass'] else '✗ 失败'}"
+        f"  |B̄ - B| = {eval_result['error_total']:.4f} ({eval_result['error_total']*100:.2f}%)\n"
+        f"  Max Oscillation = {eval_result['max_oscillation']:.4f} ({eval_result['max_oscillation']*100:.2f}%)\n"
+        f"  Hard Constraint: {'PASS' if eval_result['hard_constraint_pass'] else 'FAIL'}\n"
+        f"  Oscillation Check: {'PASS' if eval_result['oscillation_pass'] else 'FAIL'}"
     )
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.8)
     ax2.text(0.02, 0.98, textstr, transform=ax2.transAxes, fontsize=10,

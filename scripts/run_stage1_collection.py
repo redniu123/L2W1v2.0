@@ -34,6 +34,7 @@ from dataclasses import dataclass, field
 import time
 import numpy as np
 from tqdm import tqdm
+import cv2
 
 # 添加项目路径
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -222,6 +223,29 @@ def resolve_image_path(
     return None
 
 
+def compute_sobel_edge_strength(image: np.ndarray) -> float:
+    """计算图像边界区域的 Sobel 梯度强度 (v_edge)"""
+    if image is None:
+        return 0.0
+
+    if len(image.shape) == 3:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = image
+
+    sobel_x = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
+    sobel_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
+    magnitude = np.sqrt(sobel_x ** 2 + sobel_y ** 2)
+
+    h, w = gray.shape
+    boundary_width = max(1, int(w * 0.1))
+    left_region = magnitude[:, :boundary_width]
+    right_region = magnitude[:, -boundary_width:]
+    v_edge = (np.mean(left_region) + np.mean(right_region)) / 2.0
+
+    return float(v_edge)
+
+
 def run_stage1_collection(
     metadata_path: str,
     config_path: str,
@@ -404,6 +428,15 @@ def run_stage1_collection(
                 stats.failed_samples += 1
                 continue
 
+            # 计算 v_edge (Sobel 边缘强度)
+            image_bgr = cv2.imread(image_path)
+            if image_bgr is None:
+                if verbose:
+                    print(f"[Warning] 图像读取失败: {image_path}")
+                stats.failed_samples += 1
+                continue
+            v_edge = compute_sobel_edge_strength(image_bgr)
+
             # 提取样本信息
             sample_id = sample.get("id", sample.get("sample_id", f"sample_{idx:06d}"))
             gt_text = sample.get("gt_text", sample.get("gt", sample.get("label", "")))
@@ -418,6 +451,7 @@ def run_stage1_collection(
                 gt_text=gt_text,
                 source=source,
                 error_type=error_type,
+                v_edge=v_edge,
             )
 
             # 收集统计
