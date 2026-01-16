@@ -63,8 +63,8 @@ logger = get_logger()
 
 
 def compute_softmax(
-    logits: np.ndarray, 
-    axis: int = -1, 
+    logits: np.ndarray,
+    axis: int = -1,
     temperature: float = 1.0,
     debug: bool = False,
 ) -> np.ndarray:
@@ -77,7 +77,7 @@ def compute_softmax(
         - 如果输入是原始 logits，才进行 Softmax + 温度缩放
 
     PP-OCRv5 特性：
-        PaddleOCR 的 CTC Head 已经内置了 Softmax 层，模型输出的 `outputs[0]` 
+        PaddleOCR 的 CTC Head 已经内置了 Softmax 层，模型输出的 `outputs[0]`
         已经是概率分布（每行和为 1），而不是原始 logits。因此不应再次应用 Softmax。
 
     实现公式 (仅当输入是原始 logits 时):
@@ -99,32 +99,36 @@ def compute_softmax(
     # PP-OCRv5 的输出已经是 Softmax 后的概率
     input_min = logits.min()
     input_max = logits.max()
-    
+
     # 计算每行的和，检查是否接近 1（概率分布的特征）
     row_sums = np.sum(logits, axis=axis)
     is_probability = (
-        input_min >= -0.001 and  # 概率最小值应 >= 0
-        input_max <= 1.001 and   # 概率最大值应 <= 1
-        np.allclose(row_sums, 1.0, atol=0.01)  # 每行和应接近 1
+        input_min >= -0.001  # 概率最小值应 >= 0
+        and input_max <= 1.001  # 概率最大值应 <= 1
+        and np.allclose(row_sums, 1.0, atol=0.01)  # 每行和应接近 1
     )
-    
+
     if debug:
-        print(f"[compute_softmax] 输入范围: min={input_min:.4f}, max={input_max:.4f}, "
-              f"row_sum_mean={row_sums.mean():.4f}")
+        print(
+            f"[compute_softmax] 输入范围: min={input_min:.4f}, max={input_max:.4f}, "
+            f"row_sum_mean={row_sums.mean():.4f}"
+        )
         if is_probability:
             print(f"[compute_softmax] ✓ 检测到输入已是概率分布，跳过 Softmax")
         else:
-            print(f"[compute_softmax] ✓ 检测到输入是原始 logits，应用 Softmax (T={temperature})")
-    
+            print(
+                f"[compute_softmax] ✓ 检测到输入是原始 logits，应用 Softmax (T={temperature})"
+            )
+
     # 如果输入已经是概率，直接返回
     if is_probability:
         return logits
-    
+
     # 以下是原始 logits 的处理逻辑
     # 温度参数验证
     if temperature <= 0:
         raise ValueError(f"Temperature must be positive, got {temperature}")
-    
+
     # Step 1: 减去最大值以保证数值稳定性 (防止 exp 溢出)
     logits_max = np.max(logits, axis=axis, keepdims=True)
     logits_shifted = logits - logits_max
@@ -397,32 +401,34 @@ class TextRecognizerWithLogits(object):
             }
         self.postprocess_op = build_post_process(postprocess_params)
         self.postprocess_params = postprocess_params
-        
+
         # ========== SH-DA++ v4.0: 保存字符表和 blank_id ==========
         # 从 postprocess_op 动态获取 blank_id (CTCLabelDecode 约定为 0)
         # 严格遵循 CTCLabelDecode.get_ignored_tokens() 的约定
         self.blank_id = 0  # 默认值，CTCLabelDecode 的 blank token 固定为 0
-        if hasattr(self.postprocess_op, 'get_ignored_tokens'):
+        if hasattr(self.postprocess_op, "get_ignored_tokens"):
             try:
                 ignored_tokens = self.postprocess_op.get_ignored_tokens()
                 if ignored_tokens and len(ignored_tokens) > 0:
                     # CTCLabelDecode.get_ignored_tokens() 返回 [0]
                     self.blank_id = int(ignored_tokens[0])
             except Exception as e:
-                logger.warning(f"Failed to get ignored_tokens from postprocess_op: {e}. Using default blank_id=0")
+                logger.warning(
+                    f"Failed to get ignored_tokens from postprocess_op: {e}. Using default blank_id=0"
+                )
                 self.blank_id = 0
-        
+
         self.rho = 0.1  # 边界区域比例因子
-        
+
         # SH-DA++ v4.0: 温度参数用于 Softmax 缩放
         # 当 logits 值范围较小时（如 [-1, 1]），标准 Softmax 会导致概率趋于均匀
         # 通过设置 T < 1 可以有效放大差异，恢复真实的置信度分布
         # 默认值 0.1 适用于 PP-OCRv5 的 logits 范围
-        self.softmax_temperature = getattr(args, 'softmax_temperature', 0.1)
-        
+        self.softmax_temperature = getattr(args, "softmax_temperature", 0.1)
+
         # 从 postprocess_op 获取字符表用于 Top-2 索引转换
         self.character_list = None
-        if hasattr(self.postprocess_op, 'character'):
+        if hasattr(self.postprocess_op, "character"):
             self.character_list = self.postprocess_op.character
         # ==========================================================
         (
@@ -858,8 +864,8 @@ class TextRecognizerWithLogits(object):
 
         # ========== SH-DA++ v4.0: Emission 矩阵与边界统计量存储 ==========
         all_boundary_stats = [None] * img_num  # 每个样本的边界统计量
-        all_top2_info = [None] * img_num       # 每个样本的 Top-2 信息
-        lat_router_ms_list = [0.0] * img_num   # 路由器耗时 (毫秒)
+        all_top2_info = [None] * img_num  # 每个样本的 Top-2 信息
+        lat_router_ms_list = [0.0] * img_num  # 路由器耗时 (毫秒)
         # ==================================================================
 
         batch_num = self.rec_batch_num
@@ -1102,7 +1108,7 @@ class TextRecognizerWithLogits(object):
                 # ========== SH-DA++ v4.0: 默认 CTC 算法路径 ==========
                 # 这是 PP-OCRv5 使用的主要路径
                 batch_raw_logits = None  # 原始 logits 用于后续处理
-                
+
                 if self.use_onnx:
                     input_dict = {}
                     input_dict[self.input_tensor.name] = norm_img_batch
@@ -1142,98 +1148,125 @@ class TextRecognizerWithLogits(object):
                 rec_res[indices[beg_img_no + rno]] = rec_result[rno]
 
             # ========== SH-DA++ v4.0: Emission 矩阵计算与边界统计量提取 ==========
-            if batch_raw_logits is not None and self.postprocess_params["name"] == "CTCLabelDecode":
+            if (
+                batch_raw_logits is not None
+                and self.postprocess_params["name"] == "CTCLabelDecode"
+            ):
                 for rno in range(len(rec_result)):
                     # 计时开始
                     router_start = time.perf_counter()
-                    
+
                     original_idx = indices[beg_img_no + rno]
-                    
+
                     # 提取当前样本的 logits: [Seq_Len, Vocab_Size]
                     # 使用 .copy() 防止 Paddle 显存复用导致数据被覆盖
                     sample_logits = batch_raw_logits[rno].copy()
                     T, C = sample_logits.shape
-                    
+
                     # Step 1: 计算 Softmax 得到 Emission 矩阵 E ∈ [0,1]^{T×C}
                     # 使用温度缩放来放大 logits 差异（当原始值范围较小时）
+                    # debug 参数：只在全局第 0, 1000, 2000... 个样本打印调试信息
+                    global_sample_idx = beg_img_no + rno
                     E = compute_softmax(
-                        sample_logits, 
-                        axis=-1, 
+                        sample_logits,
+                        axis=-1,
                         temperature=self.softmax_temperature,
-                        debug=(rno == 0 and beg_img_no == 0),  # 只在第一个样本打印调试信息
+                        debug=(global_sample_idx % 1000 == 0),  # 每 1000 个样本打印一次
                     )
-                    
+
                     # Step 2: 计算边界统计量
                     boundary_stats = calculate_boundary_stats(
-                        E, 
-                        blank_id=self.blank_id, 
-                        rho=self.rho
+                        E, blank_id=self.blank_id, rho=self.rho
                     )
                     all_boundary_stats[original_idx] = boundary_stats
-                    
+
                     # Step 3: Top-2 提取 - 每个时间步的最大和次大概率
-                    top2_status = 'available'  # 默认状态
+                    top2_status = "available"  # 默认状态
                     top2_info = None
-                    
+
                     try:
                         # 获取 Top-2 索引和概率
                         top2_indices = np.argsort(E, axis=-1)[:, -2:][:, ::-1]  # [T, 2]
-                        top2_probs = np.take_along_axis(E, top2_indices, axis=-1)  # [T, 2]
-                        
+                        top2_probs = np.take_along_axis(
+                            E, top2_indices, axis=-1
+                        )  # [T, 2]
+
                         # 计算 Top-1 和 Top-2 的置信度统计
                         top1_conf_mean = float(np.mean(top2_probs[:, 0]))
                         top2_conf_mean = float(np.mean(top2_probs[:, 1]))
-                        conf_gap_mean = float(np.mean(top2_probs[:, 0] - top2_probs[:, 1]))
-                        
+                        conf_gap_mean = float(
+                            np.mean(top2_probs[:, 0] - top2_probs[:, 1])
+                        )
+
                         # 转换索引为字符 (如果字符表可用)
                         top1_chars = None
                         top2_chars = None
-                        if self.character_list is not None and len(self.character_list) > 0:
+                        if (
+                            self.character_list is not None
+                            and len(self.character_list) > 0
+                        ):
                             top1_chars = []
                             top2_chars = []
                             for t in range(T):
-                                idx1, idx2 = int(top2_indices[t, 0]), int(top2_indices[t, 1])
+                                idx1, idx2 = (
+                                    int(top2_indices[t, 0]),
+                                    int(top2_indices[t, 1]),
+                                )
                                 # 注意: blank_id 可能对应 '<blank>' 或特殊标记
-                                char1 = self.character_list[idx1] if 0 <= idx1 < len(self.character_list) else '<unk>'
-                                char2 = self.character_list[idx2] if 0 <= idx2 < len(self.character_list) else '<unk>'
+                                char1 = (
+                                    self.character_list[idx1]
+                                    if 0 <= idx1 < len(self.character_list)
+                                    else "<unk>"
+                                )
+                                char2 = (
+                                    self.character_list[idx2]
+                                    if 0 <= idx2 < len(self.character_list)
+                                    else "<unk>"
+                                )
                                 top1_chars.append(char1)
                                 top2_chars.append(char2)
                         else:
                             # 字符表不可用，但 Top-2 提取本身成功
-                            top2_status = 'available_no_chars'
-                        
+                            top2_status = "available_no_chars"
+
                         # 组装 Top-2 信息
                         top2_info = {
-                            'top2_status': top2_status,
-                            'T': T,
-                            'C': C,
-                            'top1_conf_mean': top1_conf_mean,
-                            'top2_conf_mean': top2_conf_mean,
-                            'conf_gap_mean': conf_gap_mean,
+                            "top2_status": top2_status,
+                            "T": T,
+                            "C": C,
+                            "top1_conf_mean": top1_conf_mean,
+                            "top2_conf_mean": top2_conf_mean,
+                            "conf_gap_mean": conf_gap_mean,
                             # 完整序列 (可选，用于详细分析，仅当 T <= 100 时保存)
-                            'top2_indices': top2_indices.tolist() if T <= 100 else None,
-                            'top2_probs': top2_probs.tolist() if T <= 100 else None,
-                            'top1_chars': top1_chars if top2_status == 'available' and T <= 100 else None,
-                            'top2_chars': top2_chars if top2_status == 'available' and T <= 100 else None,
+                            "top2_indices": top2_indices.tolist() if T <= 100 else None,
+                            "top2_probs": top2_probs.tolist() if T <= 100 else None,
+                            "top1_chars": top1_chars
+                            if top2_status == "available" and T <= 100
+                            else None,
+                            "top2_chars": top2_chars
+                            if top2_status == "available" and T <= 100
+                            else None,
                         }
                     except Exception as e:
                         # Top-2 提取失败，标记为 missing
-                        top2_status = 'missing'
+                        top2_status = "missing"
                         top2_info = {
-                            'top2_status': top2_status,
-                            'T': T,
-                            'C': C,
-                            'top1_conf_mean': 0.0,
-                            'top2_conf_mean': 0.0,
-                            'conf_gap_mean': 0.0,
-                            'error': str(e) if logger else None,
+                            "top2_status": top2_status,
+                            "T": T,
+                            "C": C,
+                            "top1_conf_mean": 0.0,
+                            "top2_conf_mean": 0.0,
+                            "conf_gap_mean": 0.0,
+                            "error": str(e) if logger else None,
                         }
-                    
+
                     all_top2_info[original_idx] = top2_info
-                    
+
                     # 计时结束
                     router_end = time.perf_counter()
-                    lat_router_ms_list[original_idx] = (router_end - router_start) * 1000.0
+                    lat_router_ms_list[original_idx] = (
+                        router_end - router_start
+                    ) * 1000.0
             # ========================================================================
 
             if self.benchmark:
@@ -1246,12 +1279,10 @@ class TextRecognizerWithLogits(object):
             # 基础识别结果
             "results": rec_res,  # List[Tuple[str, float]] - [(text, conf), ...]
             "elapsed_time": elapsed_time,
-            
             # SH-DA++ v4.0 路由器特征信号
-            "boundary_stats": all_boundary_stats,    # List[dict] - 边界统计量
-            "top2_info": all_top2_info,              # List[dict] - Top-2 信息
-            "lat_router_ms": lat_router_ms_list,     # List[float] - 路由器耗时 (ms)
-            
+            "boundary_stats": all_boundary_stats,  # List[dict] - 边界统计量
+            "top2_info": all_top2_info,  # List[dict] - Top-2 信息
+            "lat_router_ms": lat_router_ms_list,  # List[float] - 路由器耗时 (ms)
             # 配置元信息
             "router_config": {
                 "blank_id": self.blank_id,
@@ -1307,8 +1338,10 @@ def main(args):
         lat_router_ms_list = output.get("lat_router_ms", [])
         router_config = output.get("router_config", {})
         elapsed = output["elapsed_time"]
-        
-        logger.info(f"[SH-DA++ v4.0] Router Config: blank_id={router_config.get('blank_id', 'N/A')}, rho={router_config.get('rho', 'N/A')}")
+
+        logger.info(
+            f"[SH-DA++ v4.0] Router Config: blank_id={router_config.get('blank_id', 'N/A')}, rho={router_config.get('rho', 'N/A')}"
+        )
 
     except Exception as E:
         logger.info(traceback.format_exc())
@@ -1320,11 +1353,11 @@ def main(args):
         logger.info(
             "Predicts of {}:{}".format(valid_image_file_list[ino], rec_res[ino])
         )
-        
+
         # SH-DA++ v4.0: 打印边界统计量
         if ino < len(boundary_stats_list) and boundary_stats_list[ino] is not None:
             bs = boundary_stats_list[ino]
-            if bs.get('valid', False):
+            if bs.get("valid", False):
                 logger.info(
                     "  -> Boundary Stats: "
                     f"blank_mean_L={bs.get('blank_mean_L', 0):.4f}, "
@@ -1335,37 +1368,43 @@ def main(args):
                 )
             else:
                 logger.info("  -> Boundary Stats: invalid (T < 2)")
-        
+
         # SH-DA++ v4.0: 打印 Top-2 信息
         if ino < len(top2_info_list) and top2_info_list[ino] is not None:
             top2 = top2_info_list[ino]
-            status = top2.get('top2_status', 'unknown')
+            status = top2.get("top2_status", "unknown")
             logger.info(
                 f"  -> Top-2 Info: status={status}, "
                 f"T={top2.get('T', 0)}, C={top2.get('C', 0)}, "
                 f"top1_conf_mean={top2.get('top1_conf_mean', 0):.4f}, "
                 f"conf_gap_mean={top2.get('conf_gap_mean', 0):.4f}"
             )
-            if status == 'missing':
-                error_msg = top2.get('error', 'Unknown error')
+            if status == "missing":
+                error_msg = top2.get("error", "Unknown error")
                 logger.warning(f"    Top-2 extraction failed: {error_msg}")
-        
+
         # SH-DA++ v4.0: 打印路由器耗时
         if ino < len(lat_router_ms_list):
             logger.info(f"  -> Router Latency: {lat_router_ms_list[ino]:.2f} ms")
 
     logger.info(f"Total elapsed time: {elapsed:.3f}s")
-    
+
     # SH-DA++ v4.0: 统计信息汇总
-    valid_boundary_stats = [bs for bs in boundary_stats_list if bs and bs.get('valid', False)]
+    valid_boundary_stats = [
+        bs for bs in boundary_stats_list if bs and bs.get("valid", False)
+    ]
     if valid_boundary_stats:
-        avg_blank_mean_L = np.mean([bs.get('blank_mean_L', 0) for bs in valid_boundary_stats])
-        avg_blank_mean_R = np.mean([bs.get('blank_mean_R', 0) for bs in valid_boundary_stats])
+        avg_blank_mean_L = np.mean(
+            [bs.get("blank_mean_L", 0) for bs in valid_boundary_stats]
+        )
+        avg_blank_mean_R = np.mean(
+            [bs.get("blank_mean_R", 0) for bs in valid_boundary_stats]
+        )
         logger.info(
             f"[Summary] Valid boundary stats samples: {len(valid_boundary_stats)}/{len(img_list)}, "
             f"avg blank_mean_L={avg_blank_mean_L:.4f}, avg blank_mean_R={avg_blank_mean_R:.4f}"
         )
-    
+
     if lat_router_ms_list:
         avg_router_lat = np.mean([lat for lat in lat_router_ms_list if lat > 0])
         max_router_lat = max(lat_router_ms_list) if lat_router_ms_list else 0

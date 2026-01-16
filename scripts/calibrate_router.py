@@ -417,18 +417,21 @@ def process_samples_with_engine(
 
             # 2. 获取 Stage 0 信号并计算 q（严格模式：真实推理）
             output = engine([image])
-            
+
             # 提取识别结果
             results_list = output.get("results", [])
             rec_text = ""
             rec_conf = 0.0
             if results_list and len(results_list) > 0:
-                if isinstance(results_list[0], (list, tuple)) and len(results_list[0]) >= 2:
+                if (
+                    isinstance(results_list[0], (list, tuple))
+                    and len(results_list[0]) >= 2
+                ):
                     rec_text, rec_conf = results_list[0][0], results_list[0][1]
                 elif isinstance(results_list[0], dict):
                     rec_text = results_list[0].get("text", "")
                     rec_conf = results_list[0].get("confidence", 0.0)
-            
+
             boundary_stats = (
                 output.get("boundary_stats", [{}])[0]
                 if output.get("boundary_stats")
@@ -448,12 +451,14 @@ def process_samples_with_engine(
 
             q = result.q
             route_type = result.route_type.value
-            
+
             # ========== 实时打印识别结果（每 100 个样本 + 前 5 个） ==========
             if (i + 1) <= 5 or (i + 1) % 100 == 0:
                 display_text = rec_text[:25] + "..." if len(rec_text) > 25 else rec_text
                 sample_id = sample.get("id", f"sample_{i}")
-                print(f"  [{sample_id}] '{display_text}' | conf={rec_conf:.2%} | q={q:.4f} | v_edge={v_edge:.2f}")
+                print(
+                    f"  [{sample_id}] '{display_text}' | conf={rec_conf:.2%} | q={q:.4f} | v_edge={v_edge:.2f}"
+                )
 
             v_edges.append(v_edge)
             q_scores.append(q)
@@ -936,6 +941,22 @@ def main():
         json.dump(stats_dict, f, ensure_ascii=False, indent=2)
 
     print(f"\n[✓] 统计结果已保存: {args.output_stats}")
+
+    # 5.1. 保存 PP-OCRv5 识别结果到 JSONL
+    ppocrv5_text_path = stats_path.parent / "ppocrv5_text.jsonl"
+    with open(ppocrv5_text_path, "w", encoding="utf-8") as f:
+        for detail in details:
+            record = {
+                "id": detail.get("id", ""),
+                "text": detail.get("text", ""),
+                "confidence": detail.get("confidence", 0.0),
+                "q": detail.get("q", 0.0),
+                "v_edge": detail.get("v_edge", 0.0),
+                "route_type": detail.get("route_type", ""),
+            }
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    
+    print(f"[✓] PP-OCRv5 识别结果已保存: {ppocrv5_text_path} ({len(details)} 条)")
 
     # 6. 更新配置文件
     if not args.dry_run:
