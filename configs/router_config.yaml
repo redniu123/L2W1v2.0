@@ -12,6 +12,7 @@ stage0:
   blank_id: 0 # Blank token ID (PaddleOCR 默认为 0)
   rho: 0.1 # 边界窗口比例 ρ，L=[1,⌊ρT⌋], R=[⌈(1-ρ)T⌉,T]
   use_det: true # 是否启用检测器 (DET → Crop → REC)
+  det_model_dir: "" # 检测模型目录 (可选，如 PP-OCRv5 det)
 
   # Softmax 温度参数 (SH-DA++ v4.0 关键修复)
   # 当 logits 值范围较小时（如 [-1, 1]），标准 Softmax 会导致概率趋于均匀
