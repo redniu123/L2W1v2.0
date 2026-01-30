@@ -1,0 +1,9 @@
+# 忽略所有 .md 文件，但保留 README.md
+*.md
+!README.md
+
+# 忽略 docs 文件夹
+docs/
+
+# 忽略 archive 文件夹
+archive/
