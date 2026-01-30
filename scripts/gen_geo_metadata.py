@@ -27,14 +27,14 @@ def main():
     parser.add_argument(
         "--input_dir",
         type=str,
-        default="data/geo",
-        help="地质专项图像目录 (默认: data/geo)",
+        default="data/geo/geotext",
+        help="地质专项图像目录 (默认: data/geo/geotext)",
     )
     parser.add_argument(
         "--output",
         type=str,
-        default="data/geo_metadata.jsonl",
-        help="输出 jsonl 路径 (默认: data/geo_metadata.jsonl)",
+        default="data/geo/geotext.jsonl",
+        help="输出 jsonl 路径 (默认: data/geo/geotext.jsonl)",
     )
     args = parser.parse_args()
 
