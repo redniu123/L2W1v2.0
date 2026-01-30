@@ -39,10 +39,10 @@ class TextDetector:
         if self.det_model_dir:
             kwargs["det_model_dir"] = self.det_model_dir
 
-        # 某些版本不支持 show_log
+        # 某些版本不支持 show_log（会抛 Unknown argument）
         try:
             self._ocr = PaddleOCR(**kwargs, show_log=False)
-        except TypeError:
+        except Exception:
             self._ocr = PaddleOCR(**kwargs)
 
     def __call__(self, img) -> List:
