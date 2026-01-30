@@ -378,6 +378,11 @@ def run_stage1_collection(
         v_max=rule_scorer_config.get("v_max", 5.0),
         lambda_threshold=rule_scorer_config.get("lambda_threshold", 0.5),
         eta=rule_scorer_config.get("eta", 0.5),
+        geology_dict_path=rule_scorer_config.get(
+            "geology_dict_path", "data/dicts/Geology.txt"
+        ),
+        geology_min_len=rule_scorer_config.get("geology_min_len", 2),
+        geology_risk_weight=rule_scorer_config.get("geology_risk_weight", 1.0),
         # OnlineBudgetController 配置
         budget_window_size=budget_config.get("window_size", 200),
         budget_k=budget_config.get("k", 0.05),

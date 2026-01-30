@@ -72,6 +72,9 @@ class PipelineConfig:
     v_max: float = 5.0  # v_edge 归一化上界
     lambda_threshold: float = 0.5  # 初始分诊阈值 λ
     eta: float = 0.5  # 综合优先级中 r_d 权重 η
+    geology_dict_path: str = "data/dicts/Geology.txt"  # 地质词典路径
+    geology_min_len: int = 2  # 词条最短长度
+    geology_risk_weight: float = 1.0  # 地质风险权重
 
     # ========== SH-DA++ v4.0: OnlineBudgetController 配置 ==========
     budget_window_size: int = 200  # W: 滑动窗口大小
@@ -500,6 +503,9 @@ class L2W1Pipeline:
             v_max=self.config.v_max,
             lambda_threshold=self.config.lambda_threshold,
             eta=self.config.eta,
+            geology_dict_path=self.config.geology_dict_path,
+            geology_min_len=self.config.geology_min_len,
+            geology_risk_weight=self.config.geology_risk_weight,
         )
         self._rule_scorer = RuleOnlyScorer(config=scorer_config)
 
@@ -637,6 +643,7 @@ class L2W1Pipeline:
             v_edge=v_edge,
             char_count=char_count,
             expected_char_count=expected_char_count,
+            agent_a_text=result.agent_a_text,
         )
 
         result.s_b = scoring_result.s_b
