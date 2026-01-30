@@ -29,6 +29,7 @@ Tensor 规格:
 
 import os
 import sys
+from typing import Dict
 from PIL import Image
 from copy import deepcopy
 
@@ -47,6 +48,7 @@ import math
 import time
 import traceback
 import paddle
+import yaml
 
 # 从 L2W1 本地模块导入 (不再依赖外部 PaddleOCR 代码库)
 import tools.infer.utility as utility
@@ -254,6 +256,47 @@ def calculate_boundary_stats(
     }
 
 
+def get_rotate_crop_image(img: np.ndarray, points: np.ndarray) -> np.ndarray:
+    """
+    旋转裁剪：根据四点框进行透视变换，获取矫正后的文本行
+    """
+    points = np.array(points).astype("float32")
+    if points.shape != (4, 2):
+        points = points.reshape((4, 2))
+
+    def _order_points(pts):
+        rect = np.zeros((4, 2), dtype="float32")
+        s = pts.sum(axis=1)
+        rect[0] = pts[np.argmin(s)]  # top-left
+        rect[2] = pts[np.argmax(s)]  # bottom-right
+        diff = np.diff(pts, axis=1)
+        rect[1] = pts[np.argmin(diff)]  # top-right
+        rect[3] = pts[np.argmax(diff)]  # bottom-left
+        return rect
+
+    rect = _order_points(points)
+    (tl, tr, br, bl) = rect
+
+    width_a = np.linalg.norm(br - bl)
+    width_b = np.linalg.norm(tr - tl)
+    max_width = int(max(width_a, width_b))
+
+    height_a = np.linalg.norm(tr - br)
+    height_b = np.linalg.norm(tl - bl)
+    max_height = int(max(height_a, height_b))
+
+    if max_width <= 0 or max_height <= 0:
+        return img
+
+    dst = np.array(
+        [[0, 0], [max_width - 1, 0], [max_width - 1, max_height - 1], [0, max_height - 1]],
+        dtype="float32",
+    )
+    M = cv2.getPerspectiveTransform(rect, dst)
+    warped = cv2.warpPerspective(img, M, (max_width, max_height), borderMode=cv2.BORDER_REPLICATE)
+    return warped
+
+
 class TextRecognizerWithLogits(object):
     """
     L2W1 增强版文本识别器 - 支持 Logits 导出
@@ -293,6 +336,7 @@ class TextRecognizerWithLogits(object):
 
         if logger is None:
             logger = get_logger()
+        self._logger = logger
         self.rec_image_shape = [int(v) for v in args.rec_image_shape.split(",")]
         self.rec_batch_num = args.rec_batch_num
         self.rec_algorithm = args.rec_algorithm
@@ -417,14 +461,19 @@ class TextRecognizerWithLogits(object):
                     f"Failed to get ignored_tokens from postprocess_op: {e}. Using default blank_id=0"
                 )
                 self.blank_id = 0
-
-        self.rho = 0.1  # 边界区域比例因子
+        # 读取 stage0 配置（包含 use_det / rho / softmax_temperature）
+        stage0_cfg = self._load_stage0_config()
+        self.rho = float(stage0_cfg.get("rho", 0.1))
+        if hasattr(args, "rho") and args.rho is not None:
+            self.rho = float(args.rho)
 
         # SH-DA++ v4.0: 温度参数用于 Softmax 缩放
         # 当 logits 值范围较小时（如 [-1, 1]），标准 Softmax 会导致概率趋于均匀
         # 通过设置 T < 1 可以有效放大差异，恢复真实的置信度分布
         # 默认值 0.1 适用于 PP-OCRv5 的 logits 范围
-        self.softmax_temperature = getattr(args, "softmax_temperature", 0.1)
+        self.softmax_temperature = float(
+            getattr(args, "softmax_temperature", stage0_cfg.get("softmax_temperature", 0.1))
+        )
         # 控制 compute_softmax 的调试输出频率（全局样本计数）
         self._softmax_debug_counter = 0
 
@@ -432,6 +481,13 @@ class TextRecognizerWithLogits(object):
         self.character_list = None
         if hasattr(self.postprocess_op, "character"):
             self.character_list = self.postprocess_op.character
+        # ==========================================================
+        # ========== SH-DA++ v4.0: DET 开关与检测器初始化 ==========
+        self.use_det = bool(getattr(args, "use_det", stage0_cfg.get("use_det", False)))
+        self.det_model_dir = getattr(args, "det_model_dir", stage0_cfg.get("det_model_dir", ""))
+        self.detector = None
+        if self.use_det:
+            self._init_detector(args)
         # ==========================================================
         (
             self.predictor,
@@ -461,6 +517,81 @@ class TextRecognizerWithLogits(object):
                 logger=logger,
             )
         self.return_word_box = args.return_word_box
+
+    def _load_stage0_config(self) -> Dict:
+        config_path = os.path.join(L2W1_ROOT, "configs", "router_config.yaml")
+        if not os.path.exists(config_path):
+            return {}
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = yaml.safe_load(f) or {}
+            return config.get("stage0", {}) or {}
+        except Exception as e:
+            if self._logger:
+                self._logger.warning(f"[DET] Failed to load router_config.yaml: {e}")
+            return {}
+
+    def _init_detector(self, args):
+        """
+        初始化检测器（如可用则启用 DET → Crop → REC）
+        """
+        try:
+            from tools.infer.predict_det import TextDetector
+        except Exception as e:
+            if self._logger:
+                self._logger.warning(
+                    f"[DET] TextDetector 不可用，回退到纯识别模式: {e}"
+                )
+            self.use_det = False
+            return
+
+        if self.det_model_dir:
+            setattr(args, "det_model_dir", self.det_model_dir)
+
+        try:
+            self.detector = TextDetector(args)
+            if self._logger:
+                self._logger.info(
+                    f"[DET] TextDetector 初始化成功, det_model_dir={self.det_model_dir or 'default'}"
+                )
+        except Exception as e:
+            if self._logger:
+                self._logger.warning(f"[DET] TextDetector 初始化失败，回退到纯识别: {e}")
+            self.detector = None
+            self.use_det = False
+
+    def _detect_and_correct(self, img: np.ndarray) -> np.ndarray:
+        """
+        使用检测器获取 dt_boxes 并执行旋转裁剪矫正。
+        若检测失败或未检测到文字，直接返回原图。
+        """
+        if not self.use_det or self.detector is None:
+            return img
+
+        try:
+            det_out = self.detector(img)
+            if isinstance(det_out, tuple):
+                dt_boxes = det_out[0]
+            else:
+                dt_boxes = det_out
+
+            if dt_boxes is None or len(dt_boxes) == 0:
+                return img
+
+            # 选取面积最大的框作为文本行
+            def _box_area(box):
+                pts = np.array(box).astype("float32")
+                return float(cv2.contourArea(pts))
+
+            best_box = max(dt_boxes, key=_box_area)
+            crop = get_rotate_crop_image(img, best_box)
+            if crop is None or crop.size == 0:
+                return img
+            return crop
+        except Exception as e:
+            if self._logger:
+                self._logger.warning(f"[DET] 检测/矫正失败，回退到原图: {e}")
+            return img
 
     def resize_norm_img(self, img, max_wh_ratio):
         imgC, imgH, imgW = self.rec_image_shape
@@ -855,6 +986,13 @@ class TextRecognizerWithLogits(object):
             - logits 在 CTC Decode 之前拦截，用于熵计算
             - 使用 deepcopy 防止 PaddlePredictor 内存复用覆盖
         """
+        # ========== SH-DA++ v4.0: DET → Crop → REC ==========
+        if self.use_det and self.detector is not None:
+            corrected_list = []
+            for img in img_list:
+                corrected_list.append(self._detect_and_correct(img))
+            img_list = corrected_list
+
         img_num = len(img_list)
         # Calculate the aspect ratio of all text bars
         width_list = []
