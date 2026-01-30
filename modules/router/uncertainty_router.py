@@ -854,6 +854,11 @@ class RuleScorerConfig:
     # 综合优先级权重
     eta: float = 0.5        # η: r_d 权重系数
 
+    # 地质语义风险
+    geology_dict_path: str = "data/dicts/Geology.txt"
+    geology_min_len: int = 2
+    geology_risk_weight: float = 1.0
+
 
 @dataclass
 class ScoringResult:
@@ -908,6 +913,17 @@ class RuleOnlyScorer:
             config: 评分器配置，默认使用 RuleScorerConfig()
         """
         self.config = config or RuleScorerConfig()
+        self._geology = None
+        try:
+            from modules.router.domain_knowledge import GeologyKnowledge
+
+            self._geology = GeologyKnowledge(
+                dict_path=self.config.geology_dict_path,
+                min_len=self.config.geology_min_len,
+            )
+        except Exception:
+            # 地质词库缺失或加载失败时，默认关闭领域风险
+            self._geology = None
     
     def _normalize_v_edge(self, v_edge: float) -> float:
         """
@@ -1170,6 +1186,7 @@ class RuleOnlyScorer:
         v_edge: float = None,
         char_count: int = 0,
         expected_char_count: int = 0,
+        agent_a_text: str = "",
     ) -> ScoringResult:
         """
         综合评分入口
@@ -1198,18 +1215,31 @@ class RuleOnlyScorer:
         # 2. 计算识别歧义评分 s_a
         s_a, s_a_details = self.compute_ambiguity_score(top2_info=top2_info)
         
-        # 3. 计算综合优先级 q = max(s_b, s_a) + η·r_d
+        # 3. 计算领域风险 (s_d) 并合成 r_d
+        s_d = 0.0
+        geology_details = {}
+        if self._geology is not None and agent_a_text:
+            s_d, geology_details = self._geology.detect_geology_risk(agent_a_text)
+
+        r_d_geology = self.config.geology_risk_weight * s_d
+        r_d_total = float(r_d) + r_d_geology
+
+        # 4. 计算综合优先级 q = max(s_b, s_a) + η·r_d_total
         eta = self.config.eta
-        q = max(s_b, s_a) + eta * r_d
+        q = max(s_b, s_a) + eta * r_d_total
         
-        # 4. 判定分诊类型
+        # 5. 判定分诊类型
         route_type = self.determine_route_type(s_b, s_a)
         
-        # 5. 汇总详情
+        # 6. 汇总详情
         details = {
             "boundary_score_details": s_b_details,
             "ambiguity_score_details": s_a_details,
-            "r_d": float(r_d),
+            "r_d": float(r_d_total),
+            "r_d_base": float(r_d),
+            "r_d_geology": float(r_d_geology),
+            "s_d": float(s_d),
+            "geology_details": geology_details,
             "eta": eta,
             "lambda": self.config.lambda_threshold,
             "config": {

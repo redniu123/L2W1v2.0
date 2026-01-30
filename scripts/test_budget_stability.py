@@ -257,6 +257,9 @@ def process_samples_stream(
         v_max=rule_scorer_cfg.get('v_max', 100.0),
         lambda_threshold=rule_scorer_cfg.get('lambda_threshold', 0.5),
         eta=rule_scorer_cfg.get('eta', 0.5),
+        geology_dict_path=rule_scorer_cfg.get('geology_dict_path', 'data/dicts/Geology.txt'),
+        geology_min_len=rule_scorer_cfg.get('geology_min_len', 2),
+        geology_risk_weight=rule_scorer_cfg.get('geology_risk_weight', 1.0),
     )
     scorer = RuleOnlyScorer(config=scorer_config)
     

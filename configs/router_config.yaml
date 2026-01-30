@@ -48,6 +48,11 @@ sh_da_v4:
     # 综合优先级 q = max(s_b, s_a) + η * r_d
     eta: 0.5 # 语义风险权重 η
 
+    # 领域风险 (地质词典)
+    geology_dict_path: "data/dicts/Geology.txt"
+    geology_min_len: 2
+    geology_risk_weight: 1.0
+
     # 分诊阈值 λ (初始值，通过 calibrate_router.py 校准)
     lambda_threshold: 0.5 # 初始 λ_0，建议取验证集 q 的 (1-B) 分位数
 

@@ -615,14 +615,18 @@ def update_config_yaml(
     if "sh_da_v4" not in config:
         config["sh_da_v4"] = {}
 
-    config["sh_da_v4"]["rule_scorer"] = {
-        "v_min": round(v_min, 4),
-        "v_max": round(v_max, 4),
-        "lambda_threshold": round(lambda_0, 4),
-        "eta": 0.5,
-        "_calibrated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "_target_budget": target_budget,
-    }
+    existing_rule_scorer = config["sh_da_v4"].get("rule_scorer", {}) or {}
+    existing_rule_scorer.update(
+        {
+            "v_min": round(v_min, 4),
+            "v_max": round(v_max, 4),
+            "lambda_threshold": round(lambda_0, 4),
+            "eta": 0.5,
+            "_calibrated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "_target_budget": target_budget,
+        }
+    )
+    config["sh_da_v4"]["rule_scorer"] = existing_rule_scorer
 
     config["sh_da_v4"]["budget_controller"] = {
         "window_size": 200,
