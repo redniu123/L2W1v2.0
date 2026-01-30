@@ -9,21 +9,22 @@
 
 stage0:
   # CTC Emission 相关
-  blank_id: 0                    # Blank token ID (PaddleOCR 默认为 0)
-  rho: 0.1                       # 边界窗口比例 ρ，L=[1,⌊ρT⌋], R=[⌈(1-ρ)T⌉,T]
-  
+  blank_id: 0 # Blank token ID (PaddleOCR 默认为 0)
+  rho: 0.1 # 边界窗口比例 ρ，L=[1,⌊ρT⌋], R=[⌈(1-ρ)T⌉,T]
+  use_det: true # 是否启用检测器 (DET → Crop → REC)
+
   # Softmax 温度参数 (SH-DA++ v4.0 关键修复)
   # 当 logits 值范围较小时（如 [-1, 1]），标准 Softmax 会导致概率趋于均匀
   # 通过设置 T < 1 可以有效放大差异，恢复真实的置信度分布
-  softmax_temperature: 0.1       # 温度参数 T，建议值 0.1 (PP-OCRv5)
-  
+  softmax_temperature: 0.1 # 温度参数 T，建议值 0.1 (PP-OCRv5)
+
   # Top-2 信号
-  top2_enabled: true             # 是否启用 Top-2 概率提取
-  top2_fallback: "char_conf"     # Top-2 缺失时的降级策略: "char_conf" 或 "skip"
-  
+  top2_enabled: true # 是否启用 Top-2 概率提取
+  top2_fallback: "char_conf" # Top-2 缺失时的降级策略: "char_conf" 或 "skip"
+
   # 抽样调试
-  debug_sample_rate: 1000        # 每 N 行抽样保存 E_blank 序列
-  save_edge_probe_debug: false   # 是否保存边缘探针可视化
+  debug_sample_rate: 1000 # 每 N 行抽样保存 E_blank 序列
+  save_edge_probe_debug: false # 是否保存边缘探针可视化
 
 # =============================================================================
 # Layer 1: 风险评分参数 (Risk Scorers) - RuleOnlyScorer
@@ -32,33 +33,33 @@ stage0:
 sh_da_v4:
   rule_scorer:
     # EdgeProbe 归一化参数 (通过 calibrate_router.py 自动校准)
-    v_min: 0.0                   # v_edge 的 1% 分位数
-    v_max: 5.0                   # v_edge 的 99% 分位数
-    
+    v_min: 0.0 # v_edge 的 1% 分位数
+    v_max: 5.0 # v_edge 的 99% 分位数
+
     # 边界风险 s_b 系数: s_b = clip(a1*(v_edge*b_edge) + a2*b_edge + a3*drop, 0, 1)
-    a1: 0.333                    # v_edge * b_edge 权重
-    a2: 0.333                    # b_edge 权重
-    a3: 0.333                    # drop 权重
-    
+    a1: 0.333 # v_edge * b_edge 权重
+    a2: 0.333 # b_edge 权重
+    a3: 0.333 # drop 权重
+
     # 置信度陡降检测
-    K: 2                         # 边界字符窗口大小
-    
+    K: 2 # 边界字符窗口大小
+
     # 综合优先级 q = max(s_b, s_a) + η * r_d
-    eta: 0.5                     # 语义风险权重 η
-    
+    eta: 0.5 # 语义风险权重 η
+
     # 分诊阈值 λ (初始值，通过 calibrate_router.py 校准)
-    lambda_threshold: 0.5        # 初始 λ_0，建议取验证集 q 的 (1-B) 分位数
-    
+    lambda_threshold: 0.5 # 初始 λ_0，建议取验证集 q 的 (1-B) 分位数
+
   budget_controller:
     # 在线预算控制器参数 (P-control)
     # SH-DA++ v4.0 稳定性优化: 增大 W, 减小 k
-    window_size: 500             # 滑动窗口 W (增大以减少噪声)
-    k: 0.01                      # 比例系数 k (减小以提高稳定性)
-    lambda_min: 0.0              # λ 下界
-    lambda_max: 2.0              # λ 上界
-    lambda_init: 0.5             # λ 初始值 (会被 calibrate_router.py 覆盖)
-    target_budget: 0.2           # 目标调用率 B (20%)
-    warmup_samples: 500          # 前 W 行不更新 λ (与 window_size 一致)
+    window_size: 500 # 滑动窗口 W (增大以减少噪声)
+    k: 0.01 # 比例系数 k (减小以提高稳定性)
+    lambda_min: 0.0 # λ 下界
+    lambda_max: 2.0 # λ 上界
+    lambda_init: 0.5 # λ 初始值 (会被 calibrate_router.py 覆盖)
+    target_budget: 0.2 # 目标调用率 B (20%)
+    warmup_samples: 500 # 前 W 行不更新 λ (与 window_size 一致)
 
 # =============================================================================
 # Layer 2: 战略分诊参数 (Strategic Triage)
@@ -66,15 +67,15 @@ sh_da_v4:
 
 triage:
   # RoI 裁剪参数
-  boundary_roi_ratio: 0.15       # BOUNDARY 路径裁取左右各 15% 宽度
-  ambiguity_context_chars: 1     # AMBIGUITY 路径以 idx_susp 为中心扩展的字符数
-  
+  boundary_roi_ratio: 0.15 # BOUNDARY 路径裁取左右各 15% 宽度
+  ambiguity_context_chars: 1 # AMBIGUITY 路径以 idx_susp 为中心扩展的字符数
+
   # 是否启用 RoI 裁剪 (Stage 3 启用)
   enable_roi_crop: false
-  
+
   # y 方向协议
-  keep_full_height: true         # 保留全高，避免截笔画
-  y_padding_ratio: 0.05          # 上下各保留 5% padding (备选方案)
+  keep_full_height: true # 保留全高，避免截笔画
+  y_padding_ratio: 0.05 # 上下各保留 5% padding (备选方案)
 
 # =============================================================================
 # Layer 3: 回填与拒改规则 (Backfill & Rejection)
@@ -82,15 +83,15 @@ triage:
 
 backfill:
   # 严格回填规则
-  strict_mode: true              # 启用严格回填 (BOUNDARY 只许首尾, AMBIGUITY 只许单点)
-  
+  strict_mode: true # 启用严格回填 (BOUNDARY 只许首尾, AMBIGUITY 只许单点)
+
   # 全局拒改阈值
-  max_edit_distance: 2           # ED > 2 则拒改
-  max_length_change_ratio: 0.2   # 长度变化 > 20% 则拒改
-  
+  max_edit_distance: 2 # ED > 2 则拒改
+  max_length_change_ratio: 0.2 # 长度变化 > 20% 则拒改
+
   # 安全红线
-  cvr_threshold: 0.3             # CVR > 30% 触发熔断
-  aer_threshold: 0.2             # AER < 20% 表示升级无效
+  cvr_threshold: 0.3 # CVR > 30% 触发熔断
+  aer_threshold: 0.2 # AER < 20% 表示升级无效
 
 # =============================================================================
 # Agent 配置
@@ -108,10 +109,10 @@ agent_a:
 
 agent_b:
   # Stage 1 默认跳过 Agent B
-  skip: true                     # Stage 1 设为 true，Stage 2+ 设为 false
+  skip: true # Stage 1 设为 true，Stage 2+ 设为 false
   model_name: "Qwen/Qwen2.5-VL-3B-Instruct"
-  timeout_ms: 500                # 超时阈值 (ms)
-  max_queue_size: 10             # 异步队列最大长度
+  timeout_ms: 500 # 超时阈值 (ms)
+  max_queue_size: 10 # 异步队列最大长度
 
 # =============================================================================
 # 输出与日志 (Output & Logging)
@@ -119,12 +120,12 @@ agent_b:
 
 output:
   results_dir: "./results"
-  
+
   # Stage 0/1 核心日志文件
   router_features_log: "router_features.jsonl"
   backfill_log: "backfill_log.jsonl"
   metrics_summary: "metrics_summary.json"
-  
+
   # 抽样调试文件
   edge_probe_debug_dir: "./results/debug/edge_probe/"
   blank_curve_debug_dir: "./results/debug/blank_curves/"
@@ -153,4 +154,3 @@ semantic:
   ppl_threshold_high: 200.0
   model_path: ""
   use_gpu: true
-
