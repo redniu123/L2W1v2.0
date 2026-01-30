@@ -30,20 +30,42 @@ class TextDetector:
                 "请在云端环境安装 paddleocr 或提供自定义检测器。"
             ) from e
 
-        kwargs = {
-            "use_gpu": self.use_gpu,
+        # 基础参数（所有版本应该都支持）
+        base_kwargs = {
             "det": True,
             "rec": False,
             "cls": False,
         }
         if self.det_model_dir:
-            kwargs["det_model_dir"] = self.det_model_dir
+            base_kwargs["det_model_dir"] = self.det_model_dir
 
-        # 某些版本不支持 show_log（会抛 Unknown argument）
-        try:
-            self._ocr = PaddleOCR(**kwargs, show_log=False)
-        except Exception:
-            self._ocr = PaddleOCR(**kwargs)
+        # 可选参数列表（按优先级尝试）
+        optional_params_list = [
+            {"show_log": False, "use_gpu": self.use_gpu},  # 尝试1: 全部可选参数
+            {"use_gpu": self.use_gpu},                      # 尝试2: 去掉 show_log
+            {"show_log": False},                            # 尝试3: 去掉 use_gpu
+            {},                                             # 尝试4: 仅基础参数
+        ]
+
+        last_error = None
+        for optional_params in optional_params_list:
+            try:
+                kwargs = {**base_kwargs, **optional_params}
+                self._ocr = PaddleOCR(**kwargs)
+                return  # 成功则退出
+            except TypeError as e:
+                last_error = e
+                continue
+            except Exception as e:
+                # 非参数错误，直接抛出
+                if "Unknown argument" not in str(e):
+                    raise
+                last_error = e
+                continue
+
+        # 所有尝试都失败
+        if last_error:
+            raise last_error
 
     def __call__(self, img) -> List:
         """
