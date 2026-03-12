@@ -1,42 +1,28 @@
 # L2W1 执行脚本模块
 
 """
-脚本模块说明:
+SH-DA++ Stage 2 脚本模块
 
-1. data_pipeline.py - 自动化数据处理流水线
-   - 加载 HCTR 数据集
-   - 使用 Agent A 推理
-   - 难例挖掘与错误索引定位
-   - 生成 Agent B SFT 训练数据
+核心脚本:
+1. adapt_geology_data.py - 地质数据适配器
+   - 将原始数据转换为 V2.0 协议格式
    
-   Usage:
-       python data_pipeline.py --test  # 测试模式
-       python data_pipeline.py --data_dir ./data/raw --batch_size 16
-
-2. train_agent_b.py - Agent B SFT 训练脚本
-   - 使用 SFT 数据微调 Qwen2.5-VL
-
-3. evaluate.py - 评估指标计算脚本
-   - CER (Character Error Rate)
-   - OCR-R (Over-Correction Rate)
+2. prepare_calibration_data.py - 特征提取与标签构造
+   - 从 Agent A 输出提取特征
+   - 自动构造 y_deletion 标签
+   
+3. train_calibrator.py - 校准训练器
+   - 训练 Logistic Regression
+   - 保存权重到配置文件
+   
+4. test_stage2_modules.py - 模块单元测试
+   - 测试标签生成器、评分器、回填控制器
+   
+5. test_stage2_integration.py - 集成测试
+   - 测试完整 Pipeline
+   
+6. run_stage2_execution.py - 完整执行脚本
+   - 数据适配 → 特征提取 → 校准训练
 """
 
-from .data_pipeline import (
-    DataPipeline,
-    PipelineConfig,
-    HCTRDatasetLoader,
-    ErrorAnalyzer,
-    SFTGenerator,
-    DataSample,
-    SFTConversation,
-)
-
-__all__ = [
-    'DataPipeline',
-    'PipelineConfig',
-    'HCTRDatasetLoader',
-    'ErrorAnalyzer',
-    'SFTGenerator',
-    'DataSample',
-    'SFTConversation',
-]
+__all__ = []
