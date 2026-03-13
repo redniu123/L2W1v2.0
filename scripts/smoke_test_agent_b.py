@@ -140,18 +140,23 @@ def run_smoke_test_sample(
         print(f"  T_final: {T_A}")
         return
 
-    # 生成 Prompt
+    # 生成 Prompt（v5.1: 统一 Targeted Correction 软提示）
     route_type = decision.route_type
-    if route_type == RouteType.BOUNDARY:
-        prompt = prompter.generate_boundary_prompt(T_A, str(img_path))
-    elif route_type == RouteType.AMBIGUITY and decision.idx_susp is not None:
-        prompt = prompter.generate_ambiguity_prompt(
-            T_A, decision.idx_susp, decision.top2_chars or [T_A[decision.idx_susp], "？"],
-            str(img_path)
-        )
+
+    # 提取 min_conf_idx（Min_Confidence 对应的字符位置）
+    top1_probs = (top2_info or {}).get("top1_probs") or []
+    if top1_probs and len(top1_probs) > 0:
+        import numpy as np
+        min_conf_idx = int(np.argmin(top1_probs))
     else:
-        # BOTH 或 fallback
-        prompt = prompter.generate_boundary_prompt(T_A, str(img_path))
+        min_conf_idx = decision.idx_susp  # 退回 Router 的 idx_susp
+
+    prompt = prompter.generate_targeted_correction_prompt(
+        T_A=T_A,
+        min_conf_idx=min_conf_idx,
+        domain="地质勘探",
+        image_path=str(img_path),
+    )
 
     print(f"\n--- Step 3: Prompt ---")
     print(f"  prompt_type:  {prompt.get('prompt_type', 'unknown')}")
