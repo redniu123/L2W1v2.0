@@ -33,7 +33,15 @@ def mock_agent_b(prompt: dict, image_path: str) -> str:
     Mock Agent B：直接返回 T_A（不改动）
     用于在没有 Qwen2.5-VL 的情况下测试完整流程
     """
-    return prompt["user_prompt"].split("\n")[1].strip()
+    # 从 user_prompt 中提取 T_A：新 Prompt 格式为 【 T_A 】，需要去除书名号
+    user_prompt = prompt.get("user_prompt", "")
+    import re
+    m = re.search(r'\u3010\s*(.+?)\s*\u3011', user_prompt)
+    if m:
+        return m.group(1).strip()
+    # fallback：返回第二行
+    lines = [l.strip() for l in user_prompt.split('\n') if l.strip()]
+    return lines[1] if len(lines) > 1 else ""
 
 
 def load_agent_b(config: dict):
