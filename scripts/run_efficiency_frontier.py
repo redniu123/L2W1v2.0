@@ -47,32 +47,43 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
             return m.group(1).strip() if m else prompt.get("T_A", "")
         return mock_fn
 
-    model_path = agent_b_cfg.get("model_path", "")
+    model_path = agent_b_cfg.get("model_path") or agent_b_cfg.get("model_name", "Qwen/Qwen2.5-VL-3B-Instruct")
     try:
         from modules.vlm_expert.agent_b_expert import AgentBExpert, AgentBConfig
         agent = AgentBExpert(config=AgentBConfig(model_path=model_path), lazy_init=False)
-        print(f"[Agent B] 模型已加载: {model_path}")
+        print(f"[Agent B] model loaded: {model_path}")
 
         def real_fn(prompt: dict) -> str:
+            T_A = prompt.get("T_A", "")
+            image_path = prompt.get("image_path", "")
+            min_conf_idx = prompt.get("min_conf_idx", -1)
+            if min_conf_idx is None:
+                min_conf_idx = -1
+            suspicious_char = T_A[min_conf_idx] if (0 <= min_conf_idx < len(T_A)) else ""
+            manifest = {
+                "ocr_text": T_A,
+                "suspicious_index": min_conf_idx,
+                "suspicious_char": suspicious_char,
+                "risk_level": "medium",
+            }
             for attempt in range(max_retries):
                 try:
-                    manifest = {
-                        "ocr_text": prompt.get("T_A", ""),
-                        "suspicious_index": prompt.get("min_conf_idx", -1) or -1,
-                        "suspicious_char": "",
-                        "risk_level": "medium",
-                    }
-                    result = agent.process_hard_sample(prompt.get("image_path", ""), manifest)
+                    result = agent.process_hard_sample(image_path, manifest)
                     return result["corrected_text"]
-                except Exception:
+                except Exception as e:
                     if attempt < max_retries - 1:
                         time.sleep(1.0 * (attempt + 1))
-            return prompt.get("T_A", "")
+                    else:
+                        print(f"[Agent B] error: {e}")
+            return T_A
+
         return real_fn
     except Exception as e:
-        print(f"[Agent B] 加载失败: {e}，降级 Mock")
+        print(f"[Agent B] load failed: {e}, fallback to mock")
+
         def mock_fn(prompt: dict) -> str:
             return prompt.get("T_A", "")
+
         return mock_fn
 
 
