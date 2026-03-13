@@ -16,17 +16,16 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
-import Levenshtein
 import numpy as np
 from tqdm import tqdm
 
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from modules.paddle_engine.predict_rec_modified import TextRecognizer
-from modules.router.uncertainty_router import UncertaintyRouter, RouterConfig
+import Levenshtein
+from modules.paddle_engine.predict_rec_modified import TextRecognizerWithLogits
 
 
 def generate_deletion_label(T_A: str, T_GT: str, K: int = 2) -> int:
@@ -44,97 +43,99 @@ def generate_deletion_label(T_A: str, T_GT: str, K: int = 2) -> int:
     if not T_A or not T_GT:
         return 0
 
-    # 计算编辑操作序列
     ops = Levenshtein.editops(T_A, T_GT)
-    N = len(T_A)
 
-    # 扫描 deletion 操作
     for op_type, pos_A, pos_GT in ops:
         if op_type == "delete":
-            # 判断是否在边界区域（以 GT 索引为准）
             if pos_GT < K or pos_GT >= len(T_GT) - K:
                 return 1
 
     return 0
 
 
-def extract_router_features(
-    image_path: str, recognizer: TextRecognizer, router: UncertaintyRouter
-) -> Tuple[np.ndarray, Dict]:
+def extract_boundary_features(
+    logits: np.ndarray,
+    char_conf: List[float],
+    rho: float = 0.1,
+    K_drop: int = 2,
+) -> Tuple[float, float, float]:
     """
-    提取 Router 特征向量
+    从 logits 中提取 [v_edge, b_edge, drop] 特征
 
     Args:
-        image_path: 图像路径
-        recognizer: Agent A 识别器
-        router: 不确定性路由器
+        logits: Emission 矩阵 (T, C)，已经是概率
+        char_conf: 字符级置信度序列
+        rho: 边界窗口比例
+        K_drop: 陡降检测窗口
 
     Returns:
-        features: [v_edge, b_edge, v_edge*b_edge, drop] (shape: 4,)
-        metadata: 包含 T_A, char_conf 等信息
+        v_edge, b_edge, drop
     """
-    # Agent A 推理
-    result = recognizer.predict_single(image_path)
-    if not result:
-        return None, None
+    T, C = logits.shape
+    blank_id = 0
 
-    T_A = result["text"]
-    char_conf = result.get("char_conf", [])
-    logits = result.get("logits", None)
+    # --- b_edge: 边界 blank 均值 ---
+    L_end = max(1, int(rho * T))
+    R_start = min(T - 1, int((1 - rho) * T))
 
-    if logits is None:
-        return None, None
+    blank_probs = logits[:, blank_id]  # (T,)
+    blank_mean_L = float(blank_probs[:L_end].mean())
+    blank_mean_R = float(blank_probs[R_start:].mean())
+    b_edge = max(blank_mean_L, blank_mean_R)
 
-    # 计算 Router 特征
-    routing_result = router.route(logits, char_conf, T_A)
+    # --- v_edge: 边界区域视觉熵均值 ---
+    eps = 1e-10
+    entropy = -np.sum(logits * np.log(logits + eps), axis=-1)  # (T,)
+    v_edge_raw = (entropy[:L_end].mean() + entropy[R_start:].mean()) / 2.0
+    # Min-max 归一化到 [0, 1]（以 [0, 5] 为典型范围）
+    v_edge = float(np.clip(v_edge_raw / 5.0, 0.0, 1.0))
 
-    # 提取特征（需要从 router 内部获取）
-    # 这里需要修改 UncertaintyRouter 暴露内部特征
-    # 暂时返回占位符
-    features = np.array([0.0, 0.0, 0.0, 0.0], dtype=np.float32)
+    # --- drop: 边界字符置信度陡降 ---
+    N = len(char_conf)
+    if N > 2 * K_drop:
+        p_left = np.mean(char_conf[:K_drop])
+        p_right = np.mean(char_conf[N - K_drop:])
+        p_mid = np.mean(char_conf[K_drop:N - K_drop])
+        drop = float(max(0.0, p_mid - min(p_left, p_right)))
+    else:
+        drop = 0.0
 
-    metadata = {
-        "text": T_A,
-        "char_conf": char_conf,
-        "visual_entropy": routing_result.visual_entropy,
-        "max_char_entropy": routing_result.max_char_entropy,
-    }
-
-    return features, metadata
+    return v_edge, b_edge, drop
 
 
 def prepare_calibration_dataset(
     data_jsonl: str,
     output_dir: str,
-    recognizer_config: Dict,
-    router_config: RouterConfig,
+    recognizer_args,
     K: int = 2,
 ) -> None:
     """
     准备校准数据集
 
     Args:
-        data_jsonl: 验证集 JSONL 文件路径 (每行: {"image": "path/to/img.jpg", "label": "真实文本"})
+        data_jsonl: 验证集 JSONL 文件路径
         output_dir: 输出目录
-        recognizer_config: Agent A 配置
-        router_config: Router 配置
+        recognizer_args: TextRecognizerWithLogits 参数对象
         K: 边界窗口大小
     """
+    from PIL import Image
+    import cv2
+
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # 初始化 Agent A 和 Router
-    print("[1/4] 初始化 Agent A 和 Router...")
-    recognizer = TextRecognizer(recognizer_config)
-    router = UncertaintyRouter(router_config)
+    # 初始化 Agent A
+    print("[1/4] 初始化 Agent A (TextRecognizerWithLogits)...")
+    recognizer = TextRecognizerWithLogits(recognizer_args)
 
     # 读取验证集
     print(f"[2/4] 读取验证集: {data_jsonl}")
     samples = []
     with open(data_jsonl, "r", encoding="utf-8") as f:
         for line in f:
-            sample = json.loads(line.strip())
-            samples.append(sample)
+            line = line.strip()
+            if line:
+                samples.append(json.loads(line))
 
     print(f"总样本数: {len(samples)}")
 
@@ -143,17 +144,59 @@ def prepare_calibration_dataset(
     features_list = []
     labels_list = []
     metadata_list = []
+    skip_count = 0
 
     for sample in tqdm(samples, desc="Processing"):
-        image_path = sample["image"]
-        T_GT = sample["label"]
+        # 兼容多种字段名
+        image_path = sample.get("image") or sample.get("image_path")
+        T_GT = sample.get("gt_text") or sample.get("text") or sample.get("label", "")
 
-        # 提取特征
-        features, metadata = extract_router_features(image_path, recognizer, router)
-        if features is None:
+        if not image_path or not T_GT:
+            skip_count += 1
             continue
 
-        T_A = metadata["text"]
+        # 读取图像
+        try:
+            img = cv2.imread(str(image_path))
+            if img is None:
+                skip_count += 1
+                continue
+        except Exception:
+            skip_count += 1
+            continue
+
+        # Agent A 推理
+        try:
+            output = recognizer([img])
+            if not output or "results" not in output:
+                skip_count += 1
+                continue
+
+            results = output["results"]
+            logits_list = output.get("logits", [])
+
+            if not results or not logits_list:
+                skip_count += 1
+                continue
+
+            T_A, conf = results[0]
+            logits = logits_list[0]  # (T, C)
+
+            if logits is None or len(logits.shape) != 2:
+                skip_count += 1
+                continue
+
+        except Exception as e:
+            skip_count += 1
+            continue
+
+        # 提取特征
+        char_conf = [conf]  # 简化版：只有整体置信度
+        v_edge, b_edge, drop = extract_boundary_features(logits, char_conf)
+
+        features = np.array(
+            [v_edge, b_edge, v_edge * b_edge, drop], dtype=np.float32
+        )
 
         # 生成标签
         y_deletion = generate_deletion_label(T_A, T_GT, K=K)
@@ -162,24 +205,31 @@ def prepare_calibration_dataset(
         labels_list.append(y_deletion)
         metadata_list.append(
             {
-                "image": image_path,
+                "image": str(image_path),
                 "T_A": T_A,
                 "T_GT": T_GT,
                 "y_deletion": y_deletion,
-                **metadata,
+                "conf": float(conf),
+                "v_edge": float(v_edge),
+                "b_edge": float(b_edge),
+                "drop": float(drop),
             }
         )
+
+    if not features_list:
+        print(f"[错误] 没有成功处理的样本！跳过数: {skip_count}")
+        return
 
     # 转换为 numpy 数组
     X = np.array(features_list, dtype=np.float32)
     Y = np.array(labels_list, dtype=np.int32)
 
     print(f"[4/4] 保存数据集...")
+    print(f"  有效样本: {len(features_list)} / {len(samples)} (跳过: {skip_count})")
     print(f"  特征矩阵 X: {X.shape}")
     print(f"  标签向量 Y: {Y.shape}")
     print(f"  正样本比例: {Y.mean():.2%}")
 
-    # 保存
     np.save(output_dir / "features.npy", X)
     np.save(output_dir / "labels.npy", Y)
 
@@ -195,60 +245,25 @@ def prepare_calibration_dataset(
 
 def main():
     parser = argparse.ArgumentParser(description="SH-DA++ Stage 2: 准备校准数据集")
-    parser.add_argument(
-        "--data_jsonl",
-        type=str,
-        required=True,
-        help="验证集 JSONL 文件路径",
-    )
-    parser.add_argument(
-        "--output_dir",
-        type=str,
-        default="./data/calibration",
-        help="输出目录",
-    )
-    parser.add_argument(
-        "--rec_model_dir",
-        type=str,
-        default="./models/ppocrv5_rec",
-        help="Agent A 模型目录",
-    )
-    parser.add_argument(
-        "--rec_dict_path",
-        type=str,
-        default="./ppocr/utils/ppocr_keys_v1.txt",
-        help="字符字典路径",
-    )
-    parser.add_argument(
-        "--K",
-        type=int,
-        default=2,
-        help="边界窗口大小",
-    )
+    parser.add_argument("--data_jsonl", type=str, required=True, help="验证集 JSONL 路径")
+    parser.add_argument("--output_dir", type=str, default="./results/stage2", help="输出目录")
+    parser.add_argument("--rec_model_dir", type=str, default="./models/ppocrv5_rec", help="Agent A 模型目录")
+    parser.add_argument("--rec_char_dict_path", type=str, default="./ppocr/utils/ppocrv5_dict.txt", help="字符字典路径")
+    parser.add_argument("--K", type=int, default=2, help="边界窗口大小")
+    parser.add_argument("--rec_image_shape", type=str, default="3, 48, 320", help="识别图像尺寸")
+    parser.add_argument("--rec_batch_num", type=int, default=6, help="批处理大小")
+    parser.add_argument("--rec_algorithm", type=str, default="SVTR_LCNet", help="识别算法")
+    parser.add_argument("--use_space_char", type=bool, default=True, help="是否使用空格")
+    parser.add_argument("--use_gpu", type=bool, default=True, help="是否使用 GPU")
+    parser.add_argument("--use_det", action="store_true", help="是否启用检测器")
+    parser.add_argument("--det_model_dir", type=str, default="", help="检测模型目录")
 
     args = parser.parse_args()
-
-    # Agent A 配置
-    recognizer_config = {
-        "rec_model_dir": args.rec_model_dir,
-        "rec_char_dict_path": args.rec_dict_path,
-        "use_gpu": True,
-        "gpu_mem": 500,
-    }
-
-    # Router 配置
-    router_config = RouterConfig(
-        entropy_threshold_low=2.0,
-        entropy_threshold_high=4.0,
-        blank_idx=0,
-        epsilon=1e-10,
-    )
 
     prepare_calibration_dataset(
         data_jsonl=args.data_jsonl,
         output_dir=args.output_dir,
-        recognizer_config=recognizer_config,
-        router_config=router_config,
+        recognizer_args=args,
         K=args.K,
     )
 
