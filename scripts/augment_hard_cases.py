@@ -134,15 +134,19 @@ def augment_hard_cases(
         # 保存增强图像
         stem = img_path.stem
         aug_filename = f"{stem}_aug_L{left_ratio:.3f}_R{right_ratio:.3f}.jpg"
-        aug_save_path = aug_dir / aug_filename
+        # aug_dir 使用绝对路径，避免相对路径混乱
+        aug_dir_abs = Path(aug_image_dir).resolve()
+        aug_dir_abs.mkdir(parents=True, exist_ok=True)
+        aug_save_path = aug_dir_abs / aug_filename
         cv2.imwrite(str(aug_save_path), cropped)
 
         # 构造新样本（GT 不变，图像路径更新为裁剪版本）
         new_sample = dict(sample)
-        # 使用相对于 data_root 的路径
+        # 使用相对于 data_root 的路径，确保 prepare_calibration_data.py 能正确解析
         try:
             rel_path = aug_save_path.relative_to(data_root)
         except ValueError:
+            # 若无法相对化，使用绝对路径
             rel_path = aug_save_path
         new_sample["image"] = str(rel_path)
         new_sample["augmented"] = True
