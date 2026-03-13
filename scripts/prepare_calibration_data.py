@@ -167,11 +167,7 @@ def prepare_calibration_dataset(
         )
 
         # 生成标签
-        # 对于人工增强样本（force_positive=True），直接强制标签为 1
-        if sample.get("force_positive", False):
-            y_deletion = 1
-        else:
-            y_deletion = generate_deletion_label(T_A, T_GT, K=K)
+        y_deletion = generate_deletion_label(T_A, T_GT, K=K)
 
         features_list.append(features)
         labels_list.append(y_deletion)
