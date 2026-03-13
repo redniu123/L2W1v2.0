@@ -153,6 +153,8 @@ def augment_hard_cases(
         new_sample["crop_left"] = round(left_ratio, 4)
         new_sample["crop_right"] = round(right_ratio, 4)
         new_sample["crop_side"] = side
+        # 强制标记为正样本：裁剪图像必然存在边界截断，GT 不变即构成漏字
+        new_sample["force_positive"] = True
 
         augmented_samples.append(new_sample)
 
