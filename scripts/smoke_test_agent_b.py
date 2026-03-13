@@ -164,7 +164,7 @@ def run_smoke_test_sample(
     print(f"  T_cand: {T_cand}")
 
     # Backfill
-    backfill_result = backfill.apply(
+    backfill_result = backfill.apply_backfill(
         T_A=T_A,
         T_cand=T_cand,
         route_type=route_type,
