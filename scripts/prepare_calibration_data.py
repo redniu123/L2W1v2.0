@@ -244,17 +244,15 @@ def prepare_calibration_dataset(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="SH-DA++ Stage 2: 准备校准数据集")
+    # 使用 utility.init_args() 获取完整的参数列表（包含所有 Paddle 推理参数）
+    from tools.infer.utility import init_args
+
+    parser = init_args()
+
+    # 追加 Stage 2 专属参数
     parser.add_argument("--data_jsonl", type=str, required=True, help="验证集 JSONL 路径")
     parser.add_argument("--output_dir", type=str, default="./results/stage2", help="输出目录")
-    parser.add_argument("--rec_model_dir", type=str, default="./models/ppocrv5_rec", help="Agent A 模型目录")
-    parser.add_argument("--rec_char_dict_path", type=str, default="./ppocr/utils/ppocrv5_dict.txt", help="字符字典路径")
     parser.add_argument("--K", type=int, default=2, help="边界窗口大小")
-    parser.add_argument("--rec_image_shape", type=str, default="3, 48, 320", help="识别图像尺寸")
-    parser.add_argument("--rec_batch_num", type=int, default=6, help="批处理大小")
-    parser.add_argument("--rec_algorithm", type=str, default="SVTR_LCNet", help="识别算法")
-    parser.add_argument("--use_space_char", type=bool, default=True, help="是否使用空格")
-    parser.add_argument("--use_gpu", type=bool, default=True, help="是否使用 GPU")
     parser.add_argument("--use_det", action="store_true", help="是否启用检测器")
     parser.add_argument("--det_model_dir", type=str, default="", help="检测模型目录")
 
