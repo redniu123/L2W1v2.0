@@ -152,31 +152,49 @@ class ConstrainedPrompter:
 
 
 
-    # v5.1 主路径：统一软提示
-    def generate_targeted_correction_prompt(self, T_A, min_conf_idx=None, domain='地质勘探', image_path=None):
-        system_prompt = '你是一个严格的 OCR 纠错专家。你的任务是修正单行文本中的识别错误，要求最大限度保留原文原貌。'
+    # v5.1: Targeted Correction (Soft-Hint)
+    def generate_targeted_correction_prompt(
+        self, T_A, min_conf_idx=None, domain=None, image_path=None
+    ):
+        if domain is None:
+            domain = "地质勘探"
+        system_prompt = (
+            "你是一个严格的 OCR 纠错专家，修正单行文本中的识别错误，保留原文原貌。"
+        )
         hint_lines = []
         if min_conf_idx is not None and 0 <= min_conf_idx < len(T_A):
-            hint_lines.append(f'其中第 {min_conf_idx+1} 个字符 {repr(T_A[min_conf_idx])} 的机器置信度极低，请重点关注。')
+            hint_lines.append(
+                "其中第 " + str(min_conf_idx + 1) + " 个字符的机器置信度极低，请重点关注。"
+            )
         if domain:
-            hint_lines.append(f'本文本属于【{domain}】领域，请留意专业术语的准确性。')
-        hint_block = '系统检测到该文本可能存在识别错误。
-' + '
-'.join(hint_lines) + '
+            hint_lines.append(
+                "本文本属于【" + domain + "】领域，请留意专业术语的准确性。"
+            )
+        sep = "\n"
+        prefix = "系统检测到该文本可能存在识别错误。"
+        if hint_lines:
+            hint_block = prefix + "\n" + "\n".join(hint_lines) + "\n\n"
+        else:
+            hint_block = prefix + "\n\n"
+        user_prompt = (
+            "你是一个严格的 OCR 纠错专家，以下是初步的单行文本识别结果：\n"
+            + "【 " + T_A + " 】\n\n"
+            + hint_block
+            + "请结合提供的图像，修正上述文本中的错别字或漏字。\n"
+            + "**最高约束红线：**\n"
+            + "1. 尽可能保持原句原貌，绝对禁止对句子进行润色、改写或大幅度增删。\n"
+            + "2. 如果认为没有错误，请直接原样输出。\n\n"
+            + "请直接输出修正后的完整文本，不要任何解释或多余字符："
+        )
+        return {
+            "system_prompt": system_prompt,
+            "user_prompt": user_prompt,
+            "image_path": image_path,
+            "prompt_type": "targeted_correction",
+            "min_conf_idx": min_conf_idx,
+            "domain": domain,
+        }
 
-' if hint_lines else '系统检测到该文本可能存在识别错误。
-
-'
-        user_prompt = (f'你是一个严格的 OCR 纠错专家。以下是初步的单行文本识别结果：
-【 {T_A} 】
-
-{hint_block}请结合提供的图像，修正上述文本中的错别字或漏字。
-**最高约束红线：**
-1. 尽可能保持原句原貌，绝对禁止对句子进行润色、改写或大幅度增删。
-2. 如果认为没有错误，请直接原样输出。
-
-请直接输出修正后的完整文本，不要任何解释或多余字符：')
-        return {'system_prompt': system_prompt, 'user_prompt': user_prompt, 'image_path': image_path, 'prompt_type': 'targeted_correction', 'min_conf_idx': min_conf_idx, 'domain': domain}
     def generate_boundary_prompt(self, T_A: str, image_path: str = None) -> Dict:
         """
         生成 BOUNDARY 路径提示词
