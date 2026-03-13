@@ -12,11 +12,10 @@ SH-DA++ Stage 2: Calibration Data Preparation
 y_deletion = I[∃ op ∈ Ops s.t. op.type='delete' ∧ (op.pos ≤ K ∨ op.pos ≥ N-K)]
 """
 
-import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import List, Tuple
 
 import numpy as np
 from tqdm import tqdm
@@ -53,56 +52,6 @@ def generate_deletion_label(T_A: str, T_GT: str, K: int = 2) -> int:
     return 0
 
 
-def extract_boundary_features(
-    logits: np.ndarray,
-    char_conf: List[float],
-    rho: float = 0.1,
-    K_drop: int = 2,
-) -> Tuple[float, float, float]:
-    """
-    从 logits 中提取 [v_edge, b_edge, drop] 特征
-
-    Args:
-        logits: Emission 矩阵 (T, C)，已经是概率
-        char_conf: 字符级置信度序列
-        rho: 边界窗口比例
-        K_drop: 陡降检测窗口
-
-    Returns:
-        v_edge, b_edge, drop
-    """
-    T, C = logits.shape
-    blank_id = 0
-
-    # --- b_edge: 边界 blank 均值 ---
-    L_end = max(1, int(rho * T))
-    R_start = min(T - 1, int((1 - rho) * T))
-
-    blank_probs = logits[:, blank_id]  # (T,)
-    blank_mean_L = float(blank_probs[:L_end].mean())
-    blank_mean_R = float(blank_probs[R_start:].mean())
-    b_edge = max(blank_mean_L, blank_mean_R)
-
-    # --- v_edge: 边界区域视觉熵均值 ---
-    eps = 1e-10
-    entropy = -np.sum(logits * np.log(logits + eps), axis=-1)  # (T,)
-    v_edge_raw = (entropy[:L_end].mean() + entropy[R_start:].mean()) / 2.0
-    # Min-max 归一化到 [0, 1]（以 [0, 5] 为典型范围）
-    v_edge = float(np.clip(v_edge_raw / 5.0, 0.0, 1.0))
-
-    # --- drop: 边界字符置信度陡降 ---
-    N = len(char_conf)
-    if N > 2 * K_drop:
-        p_left = np.mean(char_conf[:K_drop])
-        p_right = np.mean(char_conf[N - K_drop:])
-        p_mid = np.mean(char_conf[K_drop:N - K_drop])
-        drop = float(max(0.0, p_mid - min(p_left, p_right)))
-    else:
-        drop = 0.0
-
-    return v_edge, b_edge, drop
-
-
 def prepare_calibration_dataset(
     data_jsonl: str,
     output_dir: str,
@@ -118,7 +67,6 @@ def prepare_calibration_dataset(
         recognizer_args: TextRecognizerWithLogits 参数对象
         K: 边界窗口大小
     """
-    from PIL import Image
     import cv2
 
     output_dir = Path(output_dir)
@@ -173,6 +121,7 @@ def prepare_calibration_dataset(
             continue
 
         # Agent A 推理
+        # 返回格式: {"results": [(text, conf), ...], "boundary_stats": [...], "top2_info": [...]}
         try:
             output = recognizer([img])
             if not output or "results" not in output:
@@ -180,26 +129,37 @@ def prepare_calibration_dataset(
                 continue
 
             results = output["results"]
-            logits_list = output.get("logits", [])
-
-            if not results or not logits_list:
+            if not results:
                 skip_count += 1
                 continue
 
             T_A, conf = results[0]
-            logits = logits_list[0]  # (T, C)
 
-            if logits is None or len(logits.shape) != 2:
-                skip_count += 1
-                continue
+            # 从 boundary_stats 提取边界特征（SH-DA++ v4.0 真实接口）
+            boundary_stats_list = output.get("boundary_stats", [])
+            boundary_stats = boundary_stats_list[0] if boundary_stats_list else None
 
-        except Exception as e:
+        except Exception:
             skip_count += 1
             continue
 
-        # 提取特征
-        char_conf = [conf]  # 简化版：只有整体置信度
-        v_edge, b_edge, drop = extract_boundary_features(logits, char_conf)
+        # 从 boundary_stats 计算 v_edge, b_edge, drop
+        if boundary_stats and boundary_stats.get("valid", False):
+            blank_mean_L = float(boundary_stats.get("blank_mean_L", 0.0))
+            blank_mean_R = float(boundary_stats.get("blank_mean_R", 0.0))
+            blank_peak_L = float(boundary_stats.get("blank_peak_L", 0.0))
+            blank_peak_R = float(boundary_stats.get("blank_peak_R", 0.0))
+            b_edge_L = 0.6 * blank_mean_L + 0.4 * blank_peak_L
+            b_edge_R = 0.6 * blank_mean_R + 0.4 * blank_peak_R
+            b_edge = float(max(b_edge_L, b_edge_R))
+            v_edge_raw = float(boundary_stats.get("v_edge", 0.0))
+            v_edge = float(np.clip(v_edge_raw / 5.0, 0.0, 1.0))
+            drop = float(boundary_stats.get("drop", 0.0))
+        else:
+            # boundary_stats 无效时用置信度反推
+            b_edge = float(np.clip(1.0 - conf, 0.0, 1.0))
+            v_edge = float(np.clip(1.0 - conf, 0.0, 1.0))
+            drop = 0.0
 
         features = np.array(
             [v_edge, b_edge, v_edge * b_edge, drop], dtype=np.float32
@@ -266,7 +226,7 @@ def main():
     args = parser.parse_args()
 
     # 如果用户没有显式指定 rec_model_dir，使用项目实际模型路径
-    if args.rec_model_dir is None or args.rec_model_dir == "./models/ppocrv5_rec":
+    if args.rec_model_dir is None:
         args.rec_model_dir = "./models/agent_a_ppocr/PP-OCRv5_server_rec_infer"
 
     prepare_calibration_dataset(
