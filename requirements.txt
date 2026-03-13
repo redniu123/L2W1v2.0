@@ -54,6 +54,7 @@ scipy==1.15.3
 editdistance==0.8.1
 python-Levenshtein==0.27.0  # Stage 2: 标签生成与回填验证
 scikit-learn==1.6.1  # Stage 2: Logistic Regression 校准
+pyahocorasick==2.1.1  # v5.1: 地质词典多模式匹配（r_d 语义特征）
 protobuf==6.33.0
 tqdm==4.67.1
 pyyaml==6.0.3
