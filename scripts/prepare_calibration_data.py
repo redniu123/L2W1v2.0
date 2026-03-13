@@ -152,9 +152,10 @@ def prepare_calibration_dataset(
             b_edge_L = 0.6 * blank_mean_L + 0.4 * blank_peak_L
             b_edge_R = 0.6 * blank_mean_R + 0.4 * blank_peak_R
             b_edge = float(max(b_edge_L, b_edge_R))
-            v_edge_raw = float(boundary_stats.get("v_edge", 0.0))
-            v_edge = float(np.clip(v_edge_raw / 5.0, 0.0, 1.0))
-            drop = float(boundary_stats.get("drop", 0.0))
+            # v_edge: 用边界 blank 峰值反推视觉熵代理（高 blank 概率 → 低熵 → 取反）
+            v_edge = float(np.clip(max(blank_peak_L, blank_peak_R), 0.0, 1.0))
+            # drop: 用左右边界 blank 均值的不对称性作为代理
+            drop = float(np.clip(abs(blank_mean_L - blank_mean_R), 0.0, 1.0))
         else:
             # boundary_stats 无效时用置信度反推
             b_edge = float(np.clip(1.0 - conf, 0.0, 1.0))
