@@ -131,6 +131,8 @@ def prepare_calibration_dataset(
     # 读取验证集
     print(f"[2/4] 读取验证集: {data_jsonl}")
     samples = []
+    # 以 data_jsonl 所在目录作为图像路径的基准目录
+    data_root = Path(data_jsonl).resolve().parent
     with open(data_jsonl, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -154,6 +156,11 @@ def prepare_calibration_dataset(
         if not image_path or not T_GT:
             skip_count += 1
             continue
+
+        # 将相对路径解析为绝对路径（相对于 data_jsonl 所在目录）
+        image_path = Path(image_path)
+        if not image_path.is_absolute():
+            image_path = data_root / image_path
 
         # 读取图像
         try:
