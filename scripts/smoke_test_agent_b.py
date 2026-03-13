@@ -174,7 +174,7 @@ def run_smoke_test_sample(
 
     print(f"\n--- Step 5: Backfill 结果 ---")
     print(f"  T_final:          {backfill_result.T_final}")
-    print(f"  is_accepted:      {backfill_result.is_accepted}")
+    print(f"  is_rejected:      {backfill_result.is_rejected}")
     print(f"  rejection_reason: {backfill_result.rejection_reason}")
     print(f"  edit_distance:    {backfill_result.edit_distance}")
     print(f"\n  GT 对比:          {T_GT}")
