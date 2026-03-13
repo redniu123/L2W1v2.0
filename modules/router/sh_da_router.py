@@ -204,7 +204,22 @@ class SHDARouter:
         drop = self._extract_drop(boundary_stats)
 
         # 计算 s_b（使用校准评分器）
-        s_b_result = self.scorer.compute_score(v_edge or 0.0, b_edge, drop)
+        # v5.1: 从 top2_info 提取 Mean/Min Confidence
+        top1_probs = (top2_info or {}).get("top1_probs") or []
+        if top1_probs:
+            mean_conf = float(np.mean(top1_probs))
+            min_conf = float(np.min(top1_probs))
+        else:
+            mean_conf = 0.5
+            min_conf = 0.5
+
+        s_b_result = self.scorer.compute_score(
+            mean_conf=mean_conf,
+            min_conf=min_conf,
+            b_edge=b_edge,
+            drop=drop,
+            r_d=0.0,
+        )
         s_b = s_b_result["s_b"]
 
         # 计算 s_a（使用 RuleOnlyScorer 的方法）
