@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-SH-DA++ Stage 2: Calibrator Training
+SH-DA++ v5.1 Phase 1.2 & 1.3: 校准训练 + b_edge 消融实验
 
-目标：
-1. 加载校准数据集 (features.npy, labels.npy)
-2. 训练 Logistic Regression 模型
-3. 保存权重到 router_config.yaml
+严格验证原则：
+  - 仅在 features_train.npy 上执行 .fit()
+  - 在 features_val.npy 上搜索 lambda_0 并计算 AUC 指标
+  - Test 集严格封存，本脚本禁止触碰
 
-公式：
-s_b = σ(w^T x + b) = 1 / (1 + exp(-(w^T x + b)))
-其中 x = [v_edge, b_edge, v_edge*b_edge, drop]^T
+特征顺序（5维）：
+  [Mean_Confidence, Min_Confidence, b_edge, drop, r_d]
+  b_edge 位于第 2 列（index=2）
 """
 
 import argparse
@@ -21,256 +21,192 @@ from typing import Dict, Tuple
 import numpy as np
 import yaml
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import (
-    accuracy_score,
-    average_precision_score,
-    precision_recall_curve,
-    roc_auc_score,
-)
+from sklearn.metrics import average_precision_score, roc_auc_score
 
-# 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+FEATURE_NAMES = ["Mean_Confidence", "Min_Confidence", "b_edge", "drop", "r_d"]
+B_EDGE_IDX = 2  # b_edge 在特征矩阵中的列索引
 
-def load_calibration_data(data_dir: str) -> Tuple[np.ndarray, np.ndarray]:
+
+def load_split(
+    data_dir: str, split: str
+) -> Tuple[np.ndarray, np.ndarray]:
     """
-    加载校准数据集
+    加载指定 split 的特征与标签
 
     Args:
-        data_dir: 数据目录
+        data_dir: 特征目录
+        split:    'train' | 'val' | 'test'
 
     Returns:
-        X: 特征矩阵 (N, 4)
-        Y: 标签向量 (N,)
+        X: (N, 5), Y: (N,)
     """
     data_dir = Path(data_dir)
-
-    X = np.load(data_dir / "features.npy")
-    Y = np.load(data_dir / "labels.npy")
-
-    print(f"✓ 加载数据集:")
-    print(f"  特征矩阵 X: {X.shape}")
-    print(f"  标签向量 Y: {Y.shape}")
-    print(f"  正样本比例: {Y.mean():.2%}")
-
+    X = np.load(data_dir / f"features_{split}.npy")
+    Y = np.load(data_dir / f"labels_{split}.npy")
+    print(f"  [{split:5s}] X={X.shape}, Y={Y.shape}, 正样本={Y.mean():.2%}")
     return X, Y
 
 
-def train_logistic_regression(
-    X: np.ndarray, Y: np.ndarray, C: float = 1.0, max_iter: int = 1000
-) -> Tuple[LogisticRegression, Dict]:
-    """
-    训练 Logistic Regression 模型
-
-    Args:
-        X: 特征矩阵 (N, 4)
-        Y: 标签向量 (N,)
-        C: 正则化强度的倒数
-        max_iter: 最大迭代次数
-
-    Returns:
-        model: 训练好的模型
-        metrics: 评估指标
-    """
-    print("\n[训练 Logistic Regression]")
-    print(f"  正则化参数 C: {C}")
-    print(f"  最大迭代次数: {max_iter}")
-
-    # 训练模型
+def train_lr(
+    X_train: np.ndarray,
+    Y_train: np.ndarray,
+    C: float = 1.0,
+    max_iter: int = 1000,
+) -> LogisticRegression:
+    """在 Train 集上训练 Logistic Regression"""
     model = LogisticRegression(
         C=C,
         max_iter=max_iter,
         solver="lbfgs",
         random_state=42,
-        class_weight="balanced",  # 处理类别不平衡
+        class_weight="balanced",
     )
-
-    model.fit(X, Y)
-
-    # 预测
-    Y_pred = model.predict(X)
-    Y_prob = model.predict_proba(X)[:, 1]
-
-    # 计算指标
-    accuracy = accuracy_score(Y, Y_pred)
-    roc_auc = roc_auc_score(Y, Y_prob)
-    pr_auc = average_precision_score(Y, Y_prob)
-
-    metrics = {
-        "accuracy": accuracy,
-        "roc_auc": roc_auc,
-        "pr_auc": pr_auc,
-    }
-
-    print(f"\n✓ 训练完成:")
-    print(f"  Accuracy: {accuracy:.4f}")
-    print(f"  ROC-AUC: {roc_auc:.4f}")
-    print(f"  PR-AUC: {pr_auc:.4f}")
-
-    # 打印权重
-    weights = model.coef_[0]
-    bias = model.intercept_[0]
-
-    print(f"\n权重向量 w:")
-    feature_names = ["v_edge", "b_edge", "v_edge*b_edge", "drop"]
-    for name, w in zip(feature_names, weights):
-        print(f"  {name:15s}: {w:+.6f}")
-    print(f"  bias            : {bias:+.6f}")
-
-    return model, metrics
+    model.fit(X_train, Y_train)
+    return model
 
 
-def save_weights_to_config(
-    model: LogisticRegression, config_path: str, metrics: Dict
+def evaluate_on_val(
+    model: LogisticRegression,
+    X_val: np.ndarray,
+    Y_val: np.ndarray,
+    feature_names: list,
+    label: str = "完整特征",
+) -> Dict:
+    """在 Val 集上计算 ROC-AUC 和 PR-AUC"""
+    Y_prob = model.predict_proba(X_val)[:, 1]
+    roc_auc = roc_auc_score(Y_val, Y_prob)
+    pr_auc = average_precision_score(Y_val, Y_prob)
+
+    print(f"\n[{label}]")
+    if feature_names:
+        weights = model.coef_[0]
+        bias = model.intercept_[0]
+        print(f"  权重向量 w:")
+        for name, w in zip(feature_names, weights):
+            print(f"    {name:20s}: {w:+.6f}")
+        print(f"    {'bias':20s}: {bias:+.6f}")
+    print(f"  Val ROC-AUC : {roc_auc:.4f}")
+    print(f"  Val PR-AUC  : {pr_auc:.4f}")
+
+    return {"roc_auc": roc_auc, "pr_auc": pr_auc, "Y_prob": Y_prob}
+
+
+def compute_lambda(
+    Y_prob: np.ndarray,
+    target_budget: float,
+) -> Tuple[float, float]:
+    """在 Val 集上通过分位数搜索 lambda_0"""
+    quantile = 1.0 - target_budget
+    lambda_0 = float(np.quantile(Y_prob, quantile))
+    actual_rate = float((Y_prob >= lambda_0).mean())
+    return lambda_0, actual_rate
+
+
+def save_to_config(
+    model: LogisticRegression,
+    feature_names: list,
+    lambda_0: float,
+    metrics: Dict,
+    config_path: str,
 ) -> None:
-    """
-    保存权重到 router_config.yaml
-
-    Args:
-        model: 训练好的模型
-        config_path: 配置文件路径
-        metrics: 评估指标
-    """
+    """将权重和 lambda_0 写入 router_config.yaml"""
     config_path = Path(config_path)
-
-    # 读取现有配置
     with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
-    # 提取权重
     weights = model.coef_[0]
     bias = model.intercept_[0]
 
-    # 更新配置（添加 calibrated_scorer 部分）
     if "sh_da_v4" not in config:
         config["sh_da_v4"] = {}
 
     config["sh_da_v4"]["calibrated_scorer"] = {
         "enabled": True,
-        "weights": {
-            "v_edge": float(weights[0]),
-            "b_edge": float(weights[1]),
-            "v_edge_x_b_edge": float(weights[2]),
-            "drop": float(weights[3]),
-        },
+        "feature_version": "v5.1",
+        "feature_names": feature_names,
+        "weights": {name: float(w) for name, w in zip(feature_names, weights)},
         "bias": float(bias),
         "metrics": {
-            "accuracy": float(metrics["accuracy"]),
-            "roc_auc": float(metrics["roc_auc"]),
-            "pr_auc": float(metrics["pr_auc"]),
+            "val_roc_auc": float(metrics["roc_auc"]),
+            "val_pr_auc": float(metrics["pr_auc"]),
         },
-        "note": "Trained by train_calibrator.py on validation set",
+        "note": "SH-DA++ v5.1: 5-dim feature, trained on Train split only",
     }
-
-    # 保存配置
-    with open(config_path, "w", encoding="utf-8") as f:
-        yaml.dump(config, f, allow_unicode=True, default_flow_style=False, indent=2)
-
-    print(f"\n✓ 权重已保存到: {config_path}")
-    print(f"  路径: sh_da_v4.calibrated_scorer")
-
-
-def compute_optimal_threshold(
-    model: LogisticRegression, X: np.ndarray, Y: np.ndarray, target_budget: float
-) -> float:
-    """
-    计算最优阈值 λ_0
-
-    根据目标预算 B，在验证集上计算 q 的 (1-B) 分位数作为初始阈值
-
-    Args:
-        model: 训练好的模型
-        X: 特征矩阵
-        Y: 标签向量
-        target_budget: 目标预算 B (e.g., 0.2 for 20%)
-
-    Returns:
-        lambda_0: 初始阈值
-    """
-    # 计算校准后的评分 s_b
-    s_b = model.predict_proba(X)[:, 1]
-
-    # 计算 (1-B) 分位数
-    quantile = 1 - target_budget
-    lambda_0 = np.quantile(s_b, quantile)
-
-    print(f"\n[最优阈值计算]")
-    print(f"  目标预算 B: {target_budget:.1%}")
-    print(f"  分位数: {quantile:.1%}")
-    print(f"  λ_0: {lambda_0:.4f}")
-
-    # 验证实际调用率
-    actual_call_rate = (s_b >= lambda_0).mean()
-    print(f"  实际调用率: {actual_call_rate:.2%}")
-
-    return float(lambda_0)
-
-
-def main():
-    parser = argparse.ArgumentParser(description="SH-DA++ Stage 2: 校准训练器")
-    parser.add_argument(
-        "--data_dir",
-        type=str,
-        default="./data/calibration",
-        help="校准数据集目录",
-    )
-    parser.add_argument(
-        "--config_path",
-        type=str,
-        default="./configs/router_config.yaml",
-        help="Router 配置文件路径",
-    )
-    parser.add_argument(
-        "--C",
-        type=float,
-        default=1.0,
-        help="正则化强度的倒数",
-    )
-    parser.add_argument(
-        "--max_iter",
-        type=int,
-        default=1000,
-        help="最大迭代次数",
-    )
-    parser.add_argument(
-        "--target_budget",
-        type=float,
-        default=0.2,
-        help="目标预算 B (0.2 = 20%)",
-    )
-
-    args = parser.parse_args()
-
-    print("=" * 60)
-    print("SH-DA++ Stage 2: Calibrator Training")
-    print("=" * 60)
-
-    # 1. 加载数据
-    X, Y = load_calibration_data(args.data_dir)
-
-    # 2. 训练模型
-    model, metrics = train_logistic_regression(X, Y, C=args.C, max_iter=args.max_iter)
-
-    # 3. 计算最优阈值
-    lambda_0 = compute_optimal_threshold(model, X, Y, args.target_budget)
-
-    # 4. 保存权重到配置文件
-    save_weights_to_config(model, args.config_path, metrics)
-
-    # 5. 更新 lambda_init
-    config_path = Path(args.config_path)
-    with open(config_path, "r", encoding="utf-8") as f:
-        config = yaml.safe_load(f)
-
     config["sh_da_v4"]["budget_controller"]["lambda_init"] = lambda_0
 
     with open(config_path, "w", encoding="utf-8") as f:
         yaml.dump(config, f, allow_unicode=True, default_flow_style=False, indent=2)
 
-    print(f"\n✓ λ_0 已更新到配置文件: {lambda_0:.4f}")
+    print(f"\n✓ 权重已写入: {config_path}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="SH-DA++ v5.1: 校准训练器")
+    parser.add_argument("--data_dir", type=str, default="./results/stage2_v51",
+                        help="特征目录（含 features_train/val.npy）")
+    parser.add_argument("--config_path", type=str, default="./configs/router_config.yaml")
+    parser.add_argument("--C", type=float, default=1.0)
+    parser.add_argument("--max_iter", type=int, default=1000)
+    parser.add_argument("--target_budget", type=float, default=0.2)
+    args = parser.parse_args()
+
+    print("=" * 60)
+    print("SH-DA++ v5.1: Calibrator Training (Phase 1.2 & 1.3)")
+    print("=" * 60)
+
+    # 加载 Train & Val（Test 严格封存）
+    print("\n加载数据集:")
+    X_train, Y_train = load_split(args.data_dir, "train")
+    X_val, Y_val = load_split(args.data_dir, "val")
+
+    # =========================================================
+    # Phase 1.2: 主训练流程（5 维特征）
+    # =========================================================
+    print("\n" + "-" * 40)
+    print("Phase 1.2: 主训练流程（5 维特征）")
+    print("-" * 40)
+    model_full = train_lr(X_train, Y_train, C=args.C, max_iter=args.max_iter)
+    metrics_full = evaluate_on_val(model_full, X_val, Y_val, FEATURE_NAMES, label="完整特征 (5维)")
+
+    # 计算 lambda_0（在 Val 集上搜索）
+    lambda_0, actual_rate = compute_lambda(metrics_full["Y_prob"], args.target_budget)
+    print(f"\n[预算控制]")
+    print(f"  目标调用率 B : {args.target_budget:.1%}")
+    print(f"  λ_0          : {lambda_0:.4f}")
+    print(f"  实际调用率   : {actual_rate:.2%}")
+
+    # 保存到配置
+    save_to_config(model_full, FEATURE_NAMES, lambda_0, metrics_full, args.config_path)
+
+    # =========================================================
+    # Phase 1.3: 强制 b_edge 消融实验
+    # =========================================================
+    print("\n" + "-" * 40)
+    print("Phase 1.3: b_edge 消融实验")
+    print("-" * 40)
+
+    # 剔除 b_edge 列（index=2）
+    ablation_cols = [i for i in range(X_train.shape[1]) if i != B_EDGE_IDX]
+    ablation_names = [FEATURE_NAMES[i] for i in ablation_cols]
+
+    X_train_abl = X_train[:, ablation_cols]
+    X_val_abl = X_val[:, ablation_cols]
+
+    model_abl = train_lr(X_train_abl, Y_train, C=args.C, max_iter=args.max_iter)
+    metrics_abl = evaluate_on_val(model_abl, X_val_abl, Y_val, ablation_names, label="移除 b_edge (4维)")
+
+    # 输出消融诊断
+    delta = metrics_full["pr_auc"] - metrics_abl["pr_auc"]
+    sign = "+" if delta >= 0 else ""
+    print(f"\n[消融诊断] b_edge 的独立贡献:")
+    print(f"  - 完整特征 (5维) PR-AUC  : {metrics_full['pr_auc']:.4f}")
+    print(f"  - 移除 b_edge (4维) PR-AUC: {metrics_abl['pr_auc']:.4f}")
+    print(f"  - Δ PR-AUC               : {sign}{delta:.4f}")
 
     print("\n" + "=" * 60)
-    print("训练完成！")
+    print("训练完成！（Test 集已严格封存，未被触碰）")
     print("=" * 60)
 
 
