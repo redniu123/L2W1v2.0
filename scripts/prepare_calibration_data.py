@@ -258,6 +258,10 @@ def main():
 
     args = parser.parse_args()
 
+    # 如果用户没有显式指定 rec_model_dir，使用项目实际模型路径
+    if args.rec_model_dir is None or args.rec_model_dir == "./models/ppocrv5_rec":
+        args.rec_model_dir = "./models/agent_a_ppocr/PP-OCRv5_server_rec_infer"
+
     prepare_calibration_dataset(
         data_jsonl=args.data_jsonl,
         output_dir=args.output_dir,
