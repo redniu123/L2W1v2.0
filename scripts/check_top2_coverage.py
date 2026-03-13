@@ -130,8 +130,8 @@ def check_top2_coverage(
             total_error_chars += len(boundary_errors)
             continue
 
-        top1_chars = top2_info.get("top1_chars", [])
-        top2_chars = top2_info.get("top2_chars", [])
+        top1_chars = top2_info.get("top1_chars") or []
+        top2_chars = top2_info.get("top2_chars") or []
 
         # 对每个边界错误位置，检查 GT 字符是否在 Top-2 内
         for op, p_a, p_gt in boundary_errors:
