@@ -109,8 +109,8 @@ class GeminiConfig:
     key_file: str = "key.txt"  # Key 文件路径（项目根目录）
     temperature: float = 0.1
     max_tokens: int = 256
-    max_retries: int = 2
-    timeout: int = 180  # 3 分钟
+    max_retries: int = 3  # 增加重试次数（快速跳过失效 Key）
+    timeout: int = 30  # 降低超时（正常请求 3-5 秒，超过 30 秒基本是失效 Key）
 
     def __post_init__(self):
         # 初始化 APIKeyManager
@@ -265,16 +265,15 @@ class GeminiAgentB:
 
         image_base64 = self._encode_image(image_path)
 
-        # 指数退避重试（简化日志）
+        # 指数退避重试（快速跳过失效 Key）
         corrected_text = None
         for attempt in range(self.config.max_retries):
             api_key = self.config.key_manager.get_next_key()
             corrected_text = self._call_api(prompt, image_base64, api_key)
             if corrected_text:
                 break
-            if attempt < self.config.max_retries - 1:
-                sleep_time = min(4, 2**attempt) + random.uniform(0, 0.5)
-                time.sleep(sleep_time)
+            # 不等待，立即用下一个 Key 重试
+            # （因为超时通常意味着 Key 失效，等待无意义）
 
         # 容错降级（静默失败）
         if not corrected_text:
