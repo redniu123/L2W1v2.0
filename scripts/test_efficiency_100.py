@@ -67,7 +67,7 @@ def main():
         rec_batch_num=6,
         rec_algorithm="SVTR_LCNet",
         use_space_char=True,
-        use_gpu=True,
+        use_gpu=True,  # GPU 模式
         use_xpu=False,
         use_npu=False,
         use_mlu=False,
