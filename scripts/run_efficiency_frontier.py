@@ -239,10 +239,12 @@ def run_pipeline(
     upgrade_results = {}  # {index: T_cand}
     
     if upgrade_set:
-        print(f"  [{strategy}] Calling Agent B for {len(upgrade_set)} samples (20 concurrent)...")
+        print(f"  [{strategy}] Calling Agent B for {len(upgrade_set)} samples (3 concurrent)...")
         
         def call_agent_b(idx, r):
             """单个样本的 Agent B 调用"""
+            import time
+            time.sleep(0.5)  # 每个请求前等待 0.5 秒，避免限流
             prompt = prompter.generate_targeted_correction_prompt(
                 T_A=r['T_A'], min_conf_idx=r['min_conf_idx'],
                 domain='地质勘探', image_path=r['img_path'],
@@ -250,8 +252,8 @@ def run_pipeline(
             prompt['T_A'] = r['T_A']
             return idx, agent_b_callable(prompt)
         
-        # 并发调用（20 个线程）
-        with ThreadPoolExecutor(max_workers=20) as executor:
+        # 并发调用（3 个线程，匹配 Key 数量）
+        with ThreadPoolExecutor(max_workers=3) as executor:
             futures = {
                 executor.submit(call_agent_b, i, all_results[i]): i
                 for i in upgrade_set
