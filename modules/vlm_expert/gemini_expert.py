@@ -135,6 +135,9 @@ class GeminiAgentB:
         self, prompt: str, image_base64: str, api_key: str
     ) -> Optional[str]:
         """调用 Gemini API（OpenAI 兼容格式）"""
+        import time
+        key_suffix = api_key[-6:]
+        
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -158,6 +161,7 @@ class GeminiAgentB:
             "max_tokens": self.config.max_tokens,
         }
 
+        start_time = time.time()
         try:
             response = requests.post(
                 f"{self.config.base_url}/chat/completions",
@@ -165,17 +169,25 @@ class GeminiAgentB:
                 json=payload,
                 timeout=self.config.timeout,
             )
+            elapsed = time.time() - start_time
             response.raise_for_status()
             data = response.json()
+            print(f"[Gemini] API success (key: ...{key_suffix}, {elapsed:.1f}s)")
             return data["choices"][0]["message"]["content"].strip()
+        except requests.exceptions.Timeout:
+            elapsed = time.time() - start_time
+            print(f"[Gemini] Timeout after {elapsed:.1f}s (key: ...{key_suffix})")
+            return None
         except requests.exceptions.HTTPError as e:
+            elapsed = time.time() - start_time
             if e.response.status_code == 429:
-                print(f"[Gemini] Rate limit (429), will retry with next key")
+                print(f"[Gemini] Rate limit 429 (key: ...{key_suffix}, {elapsed:.1f}s)")
             else:
-                print(f"[Gemini] HTTP error {e.response.status_code}: {e}")
+                print(f"[Gemini] HTTP {e.response.status_code} (key: ...{key_suffix}, {elapsed:.1f}s)")
             return None
         except Exception as e:
-            print(f"[Gemini] API call failed: {e}")
+            elapsed = time.time() - start_time
+            print(f"[Gemini] Error: {type(e).__name__} (key: ...{key_suffix}, {elapsed:.1f}s)")
             return None
 
     def _parse_output(self, raw_text: str) -> str:
