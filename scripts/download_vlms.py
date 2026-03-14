@@ -140,13 +140,14 @@ def download_huggingface(model_key: str, cfg: dict) -> bool:
 def main():
     parser = argparse.ArgumentParser(description="SH-DA++ VLM Downloader (9-model)")
     parser.add_argument("--model", choices=list(MODEL_REGISTRY.keys()),
-                        help="下载指定模型")
+                        action="append", dest="models",
+                        help="下载指定模型（可多次指定，如 --model qwen2.5_vl --model internvl2_awq）")
     parser.add_argument("--all", action="store_true", help="下载全部 9 款模型")
     parser.add_argument("--source", choices=["modelscope", "huggingface"],
                         default="modelscope", help="下载源（默认 modelscope）")
     args = parser.parse_args()
 
-    if not args.model and not args.all:
+    if not args.models and not args.all:
         parser.print_help()
         print("\n可用模型:")
         for k, v in MODEL_REGISTRY.items():
@@ -154,7 +155,7 @@ def main():
         sys.exit(0)
 
     OUTPUT_BASE.mkdir(parents=True, exist_ok=True)
-    targets = list(MODEL_REGISTRY.keys()) if args.all else [args.model]
+    targets = list(MODEL_REGISTRY.keys()) if args.all else args.models
 
     print("=" * 60)
     print(f"SH-DA++ VLM Downloader | source={args.source} | models={len(targets)}")
