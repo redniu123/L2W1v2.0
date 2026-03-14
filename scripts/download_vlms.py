@@ -92,13 +92,18 @@ def download_modelscope(model_key: str, cfg: dict) -> bool:
     local_dir = OUTPUT_BASE / cfg["local_dir"]
     local_dir.mkdir(parents=True, exist_ok=True)
     print(f"[ModelScope] {cfg['desc']} -> {local_dir}")
+
+    # AWQ/int4 量化模型可能只有 .bin 格式，不能排除
+    is_quantized = any(k in cfg["local_dir"].lower() for k in ["awq", "int4", "gptq"])
+    ignore = [] if is_quantized else ["*.bin"]
+
     try:
         snapshot_download(model_id=cfg["ms_id"], local_dir=str(local_dir),
-                          ignore_patterns=["*.bin"])
+                          ignore_patterns=ignore)
         print(f"[OK] {model_key}")
         return True
     except Exception as e:
-        print(f"[WARN] safetensors failed ({e}), retrying with .bin...")
+        print(f"[WARN] first attempt failed ({e}), retrying without ignore_patterns...")
         try:
             snapshot_download(model_id=cfg["ms_id"], local_dir=str(local_dir))
             print(f"[OK] {model_key}")
@@ -121,13 +126,17 @@ def download_huggingface(model_key: str, cfg: dict) -> bool:
     local_dir = OUTPUT_BASE / cfg["local_dir"]
     local_dir.mkdir(parents=True, exist_ok=True)
     print(f"[HuggingFace/{os.environ['HF_ENDPOINT']}] {cfg['desc']} -> {local_dir}")
+
+    is_quantized = any(k in cfg["local_dir"].lower() for k in ["awq", "int4", "gptq"])
+    ignore = [] if is_quantized else ["*.bin"]
+
     try:
         snapshot_download(repo_id=cfg["hf_id"], local_dir=str(local_dir),
-                          ignore_patterns=["*.bin"])
+                          ignore_patterns=ignore)
         print(f"[OK] {model_key}")
         return True
     except Exception as e:
-        print(f"[WARN] safetensors failed ({e}), retrying with .bin...")
+        print(f"[WARN] first attempt failed ({e}), retrying without ignore_patterns...")
         try:
             snapshot_download(repo_id=cfg["hf_id"], local_dir=str(local_dir))
             print(f"[OK] {model_key}")
