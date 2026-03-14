@@ -32,7 +32,7 @@ class APIKeyManager:
     - 线程安全（使用 threading.Lock）
     """
     
-    def __init__(self, key_file: str = "docs/key.txt"):
+    def __init__(self, key_file: str = "key.txt"):
         """
         Args:
             key_file: Key 文件路径（相对于项目根目录）
@@ -106,7 +106,7 @@ class GeminiConfig:
 
     base_url: str = "https://new.lemonapi.site/v1"
     model_name: str = "gemini-3-flash-preview"
-    key_file: str = "docs/key.txt"  # Key 文件路径
+    key_file: str = "key.txt"  # Key 文件路径（项目根目录）
     temperature: float = 0.1
     max_tokens: int = 256
     max_retries: int = 2
