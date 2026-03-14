@@ -283,6 +283,7 @@ def main():
     parser.add_argument('--output_dir', default='results/stage2_v51')
     parser.add_argument('--budgets', default='0.05,0.10,0.20,0.30')
     parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--n_samples', type=int, default=None, help='Limit to first N samples (for testing)')
     args = parser.parse_args()
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -326,6 +327,12 @@ def main():
     print(f'  Test: {len(samples)} samples')
     print('[4/4] Agent A full inference...')
     all_results = infer_all_samples(samples, recognizer, domain_engine, None, args.image_root)
+    
+    # 限制样本数（用于快速测试）
+    if args.n_samples and args.n_samples < len(all_results):
+        all_results = all_results[:args.n_samples]
+        print(f'  Limited to first {args.n_samples} samples for testing')
+    
     print(f'  Valid: {len(all_results)}')
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
