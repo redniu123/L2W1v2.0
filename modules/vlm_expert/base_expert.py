@@ -81,7 +81,10 @@ class BaseVLMExpert(ABC):
         PROMPT_FRAGMENTS = [
             "尽可能保持原句原貌", "绝对禁止润色", "绝对禁止对句子",
             "最高约束红线", "请直接输出修正后", "系统检测到该文本",
-            "修正上述文本中的错别字",
+            "修正上述文本中的错别字", "如有错别字请修正", "只输出文字",
+            "否则原样输出", "不要解释",
+            "The text in the image", "OCR (Optical Character", "written in Chinese",
+            "The OCR", "reads:",
         ]
         for frag in PROMPT_FRAGMENTS:
             if frag in text:
