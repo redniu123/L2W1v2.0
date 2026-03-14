@@ -2,10 +2,14 @@
 
 agent_b:
   skip: false
-  backend: "local_vlm"        # gemini | local_vlm
-  model_type: "qwen2.5_vl"   # qwen2.5_vl | internvl2 | minicpm_v
+  backend: "local_vlm"          # gemini | local_vlm
+  # 可选 model_type:
+  #   qwen2.5_vl, qwen3.5, internvl2, internvl2_5,
+  #   minicpm_v, paddleocr_vl, llava, smolvlm
+  model_type: "qwen2.5_vl"
   model_path: "./models/agent_b_vlm/Qwen2.5-VL-7B-Instruct"
-  dtype: "bfloat16"           # bfloat16 | float16
+  # 绝对红线: 2080Ti (Turing) 禁用 bfloat16，强制 float16
+  torch_dtype: "float16"
   max_new_tokens: 128
   # --- Gemini API settings (backend=gemini 时生效) ---
   model_name: "[V]gemini-3-flash-preview"
@@ -15,11 +19,9 @@ backfill:
   unified_prompt_mode: true
 
 sh_da_v4:
-  # 评分器模式
   calibrated_scorer:
     enabled: false
 
-  # 规则评分器配置
   rule_scorer:
     v_min: 0.0
     v_max: 5.0
@@ -29,7 +31,6 @@ sh_da_v4:
     geology_min_len: 2
     geology_risk_weight: 1.0
 
-  # 预算控制器配置
   budget_controller:
     target_budget: 0.1
     lambda_init: 0.5

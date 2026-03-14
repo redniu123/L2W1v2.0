@@ -1,115 +1,79 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-SH-DA++ v5.1: InternVL2 Expert Wrapper
-
-支持 OpenGVLab/InternVL2-8B 本地推理。
-显存策略: bfloat16 + device_map=auto。
+SH-DA++ v5.1: InternVL2 Expert
+兼容 InternVL2-8B-AWQ 和 InternVL2_5-8B-AWQ。
+AWQ 量化直接加载，无需 bitsandbytes。
 """
-
 from typing import Dict, Union
-
 import numpy as np
-
 from .base_expert import BaseVLMExpert
 
 
 class InternVL2Expert(BaseVLMExpert):
     """
-    InternVL2 专家包装器
-
-    模型特点:
-    - 使用 AutoModel + AutoTokenizer
-    - 图像预处理: dynamic_preprocess (448x448 tiles)
-    - 支持 trust_remote_code
+    InternVL2 / InternVL2.5 专家
+    AWQ 模型直接用 AutoModelForCausalLM 加载（autoawq 后端）。
     """
 
-    def __init__(self, model_path: str, dtype: str = "bfloat16", max_new_tokens: int = 128):
+    def __init__(self, model_path: str, torch_dtype: str = "float16", max_new_tokens: int = 128):
         self.model_path = model_path
-        self.dtype_str = dtype
+        self.torch_dtype = torch_dtype
         self.max_new_tokens = max_new_tokens
         self.model = None
         self.tokenizer = None
-        self._initialized = False
         self._init_model()
 
     def _init_model(self):
         import torch
         from transformers import AutoModel, AutoTokenizer
-
-        dtype = torch.bfloat16 if self.dtype_str == "bfloat16" else torch.float16
-        print(f"[InternVL2] Loading {self.model_path} ({self.dtype_str})...")
-
-        self.model = AutoModel.from_pretrained(
-            self.model_path,
+        dtype = torch.float16 if self.torch_dtype == "float16" else torch.bfloat16
+        is_awq = "awq" in self.model_path.lower()
+        print(f"[InternVL2] Loading {self.model_path} (AWQ={is_awq}, {self.torch_dtype})...")
+        load_kwargs = dict(
             torch_dtype=dtype,
             device_map="auto",
             trust_remote_code=True,
             low_cpu_mem_usage=True,
         )
-        self.model.eval()
+        # AWQ 模型直接加载，autoawq 会自动识别量化配置
+        self.model = AutoModel.from_pretrained(self.model_path, **load_kwargs).eval()
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, trust_remote_code=True)
+        print("[InternVL2] Ready.")
 
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            self.model_path,
-            trust_remote_code=True,
-        )
-        self._initialized = True
-        print(f"[InternVL2] Ready.")
-
-    def _load_image(self, image: Union[str, np.ndarray]):
-        """InternVL2 专用图像加载（dynamic preprocess）"""
+    def _preprocess_image(self, image_path: Union[str, np.ndarray]):
         import torch
         import torchvision.transforms as T
         from PIL import Image as PILImage
         from torchvision.transforms.functional import InterpolationMode
-
-        IMAGENET_MEAN = (0.485, 0.456, 0.406)
-        IMAGENET_STD = (0.229, 0.224, 0.225)
         IMG_SIZE = 448
-
         transform = T.Compose([
             T.Lambda(lambda img: img.convert("RGB")),
             T.Resize((IMG_SIZE, IMG_SIZE), interpolation=InterpolationMode.BICUBIC),
             T.ToTensor(),
-            T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+            T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
         ])
-
-        if isinstance(image, str):
-            pil_img = PILImage.open(image).convert("RGB")
-        elif isinstance(image, np.ndarray):
-            pil_img = PILImage.fromarray(image).convert("RGB")
+        if isinstance(image_path, str):
+            pil = PILImage.open(image_path).convert("RGB")
+        elif isinstance(image_path, np.ndarray):
+            pil = PILImage.fromarray(image_path).convert("RGB")
         else:
-            pil_img = image.convert("RGB")
+            pil = image_path.convert("RGB")
+        return transform(pil).unsqueeze(0)  # (1, 3, H, W)
 
-        pixel_values = transform(pil_img).unsqueeze(0)  # (1, 3, H, W)
-        return pixel_values
-
-    def chat_with_image(self, image: Union[str, np.ndarray], prompt: str) -> str:
+    def chat_with_image(self, image_path: Union[str, np.ndarray], prompt_text: str) -> str:
         import torch
-
-        pixel_values = self._load_image(image)
-        device = next(self.model.parameters()).device
-        dtype = next(self.model.parameters()).dtype
-        pixel_values = pixel_values.to(device=device, dtype=dtype)
-
-        generation_config = dict(
-            max_new_tokens=self.max_new_tokens,
-            do_sample=False,
-        )
-
-        response = self.model.chat(
-            self.tokenizer,
-            pixel_values,
-            prompt,
-            generation_config,
-        )
-        return response
+        try:
+            pixel_values = self._preprocess_image(image_path)
+            device = next(self.model.parameters()).device
+            dtype = next(self.model.parameters()).dtype
+            pixel_values = pixel_values.to(device=device, dtype=dtype)
+            gen_cfg = dict(max_new_tokens=self.max_new_tokens, do_sample=False)
+            response = self.model.chat(self.tokenizer, pixel_values, prompt_text, gen_cfg)
+            return response
+        finally:
+            torch.cuda.empty_cache()
 
     def get_model_info(self) -> Dict:
-        return {
-            "backend": "local_vlm",
-            "model_type": "internvl2",
-            "model_path": self.model_path,
-            "dtype": self.dtype_str,
-            "initialized": self._initialized,
-        }
+        return {"backend": "local_vlm", "model_type": "internvl2",
+                "model_path": self.model_path, "torch_dtype": self.torch_dtype}
