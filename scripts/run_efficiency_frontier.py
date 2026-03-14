@@ -38,6 +38,7 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
     import re
     agent_b_cfg = config.get("agent_b", {})
     skip = agent_b_cfg.get("skip", True)
+    backend = agent_b_cfg.get("backend", "qwen")
 
     if skip:
         print("[Agent B] skip=true，Mock 模式")
@@ -47,6 +48,41 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
             return m.group(1).strip() if m else prompt.get("T_A", "")
         return mock_fn
 
+    # Gemini 后端
+    if backend == "gemini":
+        try:
+            from modules.vlm_expert.gemini_expert import GeminiAgentB, GeminiConfig
+            agent = GeminiAgentB(config=GeminiConfig())
+            print(f"[Agent B] Gemini backend: {agent.config.model_name}")
+
+            def gemini_fn(prompt: dict) -> str:
+                T_A = prompt.get("T_A", "")
+                image_path = prompt.get("image_path", "")
+                min_conf_idx = prompt.get("min_conf_idx", -1)
+                if min_conf_idx is None:
+                    min_conf_idx = -1
+                suspicious_char = T_A[min_conf_idx] if (0 <= min_conf_idx < len(T_A)) else ""
+                manifest = {
+                    "ocr_text": T_A,
+                    "suspicious_index": min_conf_idx,
+                    "suspicious_char": suspicious_char,
+                    "risk_level": "medium",
+                }
+                try:
+                    result = agent.process_hard_sample(image_path, manifest)
+                    return result["corrected_text"]
+                except Exception as e:
+                    print(f"[Gemini] error: {e}")
+                    return T_A
+
+            return gemini_fn
+        except Exception as e:
+            print(f"[Agent B] Gemini load failed: {e}, fallback to mock")
+            def mock_fn(prompt: dict) -> str:
+                return prompt.get("T_A", "")
+            return mock_fn
+
+    # Qwen 后端
     model_path = agent_b_cfg.get("model_path") or agent_b_cfg.get("model_name", "Qwen/Qwen2.5-VL-3B-Instruct")
     try:
         from modules.vlm_expert.agent_b_expert import AgentBExpert, AgentBConfig
@@ -300,25 +336,42 @@ def main():
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         budgets = [float(b) for b in args.budgets.split(',')]
+        
         print('\n--- AgentA_Only (Baseline 0) ---')
         row = run_pipeline('AgentA_Only', 0.0, all_results, router,
                            backfill_controller, prompter, agent_b_callable)
         writer.writerow({k: row.get(k, '') for k in fieldnames})
         csvfile.flush()
         print(f"  CER={row['Overall_CER']:.4%}")
+        
+        # 并行处理 3 个策略
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        
         for B in budgets:
-            for strategy in ['Random', 'ConfOnly', 'SH-DA++']:
-                print(f'\n--- {strategy} B={B:.2f} ---')
-                row = run_pipeline(strategy, B, all_results, router,
-                                   backfill_controller, prompter, agent_b_callable)
-                writer.writerow({k: row.get(k, '') for k in fieldnames})
-                csvfile.flush()
-                print(
-                    f"  CER={row['Overall_CER']:.4%}"
-                    f"  AER={row['AER']:.2%}"
-                    f"  CVR={row['CVR']:.2%}"
-                    f"  ActualRate={row['Actual_Call_Rate']:.2%}"
-                )
+            print(f'\n=== Budget B={B:.2f} ===')
+            tasks = []
+            with ThreadPoolExecutor(max_workers=3) as executor:
+                for strategy in ['Random', 'ConfOnly', 'SH-DA++']:
+                    future = executor.submit(
+                        run_pipeline, strategy, B, all_results, router,
+                        backfill_controller, prompter, agent_b_callable
+                    )
+                    tasks.append((strategy, future))
+                
+                for strategy, future in tasks:
+                    try:
+                        row = future.result()
+                        writer.writerow({k: row.get(k, '') for k in fieldnames})
+                        csvfile.flush()
+                        print(
+                            f"  [{strategy:10s}] CER={row['Overall_CER']:.4%}"
+                            f"  AER={row['AER']:.2%}"
+                            f"  CVR={row['CVR']:.2%}"
+                            f"  ActualRate={row['Actual_Call_Rate']:.2%}"
+                        )
+                    except Exception as e:
+                        print(f"  [{strategy:10s}] ERROR: {e}")
+    
     print(f'\nDone: {csv_path}')
 
 
