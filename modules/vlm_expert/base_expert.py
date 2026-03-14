@@ -76,4 +76,14 @@ class BaseVLMExpert(ABC):
                 break
         text = text.split("\n")[0].strip()
         text = text.strip('"\'\u201c\u201d\u2018\u2019')
+        text = text.strip()
+        # 防复述检测：如果输出是 prompt 里的约束语句（超过 8 字且不含 fallback 内容），则降级
+        PROMPT_FRAGMENTS = [
+            "尽可能保持原句原貌", "绝对禁止润色", "绝对禁止对句子",
+            "最高约束红线", "请直接输出修正后", "系统检测到该文本",
+            "修正上述文本中的错别字",
+        ]
+        for frag in PROMPT_FRAGMENTS:
+            if frag in text:
+                return fallback
         return text if text else fallback
