@@ -196,6 +196,8 @@ def run_pipeline(
     strategy, target_budget, all_results,
     router, backfill_controller, prompter, agent_b_callable,
 ):
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    
     N = len(all_results)
     if N == 0:
         return None
@@ -211,6 +213,7 @@ def run_pipeline(
             'AER': 0.0, 'CVR': 0.0, 'N_valid': N,
         }
 
+    # 计算路由分数
     if strategy == 'Random':
         scores = [random.random() for _ in range(N)]
     elif strategy == 'ConfOnly':
@@ -230,23 +233,54 @@ def run_pipeline(
     upgrade_set = set(
         sorted(range(N), key=lambda i: scores[i], reverse=True)[:n_call_target]
     )
+
+    # 批量并发调用 Agent B
+    from modules.router.backfill import RouteType
+    upgrade_results = {}  # {index: T_cand}
+    
+    if upgrade_set:
+        print(f"  [{strategy}] Calling Agent B for {len(upgrade_set)} samples (20 concurrent)...")
+        
+        def call_agent_b(idx, r):
+            """单个样本的 Agent B 调用"""
+            prompt = prompter.generate_targeted_correction_prompt(
+                T_A=r['T_A'], min_conf_idx=r['min_conf_idx'],
+                domain='地质勘探', image_path=r['img_path'],
+            )
+            prompt['T_A'] = r['T_A']
+            return idx, agent_b_callable(prompt)
+        
+        # 并发调用（20 个线程）
+        with ThreadPoolExecutor(max_workers=20) as executor:
+            futures = {
+                executor.submit(call_agent_b, i, all_results[i]): i
+                for i in upgrade_set
+            }
+            
+            # 收集结果（带进度条）
+            for future in tqdm(as_completed(futures), total=len(upgrade_set), 
+                              desc=f'{strategy} B={target_budget:.2f} [API]', leave=False):
+                try:
+                    idx, T_cand = future.result()
+                    upgrade_results[idx] = T_cand
+                except Exception as e:
+                    idx = futures[future]
+                    upgrade_results[idx] = all_results[idx]['T_A']  # 失败降级
+    
+    # 回填与统计
     cer_num = 0
     gt_len = 0
     n_upgraded = 0
     n_accepted_edit = 0
     n_rejected = 0
-    from modules.router.backfill import RouteType
-    for i, r in enumerate(tqdm(all_results, desc=f'{strategy} B={target_budget:.2f}', leave=False)):
+    
+    for i, r in enumerate(all_results):
         T_A = r['T_A']
         T_GT = r['T_GT']
+        
         if i in upgrade_set:
             n_upgraded += 1
-            prompt = prompter.generate_targeted_correction_prompt(
-                T_A=T_A, min_conf_idx=r['min_conf_idx'],
-                domain='地质勘探', image_path=r['img_path'],
-            )
-            prompt['T_A'] = T_A
-            T_cand = agent_b_callable(prompt)
+            T_cand = upgrade_results.get(i, T_A)
             bf = backfill_controller.apply_backfill(
                 T_A=T_A, T_cand=T_cand, route_type=RouteType.BOUNDARY,
             )
@@ -257,6 +291,7 @@ def run_pipeline(
                 n_accepted_edit += 1
         else:
             T_final = T_A
+        
         cer_num += Levenshtein.distance(T_final, T_GT)
         gt_len += len(T_GT)
 
@@ -264,6 +299,7 @@ def run_pipeline(
     overall_cer = cer_num / gt_len if gt_len > 0 else 0.0
     aer = n_accepted_edit / n_upgraded if n_upgraded > 0 else 0.0
     cvr = n_rejected / n_upgraded if n_upgraded > 0 else 0.0
+    
     return {
         'Strategy': strategy, 'Target_Budget': target_budget,
         'Actual_Call_Rate': round(actual_rate, 4),
