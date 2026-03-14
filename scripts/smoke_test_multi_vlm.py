@@ -13,8 +13,12 @@ SH-DA++ v5.1: Multi-VLM Smoke Test
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path
+
+# 默认使用第三张显卡 (index=2)
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", "2")
 
 import yaml
 
