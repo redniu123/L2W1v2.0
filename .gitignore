@@ -22,3 +22,25 @@ results/
 # 忽略日志
 log_output/
 *.log
+
+# 忽略 __pycache__
+__pycache__/
+*.pyc
+*.pyo
+
+# 忽略临时测试文件
+scripts/_test_api.py
+scripts/_debug_agentb.py
+scripts/_models.json
+scripts/_test_model.json
+nul
+fix_out.txt
+
+# 忽略原始大数据（图像）
+data/geo/geotext/
+
+# 忽略 key 文件（安全）
+key.txt
+
+# 忽略数据集划分文件（大文件，本地生成）
+data/raw/

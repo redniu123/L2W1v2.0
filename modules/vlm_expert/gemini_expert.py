@@ -105,12 +105,12 @@ class GeminiConfig:
     """Gemini API 配置"""
 
     base_url: str = "https://new.lemonapi.site/v1"
-    model_name: str = "gemini-3-flash-preview"
+    model_name: str = "[V]gemini-3-flash-preview"
     key_file: str = "key.txt"  # Key 文件路径（项目根目录）
     temperature: float = 0.1
     max_tokens: int = 256
     max_retries: int = 3  # 增加重试次数（快速跳过失效 Key）
-    timeout: int = 30  # 降低超时（正常请求 3-5 秒，超过 30 秒基本是失效 Key）
+    timeout: int = 60  # 谷歌服务器不稳定时适当延长超时
 
     def __post_init__(self):
         # 初始化 APIKeyManager
@@ -201,12 +201,15 @@ class GeminiAgentB:
             r"输出[：:]\s*(.+)",
         ]
         for pattern in patterns:
-            m = re.search(pattern, text, re.DOTALL)
+            m = re.search(pattern, text)
             if m:
                 text = m.group(1).strip()
                 break
+        # 只取第一行（避免模型附加解释被拼入）
+        text = text.split('\n')[0].strip()
         text = text.strip('"\'""''【】')
-        text = re.sub(r"\s+", "", text)
+        # 只删除首尾空白，保留中间内容
+        text = text.strip()
         return text
 
     def process_hard_sample(

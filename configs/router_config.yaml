@@ -1,0 +1,38 @@
+# SH-DA++ v5.1 Router Config
+
+agent_b:
+  skip: false
+  backend: "local_vlm"        # gemini | local_vlm
+  model_type: "qwen2.5_vl"   # qwen2.5_vl | internvl2 | minicpm_v
+  model_path: "./models/agent_b_vlm/Qwen2.5-VL-7B-Instruct"
+  dtype: "bfloat16"           # bfloat16 | float16
+  max_new_tokens: 128
+  # --- Gemini API settings (backend=gemini 时生效) ---
+  model_name: "[V]gemini-3-flash-preview"
+
+backfill:
+  max_edit_distance: 3
+  unified_prompt_mode: true
+
+sh_da_v4:
+  # 评分器模式
+  calibrated_scorer:
+    enabled: false
+
+  # 规则评分器配置
+  rule_scorer:
+    v_min: 0.0
+    v_max: 5.0
+    lambda_threshold: 0.5
+    eta: 0.5
+    geology_dict_path: "data/dicts/Geology.txt"
+    geology_min_len: 2
+    geology_risk_weight: 1.0
+
+  # 预算控制器配置
+  budget_controller:
+    target_budget: 0.1
+    lambda_init: 0.5
+    lambda_min: 0.0
+    lambda_max: 1.0
+    alpha: 0.01
