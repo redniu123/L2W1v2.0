@@ -2,13 +2,19 @@
 """
 SH-DA++ v5.1: VLM Expert Factory
 
-根据 router_config.yaml 中的 agent_b 配置，动态实例化对应的 VLM 专家。
+根据 router_config.yaml 中的 agent_b 配置动态实例化 VLM 专家。
+支持 9 款模型的热切换，只需修改 model_type 一行配置。
 
-用法:
-    from modules.vlm_expert import AgentBFactory
-
-    expert = AgentBFactory.create(config)
-    result = expert.process_hard_sample(image, manifest)
+  model_type       expert class        典型模型
+  -----------      ----------------    --------------------------------
+  qwen2.5_vl       QwenVLExpert        Qwen2.5-VL-7B-Instruct
+  qwen3.5          Qwen35Expert        Qwen3.5-9B
+  internvl2        InternVL2Expert     InternVL2-8B-AWQ
+  internvl2_5      InternVL2Expert     InternVL2_5-8B-AWQ
+  minicpm_v        MiniCPMVExpert      MiniCPM-V-2_6-int4
+  paddleocr_vl     PaddleOCRVLExpert   PaddleOCR-VL / PaddleOCR-VL-1.5
+  llava            LLaVAExpert         llava-1.5-7b-hf
+  smolvlm          SmolVLMExpert       SmolVLM-500M-Instruct
 """
 
 from .base_expert import BaseVLMExpert
@@ -18,83 +24,82 @@ from .gemini_expert import GeminiAgentB, GeminiConfig
 
 class AgentBFactory:
     """
-    Agent B 工厂类
-
-    根据 YAML config dict 中的 agent_b.backend 和 agent_b.model_type
-    动态实例化并返回对应的专家对象。
-
-    支持的 backend:
-      - "gemini"     : Gemini API (GeminiAgentB)
-      - "local_vlm"  : 本地模型，由 model_type 决定具体实现
-          - "qwen2.5_vl" : QwenVLExpert
-          - "internvl2"  : InternVL2Expert
-          - "minicpm_v"  : MiniCPMVExpert
+    Agent B 工厂类。
+    根据 YAML config dict 中的 agent_b.backend / model_type 动态路由。
     """
 
     @staticmethod
     def create(config: dict) -> BaseVLMExpert:
         """
-        根据配置创建 VLM 专家实例。
-
         Args:
-            config: 完整的 YAML config dict（顶层，包含 agent_b 节点）
-
+            config: 顶层 YAML config dict（包含 agent_b 节点）
         Returns:
             BaseVLMExpert 子类实例
-
-        Raises:
-            ValueError: 未知的 backend 或 model_type
         """
-        agent_b_cfg = config.get("agent_b", {})
-        backend = agent_b_cfg.get("backend", "gemini")
+        cfg = config.get("agent_b", {})
+        backend = cfg.get("backend", "gemini")
 
         if backend == "gemini":
-            return AgentBFactory._create_gemini(agent_b_cfg)
+            return AgentBFactory._create_gemini(cfg)
         elif backend == "local_vlm":
-            return AgentBFactory._create_local_vlm(agent_b_cfg)
+            return AgentBFactory._create_local_vlm(cfg)
         else:
             raise ValueError(f"[AgentBFactory] Unknown backend: {backend}")
 
     @staticmethod
     def _create_gemini(cfg: dict) -> GeminiAgentB:
-        """创建 Gemini API 专家"""
-        gemini_config = GeminiConfig(
-            model_name=cfg.get("model_name", "[V]gemini-3-flash-preview"),
-        )
+        gemini_config = GeminiConfig(model_name=cfg.get("model_name", "[V]gemini-3-flash-preview"))
         agent = GeminiAgentB(config=gemini_config)
-        print(f"[AgentBFactory] Gemini backend: {gemini_config.model_name}")
+        print(f"[AgentBFactory] Gemini: {gemini_config.model_name}")
         return agent
 
     @staticmethod
     def _create_local_vlm(cfg: dict) -> BaseVLMExpert:
-        """创建本地 VLM 专家"""
         model_type = cfg.get("model_type", "qwen2.5_vl")
         model_path = cfg.get("model_path", "")
-        dtype = cfg.get("dtype", "bfloat16")
+        torch_dtype = cfg.get("torch_dtype", "float16")  # 2080Ti 红线: float16
         max_new_tokens = cfg.get("max_new_tokens", 128)
 
         if not model_path:
-            raise ValueError("[AgentBFactory] agent_b.model_path is required for local_vlm backend")
+            raise ValueError("[AgentBFactory] agent_b.model_path is required for local_vlm")
 
-        print(f"[AgentBFactory] local_vlm backend: {model_type} @ {model_path}")
+        print(f"[AgentBFactory] local_vlm | type={model_type} | dtype={torch_dtype} | path={model_path}")
+
+        kwargs = dict(model_path=model_path, torch_dtype=torch_dtype, max_new_tokens=max_new_tokens)
 
         if model_type == "qwen2.5_vl":
             from .qwen_expert import QwenVLExpert
-            return QwenVLExpert(model_path=model_path, dtype=dtype, max_new_tokens=max_new_tokens)
+            return QwenVLExpert(**kwargs)
 
-        elif model_type == "internvl2":
+        elif model_type == "qwen3.5":
+            from .qwen_expert import Qwen35Expert
+            return Qwen35Expert(**kwargs)
+
+        elif model_type in ("internvl2", "internvl2_5"):
             from .internvl_expert import InternVL2Expert
-            return InternVL2Expert(model_path=model_path, dtype=dtype, max_new_tokens=max_new_tokens)
+            return InternVL2Expert(**kwargs)
 
         elif model_type == "minicpm_v":
             from .minicpm_expert import MiniCPMVExpert
-            return MiniCPMVExpert(model_path=model_path, dtype=dtype, max_new_tokens=max_new_tokens)
+            return MiniCPMVExpert(**kwargs)
+
+        elif model_type == "paddleocr_vl":
+            from .paddleocr_vl_expert import PaddleOCRVLExpert
+            return PaddleOCRVLExpert(**kwargs)
+
+        elif model_type == "llava":
+            from .llava_expert import LLaVAExpert
+            return LLaVAExpert(**kwargs)
+
+        elif model_type == "smolvlm":
+            from .smolvlm_expert import SmolVLMExpert
+            return SmolVLMExpert(**kwargs)
 
         else:
             raise ValueError(f"[AgentBFactory] Unknown model_type: {model_type}")
 
 
-# 保持向后兼容的旧导出
+# 向后兼容旧导出
 from .agent_b_expert import (
     AgentBExpert,
     AgentBExpertMock,
@@ -105,16 +110,13 @@ from .agent_b_expert import (
 )
 
 __all__ = [
-    # 新工厂接口
     "AgentBFactory",
     "BaseVLMExpert",
-    # 旧接口（向后兼容）
     "AgentBExpert",
     "AgentBExpertMock",
     "AgentBConfig",
     "EIPPromptTemplate",
     "create_agent_b",
     "process_hard_sample",
-    # 工具
     "ConstrainedPrompter",
 ]

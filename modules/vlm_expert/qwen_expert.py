@@ -1,126 +1,113 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-SH-DA++ v5.1: Qwen2.5-VL Expert Wrapper
-
-支持 Qwen2.5-VL-7B-Instruct 本地推理。
-显存策略: bfloat16 + device_map=auto，22GB 显存下安全运行。
+SH-DA++ v5.1: Qwen Expert
+兼容 Qwen2.5-VL-7B-Instruct 和 Qwen3.5-9B。
+显存策略: float16 + device_map=auto (2080Ti Turing 禁用 bfloat16)。
 """
-
-from pathlib import Path
 from typing import Dict, Union
-
 import numpy as np
-
 from .base_expert import BaseVLMExpert
 
 
 class QwenVLExpert(BaseVLMExpert):
-    """
-    Qwen2.5-VL 专家包装器
+    """Qwen2.5-VL 多模态专家"""
 
-    模型特点:
-    - 使用 AutoProcessor + Qwen2_5_VLForConditionalGeneration
-    - 动态分辨率: min_pixels/max_pixels 控制
-    - 支持 Flash Attention 2
-    """
-
-    def __init__(self, model_path: str, dtype: str = "bfloat16", max_new_tokens: int = 128):
-        """
-        Args:
-            model_path: 本地模型路径，如 ./models/agent_b_vlm/Qwen2.5-VL-7B-Instruct
-            dtype: 推理精度，bfloat16 或 float16
-            max_new_tokens: 最大生成 token 数
-        """
+    def __init__(self, model_path: str, torch_dtype: str = "float16", max_new_tokens: int = 128):
         self.model_path = model_path
-        self.dtype_str = dtype
+        self.torch_dtype = torch_dtype
         self.max_new_tokens = max_new_tokens
         self.model = None
         self.processor = None
-        self._initialized = False
         self._init_model()
 
     def _init_model(self):
         import torch
         from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
-
-        dtype = torch.bfloat16 if self.dtype_str == "bfloat16" else torch.float16
-
-        print(f"[QwenVL] Loading {self.model_path} ({self.dtype_str})...")
-
-        # 尝试启用 Flash Attention 2
-        attn = None
+        dtype = torch.float16 if self.torch_dtype == "float16" else torch.bfloat16
+        print(f"[QwenVL] Loading {self.model_path} ({self.torch_dtype})...")
+        attn = "sdpa"
         try:
             import flash_attn  # noqa
             attn = "flash_attention_2"
             print("[QwenVL] Flash Attention 2 enabled")
         except ImportError:
-            print("[QwenVL] Flash Attention 2 not available, using sdpa")
-            attn = "sdpa"
-
+            pass
         self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-            self.model_path,
-            torch_dtype=dtype,
-            device_map="auto",
-            attn_implementation=attn,
-            trust_remote_code=True,
-        )
-        self.model.eval()
-
+            self.model_path, torch_dtype=dtype, device_map="auto",
+            attn_implementation=attn, trust_remote_code=True,
+        ).eval()
         self.processor = AutoProcessor.from_pretrained(
-            self.model_path,
-            trust_remote_code=True,
-            min_pixels=256 * 28 * 28,
-            max_pixels=1280 * 28 * 28,
+            self.model_path, trust_remote_code=True,
+            min_pixels=256 * 28 * 28, max_pixels=1280 * 28 * 28,
         )
-        self._initialized = True
-        print(f"[QwenVL] Ready.")
+        print("[QwenVL] Ready.")
 
-    def chat_with_image(self, image: Union[str, np.ndarray], prompt: str) -> str:
+    def chat_with_image(self, image_path: Union[str, np.ndarray], prompt_text: str) -> str:
         import torch
         from PIL import Image as PILImage
-
-        if isinstance(image, str):
-            pil_img = PILImage.open(image).convert("RGB")
-        elif isinstance(image, np.ndarray):
-            pil_img = PILImage.fromarray(image).convert("RGB")
-        else:
-            pil_img = image.convert("RGB")
-
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image", "image": pil_img},
-                    {"type": "text", "text": prompt},
-                ],
-            }
-        ]
-
-        text = self.processor.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
-        )
-        inputs = self.processor(
-            text=[text], images=[pil_img], padding=True, return_tensors="pt"
-        ).to(self.model.device)
-
-        with torch.no_grad():
-            generated_ids = self.model.generate(
-                **inputs,
-                max_new_tokens=self.max_new_tokens,
-                do_sample=False,
-            )
-
-        trimmed = [o[len(i):] for i, o in zip(inputs.input_ids, generated_ids)]
-        return self.processor.batch_decode(
-            trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
-        )[0]
+        try:
+            if isinstance(image_path, str):
+                pil_img = PILImage.open(image_path).convert("RGB")
+            elif isinstance(image_path, np.ndarray):
+                pil_img = PILImage.fromarray(image_path).convert("RGB")
+            else:
+                pil_img = image_path.convert("RGB")
+            messages = [{"role": "user", "content": [
+                {"type": "image", "image": pil_img},
+                {"type": "text", "text": prompt_text},
+            ]}]
+            text = self.processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+            inputs = self.processor(text=[text], images=[pil_img], padding=True, return_tensors="pt")
+            inputs = inputs.to(self.model.device)
+            with torch.no_grad():
+                gen_ids = self.model.generate(**inputs, max_new_tokens=self.max_new_tokens, do_sample=False)
+            trimmed = [o[len(i):] for i, o in zip(inputs.input_ids, gen_ids)]
+            return self.processor.batch_decode(trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
+        finally:
+            torch.cuda.empty_cache()
 
     def get_model_info(self) -> Dict:
-        return {
-            "backend": "local_vlm",
-            "model_type": "qwen2.5_vl",
-            "model_path": self.model_path,
-            "dtype": self.dtype_str,
-            "initialized": self._initialized,
-        }
+        return {"backend": "local_vlm", "model_type": "qwen2.5_vl",
+                "model_path": self.model_path, "torch_dtype": self.torch_dtype}
+
+
+class Qwen35Expert(BaseVLMExpert):
+    """Qwen3.5-9B 纯文本专家（无视觉，提示词中嵌入 OCR 文本）"""
+
+    def __init__(self, model_path: str, torch_dtype: str = "float16", max_new_tokens: int = 128):
+        self.model_path = model_path
+        self.torch_dtype = torch_dtype
+        self.max_new_tokens = max_new_tokens
+        self.model = None
+        self.tokenizer = None
+        self._init_model()
+
+    def _init_model(self):
+        import torch
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+        dtype = torch.float16 if self.torch_dtype == "float16" else torch.bfloat16
+        print(f"[Qwen3.5] Loading {self.model_path} ({self.torch_dtype})...")
+        self.model = AutoModelForCausalLM.from_pretrained(
+            self.model_path, torch_dtype=dtype, device_map="auto", trust_remote_code=True,
+        ).eval()
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, trust_remote_code=True)
+        print("[Qwen3.5] Ready.")
+
+    def chat_with_image(self, image_path: Union[str, np.ndarray], prompt_text: str) -> str:
+        """Qwen3.5 无视觉，仅使用文本 prompt"""
+        import torch
+        try:
+            messages = [{"role": "user", "content": prompt_text}]
+            text = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+            inputs = self.tokenizer(text, return_tensors="pt").to(self.model.device)
+            with torch.no_grad():
+                gen_ids = self.model.generate(**inputs, max_new_tokens=self.max_new_tokens, do_sample=False)
+            out = gen_ids[0][inputs.input_ids.shape[1]:]
+            return self.tokenizer.decode(out, skip_special_tokens=True)
+        finally:
+            torch.cuda.empty_cache()
+
+    def get_model_info(self) -> Dict:
+        return {"backend": "local_vlm", "model_type": "qwen3.5",
+                "model_path": self.model_path, "torch_dtype": self.torch_dtype}
