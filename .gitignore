@@ -7,3 +7,18 @@ docs/
 
 # 忽略 archive 文件夹
 archive/
+
+# 忽略模型文件
+models/
+*.tar.gz
+*.tar
+*.pdmodel
+*.pdiparams
+*.pdopt
+
+# 忽略结果文件
+results/
+
+# 忽略日志
+log_output/
+*.log
