@@ -49,12 +49,14 @@ class SmolVLMExpert(BaseVLMExpert):
             else:
                 pil_img = image_path.convert("RGB")
 
-            # SmolVLM 能力有限，使用极简 prompt 提升指令遵循率
-            # 从 prompt_text 中提取 OCR 文本（【 xxx 】格式），构建简短指令
+            # SmolVLM 能力有限，使用简短中文 prompt，避免翻译和复述
             import re
             m = re.search(r'\u3010\s*(.+?)\s*\u3011', prompt_text)
             ocr_text = m.group(1).strip() if m else prompt_text[:50]
-            simple_prompt = f'This is an OCR result: "{ocr_text}". Look at the image and correct any errors. Output only the corrected text, nothing else.'
+            simple_prompt = (
+                f"图中文字的OCR识别结果是：{ocr_text}\n"
+                f"如有错别字请修正，否则原样输出。只输出文字，不要解释。"
+            )
 
             messages = [{"role": "user", "content": [
                 {"type": "image"},
