@@ -30,8 +30,8 @@ class GeminiConfig:
     api_keys: List[str] = None
     temperature: float = 0.1
     max_tokens: int = 256
-    max_retries: int = 3
-    timeout: int = 30
+    max_retries: int = 2  # 减少重试次数（从 3 → 2）
+    timeout: int = 60  # 增加超时（从 30 → 60）
 
     def __post_init__(self):
         if self.api_keys is None:
@@ -193,7 +193,7 @@ class GeminiAgentB:
 
         image_base64 = self._encode_image(image_path)
 
-        # 指数退避重试
+        # 指数退避重试（简化日志）
         corrected_text = None
         for attempt in range(self.config.max_retries):
             api_key = self.config.get_next_key()
@@ -201,12 +201,11 @@ class GeminiAgentB:
             if corrected_text:
                 break
             if attempt < self.config.max_retries - 1:
-                sleep_time = (2**attempt) + random.uniform(0, 1)
+                sleep_time = min(4, 2**attempt) + random.uniform(0, 0.5)
                 time.sleep(sleep_time)
 
-        # 容错降级
+        # 容错降级（静默失败）
         if not corrected_text:
-            print(f"[Gemini] All retries failed, fallback to T_A")
             corrected_text = ocr_text
 
         # 解析输出
