@@ -167,34 +167,28 @@ def main():
 
         for B in budgets:
             print("\n" + "=" * 60)
-            print(f"Budget B={B:.2f} (3 strategies in parallel)")
+            print(f"Budget B={B:.2f}")
             print("=" * 60)
             
-            # 并行执行 3 个策略
-            tasks = []
-            with ThreadPoolExecutor(max_workers=3) as executor:
-                for strategy in strategies:
-                    future = executor.submit(
-                        run_pipeline, strategy, B, all_results,
+            # 顺序执行 3 个策略（避免并发问题）
+            for strategy in strategies:
+                print(f"\n[{strategy}] Running...")
+                try:
+                    row = run_pipeline(
+                        strategy, B, all_results,
                         router, backfill_controller, prompter, agent_b_callable,
                     )
-                    tasks.append((strategy, future))
-                
-                # 收集结果
-                for strategy, future in tasks:
-                    try:
-                        row = future.result()
-                        writer.writerow({k: row.get(k, "") for k in fieldnames})
-                        csvfile.flush()
-                        print(
-                            f"  [{strategy:10s}] "
-                            f"CER={row['Overall_CER']:.4%}  "
-                            f"AER={row['AER']:.2%}  "
-                            f"CVR={row['CVR']:.2%}  "
-                            f"ActualRate={row['Actual_Call_Rate']:.2%}"
-                        )
-                    except Exception as e:
-                        print(f"  [{strategy:10s}] ERROR: {e}")
+                    writer.writerow({k: row.get(k, "") for k in fieldnames})
+                    csvfile.flush()
+                    print(
+                        f"  [{strategy:10s}] "
+                        f"CER={row['Overall_CER']:.4%}  "
+                        f"AER={row['AER']:.2%}  "
+                        f"CVR={row['CVR']:.2%}  "
+                        f"ActualRate={row['Actual_Call_Rate']:.2%}"
+                    )
+                except Exception as e:
+                    print(f"  [{strategy:10s}] ERROR: {e}")
 
     print("\n" + "=" * 60)
     print(f"Test completed! Results saved to:")
