@@ -31,12 +31,11 @@ class InternVL2Expert(BaseVLMExpert):
         is_awq = "awq" in self.model_path.lower()
         print(f"[InternVL2] Loading {self.model_path} (AWQ={is_awq}, {self.torch_dtype})...")
         load_kwargs = dict(
-            torch_dtype=dtype,
+            dtype=dtype,
             device_map="auto",
             trust_remote_code=True,
             low_cpu_mem_usage=True,
         )
-        # AWQ 模型直接加载，autoawq 会自动识别量化配置
         self.model = AutoModel.from_pretrained(self.model_path, **load_kwargs).eval()
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, trust_remote_code=True)
         print("[InternVL2] Ready.")
