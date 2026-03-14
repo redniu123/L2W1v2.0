@@ -11,10 +11,6 @@ from .base_expert import BaseVLMExpert
 
 
 class InternVL2Expert(BaseVLMExpert):
-    """
-    InternVL2 / InternVL2.5 专家
-    AWQ 模型直接用 AutoModelForCausalLM 加载（autoawq 后端）。
-    """
 
     def __init__(self, model_path: str, torch_dtype: str = "float16", max_new_tokens: int = 128):
         self.model_path = model_path
@@ -26,17 +22,17 @@ class InternVL2Expert(BaseVLMExpert):
 
     def _init_model(self):
         import torch
-        from transformers import AutoModel, AutoTokenizer, GenerationMixin
+        from transformers import AutoModel, AutoTokenizer, GenerationMixin, GenerationConfig
         dtype = torch.float16 if self.torch_dtype == "float16" else torch.bfloat16
         is_awq = "awq" in self.model_path.lower()
         print(f"[InternVL2] Loading {self.model_path} (AWQ={is_awq}, {self.torch_dtype})...")
-        load_kwargs = dict(
+        self.model = AutoModel.from_pretrained(
+            self.model_path,
             dtype=dtype,
             device_map="auto",
             trust_remote_code=True,
             low_cpu_mem_usage=True,
-        )
-        self.model = AutoModel.from_pretrained(self.model_path, **load_kwargs).eval()
+        ).eval()
 
         # transformers >=4.50 不再自动继承 GenerationMixin，手动 patch
         lm = getattr(self.model, "language_model", None)
@@ -46,13 +42,22 @@ class InternVL2Expert(BaseVLMExpert):
                 (lm.__class__, GenerationMixin),
                 {},
             )
-            print("[InternVL2] Applied GenerationMixin patch for language_model")
+            print("[InternVL2] Applied GenerationMixin patch")
 
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, trust_remote_code=True)
+        # 修复 generation_config=None 导致的 AttributeError
+        if lm is not None and getattr(lm, "generation_config", None) is None:
+            try:
+                lm.generation_config = GenerationConfig.from_model_config(lm.config)
+            except Exception:
+                lm.generation_config = GenerationConfig()
+            print("[InternVL2] Initialized generation_config")
+
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            self.model_path, trust_remote_code=True
+        )
         print("[InternVL2] Ready.")
 
     def _preprocess_image(self, image_path: Union[str, np.ndarray]):
-        import torch
         import torchvision.transforms as T
         from PIL import Image as PILImage
         from torchvision.transforms.functional import InterpolationMode
@@ -69,7 +74,7 @@ class InternVL2Expert(BaseVLMExpert):
             pil = PILImage.fromarray(image_path).convert("RGB")
         else:
             pil = image_path.convert("RGB")
-        return transform(pil).unsqueeze(0)  # (1, 3, H, W)
+        return transform(pil).unsqueeze(0)
 
     def chat_with_image(self, image_path: Union[str, np.ndarray], prompt_text: str) -> str:
         import torch
