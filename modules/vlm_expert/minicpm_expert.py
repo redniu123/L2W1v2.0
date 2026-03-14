@@ -50,11 +50,16 @@ class MiniCPMVExpert(BaseVLMExpert):
                 pil_img = PILImage.fromarray(image_path).convert("RGB")
             else:
                 pil_img = image_path.convert("RGB")
+
             msgs = [{"role": "user", "content": [pil_img, prompt_text]}]
-            response = self.model.chat(
-                image=None, msgs=msgs, tokenizer=self.tokenizer,
-                sampling=False, max_new_tokens=self.max_new_tokens,
-            )
+
+            # MiniCPM-V int4 内部直接操作设备，需要确保在同一设备上
+            # 用 cuda:0 相对索引（CUDA_VISIBLE_DEVICES 已做映射）
+            with torch.cuda.device(0):
+                response = self.model.chat(
+                    image=None, msgs=msgs, tokenizer=self.tokenizer,
+                    sampling=False, max_new_tokens=self.max_new_tokens,
+                )
             return response
         finally:
             torch.cuda.empty_cache()
