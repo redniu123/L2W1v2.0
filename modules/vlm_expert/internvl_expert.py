@@ -26,7 +26,7 @@ class InternVL2Expert(BaseVLMExpert):
 
     def _init_model(self):
         import torch
-        from transformers import AutoModel, AutoTokenizer
+        from transformers import AutoModel, AutoTokenizer, GenerationMixin
         dtype = torch.float16 if self.torch_dtype == "float16" else torch.bfloat16
         is_awq = "awq" in self.model_path.lower()
         print(f"[InternVL2] Loading {self.model_path} (AWQ={is_awq}, {self.torch_dtype})...")
@@ -37,6 +37,17 @@ class InternVL2Expert(BaseVLMExpert):
             low_cpu_mem_usage=True,
         )
         self.model = AutoModel.from_pretrained(self.model_path, **load_kwargs).eval()
+
+        # transformers >=4.50 不再自动继承 GenerationMixin，手动 patch
+        lm = getattr(self.model, "language_model", None)
+        if lm is not None and not isinstance(lm, GenerationMixin):
+            lm.__class__ = type(
+                lm.__class__.__name__,
+                (lm.__class__, GenerationMixin),
+                {},
+            )
+            print("[InternVL2] Applied GenerationMixin patch for language_model")
+
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, trust_remote_code=True)
         print("[InternVL2] Ready.")
 
