@@ -27,28 +27,14 @@ class InternVL2Expert(BaseVLMExpert):
         is_awq = "awq" in self.model_path.lower()
         print(f"[InternVL2] Loading {self.model_path} (AWQ={is_awq}, {self.torch_dtype})...")
 
-        # transformers 新版本用 meta device 初始化，导致 .item() 报错
-        # 通过 eager init_context 绕过
-        from accelerate import init_empty_weights
-        try:
-            # 先尝试正常加载
-            self.model = AutoModel.from_pretrained(
-                self.model_path,
-                dtype=dtype,
-                device_map="auto",
-                trust_remote_code=True,
-            ).eval()
-        except RuntimeError as e:
-            if "meta tensor" in str(e).lower() or "meta" in str(e).lower():
-                print(f"[InternVL2] meta tensor error, retrying with device_map=cuda:0")
-                self.model = AutoModel.from_pretrained(
-                    self.model_path,
-                    dtype=dtype,
-                    device_map="cuda:0",
-                    trust_remote_code=True,
-                ).eval()
-            else:
-                raise
+        # device_map="auto" 在新版 transformers 触发 meta tensor 初始化导致 .item() 报错
+        # 直接指定 cuda:0 绕过
+        self.model = AutoModel.from_pretrained(
+            self.model_path,
+            dtype=dtype,
+            device_map="cuda:0",
+            trust_remote_code=True,
+        ).eval()
 
         # transformers >=4.50 不再自动继承 GenerationMixin，手动 patch
         lm = getattr(self.model, "language_model", None)
@@ -102,8 +88,6 @@ class InternVL2Expert(BaseVLMExpert):
             device = next(self.model.parameters()).device
             dtype = next(self.model.parameters()).dtype
             pixel_values = pixel_values.to(device=device, dtype=dtype)
-            assert pixel_values is not None and len(pixel_values.shape) == 4, \
-                f"pixel_values invalid: {pixel_values}"
             gen_cfg = dict(max_new_tokens=self.max_new_tokens, do_sample=False)
             response = self.model.chat(self.tokenizer, pixel_values, prompt_text, gen_cfg)
             return response
