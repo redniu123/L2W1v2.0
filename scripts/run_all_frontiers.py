@@ -172,7 +172,10 @@ def build_agent_b(model_cfg: dict, base_config: dict) -> Callable:
         }
         try:
             result = expert.process_hard_sample(image_path, manifest)
-            return result
+            # process_hard_sample 返回 dict，提取 corrected_text
+            if isinstance(result, dict):
+                return result.get('corrected_text', T_A)
+            return result if isinstance(result, str) else T_A
         except Exception as e:
             print(f"  [{model_cfg['key']}] error: {e}")
             return T_A
