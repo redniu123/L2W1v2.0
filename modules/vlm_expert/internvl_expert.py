@@ -31,7 +31,6 @@ class InternVL2Expert(BaseVLMExpert):
             dtype=dtype,
             device_map="auto",
             trust_remote_code=True,
-            low_cpu_mem_usage=True,
         ).eval()
 
         # transformers >=4.50 不再自动继承 GenerationMixin，手动 patch

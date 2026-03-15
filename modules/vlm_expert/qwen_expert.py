@@ -95,12 +95,19 @@ class Qwen35Expert(BaseVLMExpert):
         print("[Qwen3.5] Ready.")
 
     def chat_with_image(self, image_path: Union[str, np.ndarray], prompt_text: str) -> str:
-        """Qwen3.5 无视觉，仅使用文本 prompt，加 /no_think 禁用思维链"""
+        """Qwen3.5 无视觉，仅使用文本 prompt，强制禁用思维链"""
         import torch
         try:
-            # /no_think 告知 Qwen3.5 直接输出答案，不输出思维链
-            no_think_prompt = prompt_text.rstrip() + " /no_think"
-            messages = [{"role": "user", "content": no_think_prompt}]
+            system_msg = (
+                "You are a Chinese OCR text correction assistant. "
+                "Output ONLY the corrected Chinese text, nothing else. "
+                "No analysis, no explanation, no markdown, no English."
+            )
+            no_think_prompt = prompt_text.rstrip() + "\n\n/no_think"
+            messages = [
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": no_think_prompt},
+            ]
             text = self.tokenizer.apply_chat_template(
                 messages, tokenize=False, add_generation_prompt=True
             )
