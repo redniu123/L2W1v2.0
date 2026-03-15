@@ -155,7 +155,8 @@ def build_agent_b(model_cfg: dict, base_config: dict) -> Callable:
     }
 
     from modules.vlm_expert import AgentBFactory
-    expert = AgentBFactory.create(cfg_override["agent_b"])
+    # AgentBFactory.create() 接收顶层 config（含 agent_b 节点）
+    expert = AgentBFactory.create(cfg_override)
     print(f"  [AgentB] {model_cfg['label']} loaded")
 
     def local_fn(prompt: dict) -> str:
