@@ -323,6 +323,8 @@ def main():
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--n_samples', type=int, default=None, help='Limit to first N samples (for testing)')
     parser.add_argument('--use_gpu', action='store_true', default=False, help='Use GPU for Agent A (default: CPU)')
+    parser.add_argument('--use_cache', action='store_true', default=False, help='Load Agent A results from cache instead of re-inferring')
+    parser.add_argument('--rebuild_cache', action='store_true', default=False, help='Force rebuild Agent A cache even if it exists')
     args = parser.parse_args()
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -365,14 +367,37 @@ def main():
             if line:
                 samples.append(json.loads(line))
     print(f'  Test: {len(samples)} samples')
-    print('[4/4] Agent A full inference...')
-    all_results = infer_all_samples(samples, recognizer, domain_engine, None, args.image_root)
-    
+
+    # Agent A 推理缓存：避免每次重复推理
+    cache_path = Path(args.output_dir) / 'agent_a_cache.json'
+    if args.use_cache and not args.rebuild_cache and cache_path.exists():
+        print(f'[4/4] Agent A cache HIT: loading from {cache_path}')
+        with open(cache_path, 'r', encoding='utf-8') as f:
+            all_results = json.load(f)
+        print(f'  Loaded {len(all_results)} cached results')
+    else:
+        print('[4/4] Agent A full inference...')
+        all_results = infer_all_samples(samples, recognizer, domain_engine, None, args.image_root)
+        # 保存缓存（完整集，不限制 n_samples）
+        Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+        # top2_info/boundary_stats 中可能含 numpy，序列化前转 list
+        cache_data = []
+        for r in all_results:
+            rc = dict(r)
+            for k in ('top2_info', 'boundary_stats'):
+                if isinstance(rc.get(k), dict):
+                    rc[k] = {kk: (vv.tolist() if hasattr(vv, 'tolist') else vv)
+                             for kk, vv in rc[k].items()}
+            cache_data.append(rc)
+        with open(cache_path, 'w', encoding='utf-8') as f:
+            json.dump(cache_data, f, ensure_ascii=False)
+        print(f'  Agent A cache saved: {cache_path} ({len(all_results)} samples)')
+
     # 限制样本数（用于快速测试）
     if args.n_samples and args.n_samples < len(all_results):
         all_results = all_results[:args.n_samples]
         print(f'  Limited to first {args.n_samples} samples for testing')
-    
+
     print(f'  Valid: {len(all_results)}')
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)

@@ -384,6 +384,8 @@ def main():
     parser.add_argument("--n_samples", type=int, default=None)
     parser.add_argument("--models", default="smolvlm,minicpm_v,llava,qwen2.5_vl,qwen3.5,gemini")
     parser.add_argument("--skip_baselines", action="store_true")
+    parser.add_argument("--use_cache", action="store_true", default=False, help="Load Agent A results from cache")
+    parser.add_argument("--rebuild_cache", action="store_true", default=False, help="Force rebuild Agent A cache")
     args = parser.parse_args()
 
     random.seed(args.seed)
@@ -431,15 +433,34 @@ def main():
                 samples.append(json.loads(line))
     print(f"  Test: {len(samples)} samples")
 
-    print("[4/4] Agent A full inference...")
-    all_results = infer_all_samples(samples, recognizer, domain_engine, args.image_root)
+    # Agent A 推理缓存
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    cache_path = output_dir / "agent_a_cache.json"
+    if args.use_cache and not args.rebuild_cache and cache_path.exists():
+        print(f"[4/4] Agent A cache HIT: {cache_path}")
+        import json as _json
+        with open(cache_path, "r", encoding="utf-8") as f:
+            all_results = _json.load(f)
+        print(f"  Loaded {len(all_results)} cached results")
+    else:
+        print("[4/4] Agent A full inference...")
+        all_results = infer_all_samples(samples, recognizer, domain_engine, args.image_root)
+        cache_data = []
+        for r in all_results:
+            rc = dict(r)
+            for k in ("top2_info", "boundary_stats"):
+                if isinstance(rc.get(k), dict):
+                    rc[k] = {kk: (vv.tolist() if hasattr(vv, "tolist") else vv) for kk, vv in rc[k].items()}
+            cache_data.append(rc)
+        import json as _json
+        with open(cache_path, "w", encoding="utf-8") as f:
+            _json.dump(cache_data, f, ensure_ascii=False)
+        print(f"  Agent A cache saved: {cache_path}")
     if args.n_samples and args.n_samples < len(all_results):
         all_results = all_results[:args.n_samples]
         print(f"  Limited to {args.n_samples} samples")
     print(f"  Valid: {len(all_results)}")
-
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
     csv_path = output_dir / "master_efficiency_frontier.csv"
     fieldnames = ["Model", "Strategy", "Target_Budget", "Actual_Call_Rate",
                   "Overall_CER", "AER", "CVR", "N_valid"]
