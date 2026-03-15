@@ -244,7 +244,7 @@ def run_pipeline(
         def call_agent_b(idx, r):
             """单个样本的 Agent B 调用"""
             import time
-            time.sleep(0.5)  # 每个请求前等待 0.5 秒，避免限流
+            time.sleep(0.2)  # 每个请求前等待 0.2 秒，避免限流
             prompt = prompter.generate_targeted_correction_prompt(
                 T_A=r['T_A'], min_conf_idx=r['min_conf_idx'],
                 domain='地质勘探', image_path=r['img_path'],
@@ -252,8 +252,8 @@ def run_pipeline(
             prompt['T_A'] = r['T_A']
             return idx, agent_b_callable(prompt)
         
-        # 并发调用（3 个线程，匹配 Key 数量）
-        with ThreadPoolExecutor(max_workers=3) as executor:
+        # 并发调用（5 个线程，匹配 Key 数量）
+        with ThreadPoolExecutor(max_workers=5) as executor:
             futures = {
                 executor.submit(call_agent_b, i, all_results[i]): i
                 for i in upgrade_set
@@ -322,19 +322,21 @@ def main():
     parser.add_argument('--budgets', default='0.05,0.10,0.20,0.30')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--n_samples', type=int, default=None, help='Limit to first N samples (for testing)')
+    parser.add_argument('--use_gpu', action='store_true', default=False, help='Use GPU for Agent A (default: CPU)')
     args = parser.parse_args()
     random.seed(args.seed)
     np.random.seed(args.seed)
     with open(args.config, 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
     print('[1/4] Init Agent A...')
+    print(f'  Agent A device: {"GPU" if args.use_gpu else "CPU"}')
     import argparse as _ap
     rec_args = _ap.Namespace(
         rec_model_dir=args.rec_model_dir,
         rec_char_dict_path=args.rec_char_dict_path,
         rec_image_shape='3, 48, 320', rec_batch_num=6,
         rec_algorithm='SVTR_LCNet', use_space_char=True,
-        use_gpu=True, use_xpu=False, use_npu=False, use_mlu=False,
+        use_gpu=args.use_gpu, use_xpu=False, use_npu=False, use_mlu=False,
         use_metax_gpu=False, use_gcu=False, ir_optim=True,
         use_tensorrt=False, min_subgraph_size=15, precision='fp32',
         gpu_mem=500, gpu_id=0, enable_mkldnn=None, cpu_threads=10,

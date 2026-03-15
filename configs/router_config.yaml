@@ -2,7 +2,7 @@
 
 agent_b:
   skip: false
-  backend: "local_vlm"          # gemini | local_vlm
+  backend: "gemini"             # gemini | local_vlm
   # 可选 model_type:
   #   qwen2.5_vl, qwen3.5, internvl2, internvl2_5,
   #   minicpm_v, paddleocr_vl, llava, smolvlm
@@ -12,7 +12,7 @@ agent_b:
   torch_dtype: "float16"
   max_new_tokens: 128
   # --- Gemini API settings (backend=gemini 时生效) ---
-  model_name: "[V]gemini-3-flash-preview"
+  model_name: "gemini-3-flash-preview"
 
 backfill:
   max_edit_distance: 3
