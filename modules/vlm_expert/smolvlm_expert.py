@@ -26,14 +26,19 @@ class SmolVLMExpert(BaseVLMExpert):
 
     def _init_model(self):
         import torch
-        from transformers import AutoModelForVision2Seq, AutoProcessor
+        # transformers v5 将 AutoModelForVision2Seq 改名，兼容两个版本
+        try:
+            from transformers import AutoModelForImageTextToText as _VisionModel
+        except ImportError:
+            from transformers import AutoModelForVision2Seq as _VisionModel
+        from transformers import AutoProcessor
         dtype = torch.float16 if self.torch_dtype == "float16" else torch.bfloat16
         print(f"[SmolVLM] Loading {self.model_path} ({self.torch_dtype})...")
-        self.model = AutoModelForVision2Seq.from_pretrained(
+        self.model = _VisionModel.from_pretrained(
             self.model_path,
             torch_dtype=dtype,
             device_map="auto",
-            _attn_implementation="eager",  # 500M 不支持 flash_attention_2
+            _attn_implementation="eager",
         ).eval()
         self.processor = AutoProcessor.from_pretrained(self.model_path)
         print("[SmolVLM] Ready.")
