@@ -86,6 +86,8 @@ class InternVL2Expert(BaseVLMExpert):
             device = next(self.model.parameters()).device
             dtype = next(self.model.parameters()).dtype
             pixel_values = pixel_values.to(device=device, dtype=dtype)
+            assert pixel_values is not None and len(pixel_values.shape) == 4, \
+                f"pixel_values invalid: {pixel_values}"
             gen_cfg = dict(max_new_tokens=self.max_new_tokens, do_sample=False)
             response = self.model.chat(self.tokenizer, pixel_values, prompt_text, gen_cfg)
             return response
