@@ -36,7 +36,11 @@ class MiniCPMVExpert(BaseVLMExpert):
         if not is_int4:
             import torch
             load_kwargs["torch_dtype"] = torch.float16 if self.torch_dtype == "float16" else torch.bfloat16
-        self.model = AutoModel.from_pretrained(self.model_path, **load_kwargs).eval()
+        self.model = AutoModel.from_pretrained(self.model_path, **load_kwargs)
+        # 新版 transformers 要求 all_tied_weights_keys，手动补全
+        if not hasattr(self.model, 'all_tied_weights_keys'):
+            self.model.all_tied_weights_keys = []
+        self.model = self.model.eval()
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, trust_remote_code=True)
         print("[MiniCPM-V] Ready.")
 
