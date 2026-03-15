@@ -3,7 +3,7 @@
 """
 SH-DA++ v5.1: PaddleOCR-VL Expert
 兼容 PaddlePaddle/PaddleOCR-VL 和 PaddleOCR-VL-1.5。
-使用 transformers AutoModel 加载（PaddleNLP 风格）。
+使用标准 generate 接口（不依赖 .chat() 方法）。
 """
 from typing import Dict, Union
 import numpy as np
@@ -11,10 +11,6 @@ from .base_expert import BaseVLMExpert
 
 
 class PaddleOCRVLExpert(BaseVLMExpert):
-    """
-    PaddleOCR-VL 专家包装器。
-    PaddleOCR-VL 系列已支持 transformers 加载方式。
-    """
 
     def __init__(self, model_path: str, torch_dtype: str = "float16", max_new_tokens: int = 128):
         self.model_path = model_path
@@ -31,13 +27,20 @@ class PaddleOCRVLExpert(BaseVLMExpert):
         print(f"[PaddleOCR-VL] Loading {self.model_path} ({self.torch_dtype})...")
         self.model = AutoModel.from_pretrained(
             self.model_path,
-            torch_dtype=dtype,
+            dtype=dtype,
             device_map="auto",
             trust_remote_code=True,
         ).eval()
-        self.processor = AutoProcessor.from_pretrained(
-            self.model_path, trust_remote_code=True
-        )
+        # 尝试 AutoProcessor，失败则用 AutoTokenizer
+        try:
+            self.processor = AutoProcessor.from_pretrained(
+                self.model_path, trust_remote_code=True
+            )
+        except Exception:
+            from transformers import AutoTokenizer
+            self.processor = AutoTokenizer.from_pretrained(
+                self.model_path, trust_remote_code=True
+            )
         print("[PaddleOCR-VL] Ready.")
 
     def chat_with_image(self, image_path: Union[str, np.ndarray], prompt_text: str) -> str:
@@ -56,29 +59,39 @@ class PaddleOCRVLExpert(BaseVLMExpert):
                 {"type": "text", "text": prompt_text},
             ]}]
 
-            # 尝试标准 chat_template 方式
+            # 尝试 apply_chat_template 方式
             try:
                 text = self.processor.apply_chat_template(
                     messages, tokenize=False, add_generation_prompt=True
                 )
                 inputs = self.processor(
-                    text=[text], images=[pil_img], return_tensors="pt", padding=True
+                    text=[text], images=[pil_img],
+                    return_tensors="pt", padding=True
                 ).to(self.model.device)
                 with torch.no_grad():
                     gen_ids = self.model.generate(
-                        **inputs, max_new_tokens=self.max_new_tokens, do_sample=False
+                        **inputs,
+                        max_new_tokens=self.max_new_tokens,
+                        do_sample=False,
                     )
                 trimmed = [o[len(i):] for i, o in zip(inputs.input_ids, gen_ids)]
                 return self.processor.batch_decode(
                     trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
-                )[0]
-            except Exception:
-                # 降级：尝试 model.chat() 接口
-                response = self.model.chat(
-                    self.processor, pil_img, prompt_text,
-                    max_new_tokens=self.max_new_tokens
-                )
-                return response if isinstance(response, str) else str(response)
+                )[0].strip()
+            except Exception as e1:
+                # 降级：只用文本 prompt
+                print(f"[PaddleOCR-VL] chat_template failed ({e1}), falling back to text-only")
+                inputs = self.processor(
+                    text=prompt_text, return_tensors="pt"
+                ).to(self.model.device)
+                with torch.no_grad():
+                    gen_ids = self.model.generate(
+                        **inputs,
+                        max_new_tokens=self.max_new_tokens,
+                        do_sample=False,
+                    )
+                new_tokens = gen_ids[0][inputs.input_ids.shape[1]:]
+                return self.processor.decode(new_tokens, skip_special_tokens=True).strip()
         finally:
             torch.cuda.empty_cache()
 

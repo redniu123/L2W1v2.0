@@ -58,6 +58,7 @@ class InternVL2Expert(BaseVLMExpert):
         print("[InternVL2] Ready.")
 
     def _preprocess_image(self, image_path: Union[str, np.ndarray]):
+        import torch
         import torchvision.transforms as T
         from PIL import Image as PILImage
         from torchvision.transforms.functional import InterpolationMode
@@ -74,7 +75,9 @@ class InternVL2Expert(BaseVLMExpert):
             pil = PILImage.fromarray(image_path).convert("RGB")
         else:
             pil = image_path.convert("RGB")
-        return transform(pil).unsqueeze(0)
+        tensor = transform(pil).unsqueeze(0)  # (1, 3, H, W)
+        assert tensor is not None and tensor.shape[0] == 1, f"preprocess failed: {tensor}"
+        return tensor
 
     def chat_with_image(self, image_path: Union[str, np.ndarray], prompt_text: str) -> str:
         import torch
