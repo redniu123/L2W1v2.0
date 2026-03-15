@@ -105,7 +105,7 @@ class GeminiConfig:
     """Gemini API 配置"""
 
     base_url: str = "https://new.lemonapi.site/v1"
-    model_name: str = "[V]gemini-3-flash-preview"
+    model_name: str = "gemini-3-flash-preview"
     key_file: str = "key.txt"  # Key 文件路径（项目根目录）
     temperature: float = 0.1
     max_tokens: int = 256

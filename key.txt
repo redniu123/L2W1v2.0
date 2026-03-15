@@ -2,7 +2,14 @@ BASE_URL = "https://new.lemonapi.site/v1"
 MODEL_NAME = "gemini-3-flash-preview"
 
 API_KEYS = [
-"sk-VTp7mM7RfObthngLyP824OjsFhBIhn2FaWXkvjgdHycuuZ7F",
-"sk-F5EsCZ0tRMQ9WYJulZsUkmtLZ71FsOE9zU6mpFrtzg4eyKps",
-"sk-Cg1NRKizTSASCpZGqySmTodMiOubFoHvR7lhQzFDFm3JQaSn"
+"sk-Da9F3BmLqPRSdkpbvBN34CIEd61si6BRCaOt32D7Xh8CvLRP",
+"sk-yjRjd52Yk19yMWc3bsYeNTCo02b5TRfKy9pdZiCyszaTNHN1",
+"sk-rPw9AkG9rZqNfnK2HRjfFsJRC9TSM7Sgn9kTb9y2EPqn2jHd",
+"sk-fc9cSdCAG2Yd3dbdhtb3I0aoLBhouoT1EBRLN5Y7920601F7",
+"sk-dBew3eOjvevgqGdnPbct7k0GhmSHfOMF3yi2x4Z8bREi4Td4",
+"sk-ExKwnlNFyrMkKevcNJI17qDQCfA4XuEvH0sAFlcqGfAU8Rue",
+"sk-ZcmI7YljXubWgG73MHCp7DIs6xtgGwOGQ0P3QeX50RjpEAqi",
+"sk-N1P1kH5ge5k7m65D1clE9gPyWq8XS82bpMeSbY9jvrKzMkQm",
+"sk-pBgaHJfzvBD82CBvyUAnop4Nh6LY2WvFZYJTWgvKa5ES2nvd",
+"sk-YGXp2V3cHWG56hi6iHKkCG0a1pFxo2iE7mCOM0UFKTyfaIQo"
 ]

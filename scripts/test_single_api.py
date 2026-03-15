@@ -34,12 +34,12 @@ try:
     print(f"  Is corrected: {result['is_corrected']}")
     
     if result['is_corrected']:
-        print(f"\n✓ API 工作正常！修正了文本")
+        print(f"\n[OK] API 工作正常！修正了文本")
     else:
-        print(f"\n✗ API 返回了原文，可能是：")
+        print(f"\n[--] API 返回了原文，可能是：")
         print(f"    1. Gemini 认为没有错误")
         print(f"    2. API 调用失败被静默降级")
 except Exception as e:
-    print(f"\n✗ Error: {e}")
+    print(f"\n[ERROR] {e}")
     import traceback
     traceback.print_exc()
