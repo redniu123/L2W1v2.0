@@ -334,6 +334,8 @@ def run_pipeline(
         if i in upgrade_set:
             n_upgraded += 1
             T_cand = upgrade_results.get(i, T_A)
+            if not isinstance(T_cand, str) or not T_cand:
+                T_cand = T_A
             bf = backfill_controller.apply_backfill(
                 T_A=T_A, T_cand=T_cand, route_type=RouteType.BOUNDARY,
             )
