@@ -71,6 +71,15 @@ class BaseVLMExpert(ABC):
         # 去除 "Thinking Process:" 等思维链残留
         text = _re.sub(r'^(Thinking Process|思考过程|思维链)[:\uff1a].*', '', text, flags=_re.MULTILINE).strip()
 
+        # 过滤英文分析输出（模型无视指令时降级）
+        if _re.search(r'^\s*(\d+\.\s*)?\*{0,2}(Analyze|analyze|Analysis|Step|Correction|Result)', text):
+            return fallback
+        # 过滤纯英文输出（OCR 任务应输出中文）
+        chinese_chars = len(_re.findall(r'[\u4e00-\u9fff]', text))
+        total_chars = len(_re.sub(r'\s', '', text))
+        if total_chars > 4 and chinese_chars / max(total_chars, 1) < 0.3:
+            return fallback
+
         patterns = [
             r"修正后的文本[:\uff1a]\s*(.+)",
             r"修正后的完整文本[:\uff1a]\s*(.+)",
