@@ -64,27 +64,34 @@ class BaseVLMExpert(ABC):
         if not raw_text:
             return fallback
         text = raw_text.strip()
+
+        # 去除 Qwen3 思维链 <think>...</think> 块
+        import re as _re
+        text = _re.sub(r'<think>.*?</think>', '', text, flags=_re.DOTALL).strip()
+        # 去除 "Thinking Process:" 等思维链残留
+        text = _re.sub(r'^(Thinking Process|思考过程|思维链)[:\uff1a].*', '', text, flags=_re.MULTILINE).strip()
+
         patterns = [
             r"修正后的文本[:\uff1a]\s*(.+)",
             r"修正后的完整文本[:\uff1a]\s*(.+)",
             r"输出[:\uff1a]\s*(.+)",
         ]
         for pattern in patterns:
-            m = re.search(pattern, text)
+            m = _re.search(pattern, text)
             if m:
                 text = m.group(1).strip()
                 break
         text = text.split("\n")[0].strip()
         text = text.strip('"\'\u201c\u201d\u2018\u2019')
         text = text.strip()
-        # 防复述检测：如果输出是 prompt 里的约束语句（超过 8 字且不含 fallback 内容），则降级
+        # 防复述检测
         PROMPT_FRAGMENTS = [
             "尽可能保持原句原貌", "绝对禁止润色", "绝对禁止对句子",
             "最高约束红线", "请直接输出修正后", "系统检测到该文本",
             "修正上述文本中的错别字", "如有错别字请修正", "只输出文字",
             "否则原样输出", "不要解释",
             "The text in the image", "OCR (Optical Character", "written in Chinese",
-            "The OCR", "reads:",
+            "The OCR", "reads:", "Thinking Process", "思考过程",
         ]
         for frag in PROMPT_FRAGMENTS:
             if frag in text:
