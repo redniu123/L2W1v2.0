@@ -95,14 +95,20 @@ class Qwen35Expert(BaseVLMExpert):
         print("[Qwen3.5] Ready.")
 
     def chat_with_image(self, image_path: Union[str, np.ndarray], prompt_text: str) -> str:
-        """Qwen3.5 无视觉，仅使用文本 prompt"""
+        """Qwen3.5 无视觉，仅使用文本 prompt，加 /no_think 禁用思维链"""
         import torch
         try:
-            messages = [{"role": "user", "content": prompt_text}]
-            text = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+            # /no_think 告知 Qwen3.5 直接输出答案，不输出思维链
+            no_think_prompt = prompt_text.rstrip() + " /no_think"
+            messages = [{"role": "user", "content": no_think_prompt}]
+            text = self.tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
             inputs = self.tokenizer(text, return_tensors="pt").to(self.model.device)
             with torch.no_grad():
-                gen_ids = self.model.generate(**inputs, max_new_tokens=self.max_new_tokens, do_sample=False)
+                gen_ids = self.model.generate(
+                    **inputs, max_new_tokens=self.max_new_tokens, do_sample=False
+                )
             out = gen_ids[0][inputs.input_ids.shape[1]:]
             return self.tokenizer.decode(out, skip_special_tokens=True)
         finally:
