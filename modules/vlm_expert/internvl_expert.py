@@ -26,12 +26,29 @@ class InternVL2Expert(BaseVLMExpert):
         dtype = torch.float16 if self.torch_dtype == "float16" else torch.bfloat16
         is_awq = "awq" in self.model_path.lower()
         print(f"[InternVL2] Loading {self.model_path} (AWQ={is_awq}, {self.torch_dtype})...")
-        self.model = AutoModel.from_pretrained(
-            self.model_path,
-            dtype=dtype,
-            device_map="auto",
-            trust_remote_code=True,
-        ).eval()
+
+        # transformers 新版本用 meta device 初始化，导致 .item() 报错
+        # 通过 eager init_context 绕过
+        from accelerate import init_empty_weights
+        try:
+            # 先尝试正常加载
+            self.model = AutoModel.from_pretrained(
+                self.model_path,
+                dtype=dtype,
+                device_map="auto",
+                trust_remote_code=True,
+            ).eval()
+        except RuntimeError as e:
+            if "meta tensor" in str(e).lower() or "meta" in str(e).lower():
+                print(f"[InternVL2] meta tensor error, retrying with device_map=cuda:0")
+                self.model = AutoModel.from_pretrained(
+                    self.model_path,
+                    dtype=dtype,
+                    device_map="cuda:0",
+                    trust_remote_code=True,
+                ).eval()
+            else:
+                raise
 
         # transformers >=4.50 不再自动继承 GenerationMixin，手动 patch
         lm = getattr(self.model, "language_model", None)
