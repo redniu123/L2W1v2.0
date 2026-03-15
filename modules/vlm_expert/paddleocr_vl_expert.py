@@ -68,15 +68,23 @@ class PaddleOCRVLExpert(BaseVLMExpert):
                     text=[text], images=[pil_img],
                     return_tensors="pt", padding=True
                 ).to(self.model.device)
+                # PaddleOCR-VL generate() 第一参数是 inputs tensor，不能用 **inputs 展开
+                input_tensor = inputs.get("input_ids", inputs.get("inputs", None))
                 with torch.no_grad():
                     gen_ids = self.model.generate(
-                        **inputs,
+                        input_tensor,
                         max_new_tokens=self.max_new_tokens,
                         do_sample=False,
+                        pixel_values=inputs.get("pixel_values", None),
+                        attention_mask=inputs.get("attention_mask", None),
                     )
-                trimmed = [o[len(i):] for i, o in zip(inputs.input_ids, gen_ids)]
+                # gen_ids 可能已经是完整序列或只有新 token
+                if gen_ids.shape[1] > input_tensor.shape[1]:
+                    new_tokens = gen_ids[0][input_tensor.shape[1]:]
+                else:
+                    new_tokens = gen_ids[0]
                 return self.processor.batch_decode(
-                    trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
+                    [new_tokens], skip_special_tokens=True, clean_up_tokenization_spaces=False
                 )[0].strip()
             except Exception as e1:
                 # 降级：只用文本 prompt
@@ -84,13 +92,14 @@ class PaddleOCRVLExpert(BaseVLMExpert):
                 inputs = self.processor(
                     text=prompt_text, return_tensors="pt"
                 ).to(self.model.device)
+                input_tensor = inputs.get("input_ids", None)
                 with torch.no_grad():
                     gen_ids = self.model.generate(
-                        **inputs,
+                        input_tensor,
                         max_new_tokens=self.max_new_tokens,
                         do_sample=False,
                     )
-                new_tokens = gen_ids[0][inputs.input_ids.shape[1]:]
+                new_tokens = gen_ids[0][input_tensor.shape[1]:]
                 return self.processor.decode(new_tokens, skip_special_tokens=True).strip()
         finally:
             torch.cuda.empty_cache()
