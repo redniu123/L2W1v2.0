@@ -239,12 +239,15 @@ def run_pipeline(
     upgrade_results = {}  # {index: T_cand}
     
     if upgrade_set:
-        print(f"  [{strategy}] Calling Agent B for {len(upgrade_set)} samples (3 concurrent)...")
+        # 自动根据 Key 数量设置并发数
+        try:
+            n_keys = agent_b_callable.__self__.config.key_manager.get_key_count()
+        except Exception:
+            n_keys = 10
+        print(f"  [{strategy}] Calling Agent B for {len(upgrade_set)} samples ({n_keys} concurrent)...")
         
         def call_agent_b(idx, r):
-            """单个样本的 Agent B 调用"""
-            import time
-            time.sleep(0.2)  # 每个请求前等待 0.2 秒，避免限流
+            """单个样本的 Agent B 调用，无等待"""
             prompt = prompter.generate_targeted_correction_prompt(
                 T_A=r['T_A'], min_conf_idx=r['min_conf_idx'],
                 domain='地质勘探', image_path=r['img_path'],
@@ -252,8 +255,8 @@ def run_pipeline(
             prompt['T_A'] = r['T_A']
             return idx, agent_b_callable(prompt)
         
-        # 并发调用（5 个线程，匹配 Key 数量）
-        with ThreadPoolExecutor(max_workers=5) as executor:
+        # 并发调用（Key 数量个线程，每个线程独占一个 Key）
+        with ThreadPoolExecutor(max_workers=n_keys) as executor:
             futures = {
                 executor.submit(call_agent_b, i, all_results[i]): i
                 for i in upgrade_set
