@@ -86,16 +86,40 @@ def call_gemini_ocr(agent, r: dict) -> str:
 # ============================================================
 # 并发批量调用
 # ============================================================
-def batch_call_gemini(agent, all_results, call_fn, desc, max_workers=5, delay=0.2):
-    """并发调用 Gemini，返回 {idx: output_text} 字典"""
+def batch_call_gemini(agent, all_results, call_fn, desc, max_workers=None):
+    """并发调用 Gemini，每个线程绑定专属 Key，真正并行。
+    max_workers 默认等于 Key 数量，充分利用所有 Key。
+    """
     outputs = {}
+    n_keys = agent.config.key_manager.get_key_count()
+    if max_workers is None:
+        max_workers = n_keys  # 有几个 Key 就开几个并发
 
-    def worker(idx, r):
-        time.sleep(delay)
-        return idx, call_fn(agent, r)
+    # 预先给每个任务分配固定的 Key（轮询分配，避免竞争）
+    keys = agent.config.key_manager.keys  # 直接取 key 列表
+
+    def worker(idx, r, api_key):
+        """每个 worker 使用自己专属的 Key，无需等待"""
+        # 编码图像
+        try:
+            image_base64 = agent._encode_image(r["img_path"])
+        except Exception as e:
+            return idx, r.get("T_A", "")
+        # 直接用分配的 Key 调用，失败则轮换下一个 Key 重试
+        for attempt in range(agent.config.max_retries):
+            key = keys[(idx + attempt) % n_keys]  # 失败时换下一个 Key
+            result = agent._call_api(
+                _build_prompt(call_fn, agent, r), image_base64, key
+            )
+            if result:
+                return idx, _post_process(call_fn, result, r)
+        return idx, r.get("T_A", "")
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(worker, i, r): i for i, r in enumerate(all_results)}
+        futures = {
+            executor.submit(worker, i, r, keys[i % n_keys]): i
+            for i, r in enumerate(all_results)
+        }
         for future in tqdm(as_completed(futures), total=len(all_results), desc=desc):
             try:
                 idx, text = future.result()
@@ -104,6 +128,53 @@ def batch_call_gemini(agent, all_results, call_fn, desc, max_workers=5, delay=0.
                 idx = futures[future]
                 outputs[idx] = all_results[idx].get("T_A", "")
     return outputs
+
+
+def _build_prompt(call_fn, agent, r):
+    """根据调用函数类型构建 prompt 字符串"""
+    if call_fn is call_gemini_ocr:
+        return OCR_PROMPT
+    else:  # correction
+        T_A = r["T_A"]
+        suspicious_index = r.get("min_conf_idx", -1) or -1
+        suspicious_char = T_A[suspicious_index] if 0 <= suspicious_index < len(T_A) else ""
+        hint_lines = []
+        if suspicious_index >= 0 and suspicious_char:
+            hint_lines.append(
+                f"其中第 {suspicious_index + 1} 个字符 '{suspicious_char}' 的机器置信度极低，请重点关注。"
+            )
+        hint_lines.append("本文本属于【地质勘探】领域，请留意专业术语的准确性。")
+        hint_block = "系统检测到该文本可能存在识别错误。\n" + "\n".join(hint_lines) + "\n\n"
+        return (
+            f"你是一个严格的 OCR 纠错专家。以下是初步的单行文本识别结果：\n"
+            f"【 {T_A} 】\n\n"
+            f"{hint_block}"
+            f"请结合提供的图像，修正上述文本中的错别字或漏字。\n"
+            f"**最高约束红线：**\n"
+            f"1. 尽可能保持原句原貌，绝对禁止对句子进行润色、改写或大幅度增删。\n"
+            f"2. 如果认为没有错误，请直接原样输出。\n\n"
+            f"请直接输出修正后的完整文本，不要任何解释或多余字符："
+        )
+
+
+def _post_process(call_fn, result, r):
+    """后处理模型输出"""
+    text = result.strip().split("\n")[0].strip().strip('"\' \u201c\u201d\u2018\u2019')
+    if call_fn is call_gemini_correction:
+        # 复用 agent 的 _parse_output 逻辑
+        import re
+        patterns = [
+            r"修正后的文本[：:]\s*(.+)",
+            r"修正后的完整文本[：:]\s*(.+)",
+            r"输出[：:]\s*(.+)",
+        ]
+        for pattern in patterns:
+            m = re.search(pattern, text)
+            if m:
+                text = m.group(1).strip()
+                break
+        text = text.strip('"\' \u201c\u201d\u3010\u3011')
+    return text if text else r.get("T_A", "")
 
 
 # ============================================================
