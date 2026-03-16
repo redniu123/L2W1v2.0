@@ -86,38 +86,42 @@ def call_gemini_ocr(agent, r: dict) -> str:
 # ============================================================
 # 并发批量调用
 # ============================================================
-def batch_call_gemini(agent, all_results, call_fn, desc, max_workers=None):
-    """并发调用 Gemini，每个线程绑定专属 Key，真正并行。
-    max_workers 默认等于 Key 数量，充分利用所有 Key。
+def batch_call_gemini(agent, all_results, call_fn, desc, max_workers=5):
+    """并发调用 Gemini。
+    - max_workers=5：保守并发，避免中转服务器限流
+    - 失败后换 Key 重试，最多 10 次，绝不降级到 T_A
     """
     outputs = {}
     n_keys = agent.config.key_manager.get_key_count()
-    if max_workers is None:
-        max_workers = n_keys  # 有几个 Key 就开几个并发
+    keys = agent.config.key_manager.keys
+    MAX_RETRIES = 10  # 最多重试 10 次（轮换所有 Key）
 
-    # 预先给每个任务分配固定的 Key（轮询分配，避免竞争）
-    keys = agent.config.key_manager.keys  # 直接取 key 列表
-
-    def worker(idx, r, api_key):
-        """每个 worker 使用自己专属的 Key，无需等待"""
-        # 编码图像
+    def worker(idx, r):
+        """单样本调用，失败换 Key 重试，直到成功为止"""
         try:
             image_base64 = agent._encode_image(r["img_path"])
         except Exception as e:
+            print(f"  [Worker {idx}] image encode error: {e}")
             return idx, r.get("T_A", "")
-        # 直接用分配的 Key 调用，失败则轮换下一个 Key 重试
-        for attempt in range(agent.config.max_retries):
-            key = keys[(idx + attempt) % n_keys]  # 失败时换下一个 Key
-            result = agent._call_api(
-                _build_prompt(call_fn, agent, r), image_base64, key
-            )
+
+        prompt = _build_prompt(call_fn, agent, r)
+        for attempt in range(MAX_RETRIES):
+            key = keys[(idx + attempt) % n_keys]
+            result = agent._call_api(prompt, image_base64, key)
             if result:
                 return idx, _post_process(call_fn, result, r)
+            # 失败后稍等再换 Key 重试
+            wait = 2.0 * (attempt + 1)  # 2s, 4s, 6s ...
+            print(f"  [Worker {idx}] attempt {attempt+1}/{MAX_RETRIES} failed, retry in {wait:.0f}s...")
+            time.sleep(wait)
+
+        # 所有重试耗尽才降级（几乎不应该发生）
+        print(f"  [Worker {idx}] ALL {MAX_RETRIES} retries failed! Falling back to T_A.")
         return idx, r.get("T_A", "")
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
-            executor.submit(worker, i, r, keys[i % n_keys]): i
+            executor.submit(worker, i, r): i
             for i, r in enumerate(all_results)
         }
         for future in tqdm(as_completed(futures), total=len(all_results), desc=desc):
@@ -126,6 +130,7 @@ def batch_call_gemini(agent, all_results, call_fn, desc, max_workers=None):
                 outputs[idx] = text
             except Exception as e:
                 idx = futures[future]
+                print(f"  [Batch] unexpected error idx={idx}: {e}")
                 outputs[idx] = all_results[idx].get("T_A", "")
     return outputs
 
