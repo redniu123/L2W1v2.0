@@ -109,8 +109,8 @@
 ### P1-3 在线预算实验脚本正式化
 **目标**：区分“在线预算实验”和“离线预算回放”。
 
-- [ ] 新建或改造脚本，使样本逐条经过 `OnlineBudgetController.step(q)`
-- [ ] 每条样本记录：
+- [x] 新建或改造脚本，使样本逐条经过 `OnlineBudgetController.step(q)`
+- [x] 每条样本记录：
   - `lambda_current`
   - `selected_for_upgrade`
   - `actual_budget_window`
