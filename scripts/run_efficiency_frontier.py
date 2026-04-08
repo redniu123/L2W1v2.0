@@ -5,7 +5,7 @@ SH-DA++ v5.1 Phase 3: Efficiency Frontier Grand Loop
 
 评测数据集: Test 集
 目标预算: [0.05, 0.10, 0.20, 0.30]
-策略: AgentA_Only / Random / ConfOnly / SH-DA++
+策略: AgentA_Only / GCR / BAUR / DAR / BAUR-only / SH-DA++
 输出: results/stage2_v51/efficiency_frontier.csv
 """
 
@@ -15,6 +15,7 @@ import json
 import random
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
@@ -165,6 +166,12 @@ def infer_all_samples(samples, recognizer, domain_engine, data_root, image_root)
         r_d = domain_engine.compute_r_d(T_A) if domain_engine else 0.0
 
         results.append({
+            "sample_id": sample.get("sample_id", f"sample_{len(results):06d}"),
+            "source_image_id": sample.get("source_image_id", ""),
+            "domain": sample.get("domain", "geology"),
+            "split": sample.get("split", "test"),
+            "professional_terms": sample.get("professional_terms", []),
+            "has_professional_terms": sample.get("has_professional_terms", False),
             "image_path": str(image_path),
             "img_path": str(img_path),
             "T_A": T_A,
@@ -195,6 +202,7 @@ def infer_all_samples(samples, recognizer, domain_engine, data_root, image_root)
 def run_pipeline(
     strategy, target_budget, all_results,
     router, backfill_controller, prompter, agent_b_callable,
+    run_id: str = '', prompt_version: str = 'prompt_v1.0',
 ):
     from concurrent.futures import ThreadPoolExecutor, as_completed
     
@@ -206,20 +214,58 @@ def run_pipeline(
     if strategy == 'AgentA_Only':
         cer_num = sum(Levenshtein.distance(r['T_A'], r['T_GT']) for r in all_results)
         gt_len = sum(len(r['T_GT']) for r in all_results)
+        per_sample = []
+        for r in all_results:
+            per_sample.append({
+                'sample_id': r.get('sample_id', ''),
+                'image_path': r.get('image_path', ''),
+                'source_image_id': r.get('source_image_id', ''),
+                'domain': r.get('domain', 'geology'),
+                'split': r.get('split', 'test'),
+                'gt': r['T_GT'],
+                'ocr_text': r['T_A'],
+                'router_name': 'AgentA_Only',
+                'router_score': 0.0,
+                'budget': 0.0,
+                'budget_mode': 'online',
+                'selected_for_upgrade': False,
+                'vlm_model': 'none',
+                'prompt_version': prompt_version,
+                'vlm_raw_output': '',
+                'final_text_if_upgraded': '',
+                'final_text': r['T_A'],
+                'backfill_status': 'not_applicable',
+                'backfill_reason': 'not_upgraded',
+                'run_id': run_id,
+            })
         return {
-            'Strategy': 'AgentA_Only', 'Target_Budget': 0.0,
-            'Actual_Call_Rate': 0.0,
-            'Overall_CER': round(cer_num / gt_len, 6) if gt_len else 0,
-            'AER': 0.0, 'CVR': 0.0, 'N_valid': N,
+            'summary': {
+                'Strategy': 'AgentA_Only', 'Target_Budget': 0.0,
+                'Actual_Call_Rate': 0.0,
+                'Overall_CER': round(cer_num / gt_len, 6) if gt_len else 0,
+                'AER': 0.0, 'CVR': 0.0, 'N_valid': N,
+            },
+            'per_sample': per_sample,
+            'backfill_log': [],
         }
 
     # 计算路由分数
-    if strategy == 'Random':
-        scores = [random.random() for _ in range(N)]
-    elif strategy == 'ConfOnly':
-        scores = [(1.0 - r['mean_conf']) + (1.0 - r['min_conf']) + r['drop']
-                  for r in all_results]
-    else:
+    if strategy == 'GCR':
+        # Global Confidence Router：仅用全局置信度
+        scores = [(1.0 - r['conf']) for r in all_results]
+    elif strategy == 'BAUR':
+        # Budget-Aware Uncertainty Router：轻量不确定性，不含领域项
+        scores = []
+        for r in all_results:
+            dec = router.route(
+                boundary_stats=r['boundary_stats'],
+                top2_info=r['top2_info'],
+                r_d=0.0,
+                agent_a_text=r['T_A'],
+            )
+            scores.append(max(dec.s_b, dec.s_a))
+    elif strategy == 'DAR':
+        # Domain-Augmented Router：在 BAUR 基础上显式加入领域项
         scores = []
         for r in all_results:
             dec = router.route(
@@ -229,6 +275,17 @@ def run_pipeline(
                 agent_a_text=r['T_A'],
             )
             scores.append(dec.q)
+    else:  # SH-DA++ or BAUR-only
+        # BAUR-only / SH-DA++ 当前都基于 BAUR 路由（不含领域项）
+        scores = []
+        for r in all_results:
+            dec = router.route(
+                boundary_stats=r['boundary_stats'],
+                top2_info=r['top2_info'],
+                r_d=0.0,
+                agent_a_text=r['T_A'],
+            )
+            scores.append(max(dec.s_b, dec.s_a))
 
     upgrade_set = set(
         sorted(range(N), key=lambda i: scores[i], reverse=True)[:n_call_target]
@@ -248,9 +305,10 @@ def run_pipeline(
         
         def call_agent_b(idx, r):
             """单个样本的 Agent B 调用，无等待"""
+            domain = '地质勘探' if strategy == 'SH-DA++' else None
             prompt = prompter.generate_targeted_correction_prompt(
                 T_A=r['T_A'], min_conf_idx=r['min_conf_idx'],
-                domain='地质勘探', image_path=r['img_path'],
+                domain=domain, image_path=r['img_path'],
             )
             prompt['T_A'] = r['T_A']
             return idx, agent_b_callable(prompt)
@@ -278,27 +336,90 @@ def run_pipeline(
     n_upgraded = 0
     n_accepted_edit = 0
     n_rejected = 0
+    per_sample = []
+    backfill_log = []
     
     for i, r in enumerate(all_results):
         T_A = r['T_A']
         T_GT = r['T_GT']
+        router_score = float(scores[i]) if i < len(scores) else 0.0
+        vlm_raw_output = ''
+        final_text_if_upgraded = ''
+        backfill_status = 'not_upgraded'
+        backfill_reason = 'not_upgraded'
         
         if i in upgrade_set:
             n_upgraded += 1
             T_cand = upgrade_results.get(i, T_A)
-            bf = backfill_controller.apply_backfill(
-                T_A=T_A, T_cand=T_cand, route_type=RouteType.BOUNDARY,
-            )
-            T_final = bf.T_final
-            if bf.is_rejected:
-                n_rejected += 1
-            elif T_final != T_A:
-                n_accepted_edit += 1
+            vlm_raw_output = T_cand
+
+            if strategy == 'BAUR-only':
+                # BAUR-only：不启用严格回填，直接接受 Agent B 输出
+                T_final = T_cand if isinstance(T_cand, str) and T_cand else T_A
+                final_text_if_upgraded = T_final
+                backfill_status = 'skipped'
+                backfill_reason = 'baur_only_no_backfill'
+                if T_final != T_A:
+                    n_accepted_edit += 1
+            else:
+                # SH-DA++ / 其他策略：启用严格回填
+                bf = backfill_controller.apply_backfill(
+                    T_A=T_A, T_cand=T_cand, route_type=RouteType.BOUNDARY,
+                )
+                T_final = bf.T_final
+                final_text_if_upgraded = T_final
+                if bf.is_rejected:
+                    n_rejected += 1
+                    backfill_status = 'rejected'
+                    backfill_reason = bf.rejection_reason.value
+                else:
+                    backfill_status = 'accepted'
+                    backfill_reason = bf.rejection_reason.value
+                    if T_final != T_A:
+                        n_accepted_edit += 1
         else:
             T_final = T_A
         
         cer_num += Levenshtein.distance(T_final, T_GT)
         gt_len += len(T_GT)
+        per_sample.append({
+            'sample_id': r.get('sample_id', ''),
+            'image_path': r.get('image_path', ''),
+            'source_image_id': r.get('source_image_id', ''),
+            'domain': r.get('domain', 'geology'),
+            'split': r.get('split', 'test'),
+            'gt': T_GT,
+            'ocr_text': T_A,
+            'router_name': strategy,
+            'router_score': round(router_score, 6),
+            'budget': target_budget,
+            'budget_mode': 'online',
+            'selected_for_upgrade': i in upgrade_set,
+            'vlm_model': 'configured_agent_b',
+            'prompt_version': prompt_version,
+            'vlm_raw_output': vlm_raw_output,
+            'final_text_if_upgraded': final_text_if_upgraded,
+            'final_text': T_final,
+            'backfill_status': backfill_status,
+            'backfill_reason': backfill_reason,
+            'is_correct_ocr': T_A == T_GT,
+            'is_correct_final': T_final == T_GT,
+            'edit_distance_ocr': Levenshtein.distance(T_A, T_GT),
+            'edit_distance_final': Levenshtein.distance(T_final, T_GT),
+            'run_id': run_id,
+        })
+        if i in upgrade_set:
+            backfill_log.append({
+                'sample_id': r.get('sample_id', ''),
+                'router_name': strategy,
+                'budget': target_budget,
+                'ocr_text': T_A,
+                'vlm_raw_output': vlm_raw_output,
+                'final_text': T_final,
+                'backfill_status': backfill_status,
+                'backfill_reason': backfill_reason,
+                'run_id': run_id,
+            })
 
     actual_rate = n_upgraded / N if N > 0 else 0.0
     overall_cer = cer_num / gt_len if gt_len > 0 else 0.0
@@ -306,10 +427,14 @@ def run_pipeline(
     cvr = n_rejected / n_upgraded if n_upgraded > 0 else 0.0
     
     return {
-        'Strategy': strategy, 'Target_Budget': target_budget,
-        'Actual_Call_Rate': round(actual_rate, 4),
-        'Overall_CER': round(overall_cer, 6),
-        'AER': round(aer, 4), 'CVR': round(cvr, 4), 'N_valid': N,
+        'summary': {
+            'Strategy': strategy, 'Target_Budget': target_budget,
+            'Actual_Call_Rate': round(actual_rate, 4),
+            'Overall_CER': round(overall_cer, 6),
+            'AER': round(aer, 4), 'CVR': round(cvr, 4), 'N_valid': N,
+        },
+        'per_sample': per_sample,
+        'backfill_log': backfill_log,
     }
 
 
@@ -404,39 +529,112 @@ def main():
     print(f'  Valid: {len(all_results)}')
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    csv_path = output_dir / 'efficiency_frontier.csv'
+
+    run_id = datetime.now().strftime('%Y%m%d_run%H%M%S')
+    run_dir = output_dir / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    print(f'  Run dir: {run_dir}')
+
+    with open(run_dir / 'config_snapshot.yaml', 'w', encoding='utf-8') as f:
+        yaml.safe_dump({
+            'run_id': run_id,
+            'args': vars(args),
+            'config': config,
+        }, f, allow_unicode=True, sort_keys=False)
+
+    csv_path = run_dir / 'summary.csv'
+    metrics_json_path = run_dir / 'metrics_summary.json'
+    failure_cases_path = run_dir / 'failure_cases.csv'
+    domain_breakdown_path = run_dir / 'domain_breakdown.csv'
+    backfill_log_path = run_dir / 'backfill_log.jsonl'
     fieldnames = ['Strategy', 'Target_Budget', 'Actual_Call_Rate',
                   'Overall_CER', 'AER', 'CVR', 'N_valid']
+    metrics_rows = []
+    all_failure_cases = []
+    all_backfill_logs = []
+    domain_stats = {}
     with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         budgets = [float(b) for b in args.budgets.split(',')]
         
         print('\n--- AgentA_Only (Baseline 0) ---')
-        row = run_pipeline('AgentA_Only', 0.0, all_results, router,
-                           backfill_controller, prompter, agent_b_callable)
+        result = run_pipeline('AgentA_Only', 0.0, all_results, router,
+                              backfill_controller, prompter, agent_b_callable,
+                              run_id=run_id, prompt_version='prompt_v1.0')
+        row = result['summary']
         writer.writerow({k: row.get(k, '') for k in fieldnames})
+        metrics_rows.append(row)
+        all_backfill_logs.extend(result.get('backfill_log', []))
+        for item in result['per_sample']:
+            key = (item.get('router_name', 'unknown'), item.get('domain', 'unknown'), str(item.get('budget', 0.0)))
+            stat = domain_stats.setdefault(key, {'total': 0, 'correct_final': 0})
+            stat['total'] += 1
+            stat['correct_final'] += 1 if item.get('is_correct_final') else 0
+            if item.get('is_correct_ocr') is False and item.get('is_correct_final') is False:
+                all_failure_cases.append({
+                    'sample_id': item.get('sample_id', ''),
+                    'router_name': item.get('router_name', ''),
+                    'budget': item.get('budget', 0.0),
+                    'domain': item.get('domain', ''),
+                    'ocr_text': item.get('ocr_text', ''),
+                    'final_text': item.get('final_text', ''),
+                    'gt': item.get('gt', ''),
+                    'backfill_status': item.get('backfill_status', ''),
+                    'backfill_reason': item.get('backfill_reason', ''),
+                    'edit_distance_final': item.get('edit_distance_final', 0),
+                })
+        with open(run_dir / 'online_budget_00_results.jsonl', 'w', encoding='utf-8') as f:
+            for item in result['per_sample']:
+                f.write(json.dumps(item, ensure_ascii=False) + '\n')
         csvfile.flush()
         print(f"  CER={row['Overall_CER']:.4%}")
         
-        # 并行处理 3 个策略
+        # 并行处理正式策略
         from concurrent.futures import ThreadPoolExecutor, as_completed
         
         for B in budgets:
             print(f'\n=== Budget B={B:.2f} ===')
             tasks = []
-            with ThreadPoolExecutor(max_workers=3) as executor:
-                for strategy in ['Random', 'ConfOnly', 'SH-DA++']:
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                for strategy in ['GCR', 'BAUR', 'DAR', 'BAUR-only', 'SH-DA++']:
                     future = executor.submit(
                         run_pipeline, strategy, B, all_results, router,
-                        backfill_controller, prompter, agent_b_callable
+                        backfill_controller, prompter, agent_b_callable,
+                        run_id, 'prompt_v1.0'
                     )
                     tasks.append((strategy, future))
                 
                 for strategy, future in tasks:
                     try:
-                        row = future.result()
+                        result = future.result()
+                        row = result['summary']
                         writer.writerow({k: row.get(k, '') for k in fieldnames})
+                        metrics_rows.append(row)
+                        all_backfill_logs.extend(result.get('backfill_log', []))
+                        for item in result['per_sample']:
+                            key = (item.get('router_name', 'unknown'), item.get('domain', 'unknown'), str(item.get('budget', 0.0)))
+                            stat = domain_stats.setdefault(key, {'total': 0, 'correct_final': 0})
+                            stat['total'] += 1
+                            stat['correct_final'] += 1 if item.get('is_correct_final') else 0
+                            if item.get('is_correct_ocr') is False and item.get('is_correct_final') is False:
+                                all_failure_cases.append({
+                                    'sample_id': item.get('sample_id', ''),
+                                    'router_name': item.get('router_name', ''),
+                                    'budget': item.get('budget', 0.0),
+                                    'domain': item.get('domain', ''),
+                                    'ocr_text': item.get('ocr_text', ''),
+                                    'final_text': item.get('final_text', ''),
+                                    'gt': item.get('gt', ''),
+                                    'backfill_status': item.get('backfill_status', ''),
+                                    'backfill_reason': item.get('backfill_reason', ''),
+                                    'edit_distance_final': item.get('edit_distance_final', 0),
+                                })
+                        budget_tag = f"{int(round(B * 100)):02d}"
+                        jsonl_path = run_dir / f'online_budget_{budget_tag}_{strategy}.jsonl'
+                        with open(jsonl_path, 'w', encoding='utf-8') as f:
+                            for item in result['per_sample']:
+                                f.write(json.dumps(item, ensure_ascii=False) + '\n')
                         csvfile.flush()
                         print(
                             f"  [{strategy:10s}] CER={row['Overall_CER']:.4%}"
@@ -447,7 +645,46 @@ def main():
                     except Exception as e:
                         print(f"  [{strategy:10s}] ERROR: {e}")
     
+    with open(metrics_json_path, 'w', encoding='utf-8') as f:
+        json.dump(metrics_rows, f, ensure_ascii=False, indent=2)
+
+    with open(backfill_log_path, 'w', encoding='utf-8') as f:
+        for item in all_backfill_logs:
+            f.write(json.dumps(item, ensure_ascii=False) + '\n')
+
+    with open(failure_cases_path, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=['sample_id', 'router_name', 'budget', 'domain', 'ocr_text', 'final_text', 'gt',
+                        'backfill_status', 'backfill_reason', 'edit_distance_final']
+        )
+        writer.writeheader()
+        for row in all_failure_cases:
+            writer.writerow(row)
+
+    with open(domain_breakdown_path, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=['router_name', 'domain', 'budget', 'n_samples', 'final_accuracy']
+        )
+        writer.writeheader()
+        for (router_name, domain, budget), stat in sorted(domain_stats.items()):
+            total = stat['total']
+            acc = (stat['correct_final'] / total) if total else 0.0
+            writer.writerow({
+                'router_name': router_name,
+                'domain': domain,
+                'budget': budget,
+                'n_samples': total,
+                'final_accuracy': round(acc, 6),
+            })
+
     print(f'\nDone: {csv_path}')
+    print(f'Done: {metrics_json_path}')
+    print(f'Done: {failure_cases_path}')
+    print(f'Done: {domain_breakdown_path}')
+    print(f'Done: {backfill_log_path}')
+    print(f'Done: {run_dir}')
 
 
 if __name__ == '__main__':

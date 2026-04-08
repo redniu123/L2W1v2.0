@@ -278,13 +278,28 @@ def run_pipeline(
         }
 
     # 计算路由分数
-    if strategy == "Random":
-        scores = [random.random() for _ in range(N)]
-    elif strategy == "ConfOnly":
-        scores = [
-            (1.0 - r["mean_conf"]) + (1.0 - r["min_conf"]) + r["drop"]
-            for r in all_results
-        ]
+    if strategy == "GCR":
+        scores = [1.0 - r["conf"] for r in all_results]
+    elif strategy == "BAUR":
+        scores = []
+        for r in all_results:
+            dec = router.route(
+                boundary_stats=r["boundary_stats"],
+                top2_info=r["top2_info"],
+                r_d=0.0,
+                agent_a_text=r["T_A"],
+            )
+            scores.append(max(dec.s_b, dec.s_a))
+    elif strategy == "DAR":
+        scores = []
+        for r in all_results:
+            dec = router.route(
+                boundary_stats=r["boundary_stats"],
+                top2_info=r["top2_info"],
+                r_d=r["r_d"],
+                agent_a_text=r["T_A"],
+            )
+            scores.append(dec.q)
     else:  # SH-DA++
         scores = []
         for r in all_results:
@@ -482,7 +497,7 @@ def main():
         write_row("baseline", row)
         print(f"  AgentA_Only  CER={row['Overall_CER']:.4%}")
         for B in budgets:
-            for strategy in ["Random", "ConfOnly"]:
+            for strategy in ["GCR", "BAUR", "DAR", "SH-DA++"]:
                 row = run_pipeline(strategy, B, all_results, router,
                                    backfill_controller, prompter,
                                    lambda p: p.get("T_A", ""), "baseline")
