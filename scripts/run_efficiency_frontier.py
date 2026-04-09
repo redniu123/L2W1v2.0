@@ -85,6 +85,18 @@ def summarize_extended_metrics(per_sample: List[dict], boundary_k: int = 2) -> D
     }
 
 
+def summarize_latency_and_token_usage(per_sample: List[dict]) -> Dict[str, float]:
+    latencies = [float(item['latency_ms']) for item in per_sample if item.get('latency_ms') is not None]
+    token_usages = [float(item['token_usage']) for item in per_sample if item.get('token_usage') is not None]
+    return {
+        'P95_Latency_MS': round(float(np.percentile(latencies, 95)), 3) if latencies else 0.0,
+        'Avg_Token_Usage': round((sum(token_usages) / len(token_usages)), 3) if token_usages else 0.0,
+        'Total_Token_Usage': round(sum(token_usages), 3) if token_usages else 0.0,
+        'N_Latency_Valid': len(latencies),
+        'N_Token_Valid': len(token_usages),
+    }
+
+
 def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
     """构建 Agent B 调用函数（含重试）"""
     import re
@@ -343,6 +355,7 @@ def run_pipeline(
                 'backfill_reason': 'not_upgraded',
                 'run_id': run_id,
             })
+        usage_metrics = summarize_latency_and_token_usage(per_sample)
         return {
             'summary': {
                 'Strategy': 'AgentA_Only', 'Target_Budget': 0.0,
@@ -350,6 +363,11 @@ def run_pipeline(
                 'Overall_CER': round(cer_num / gt_len, 6) if gt_len else 0,
                 'Boundary_Deletion_Recall@B': 0.0,
                 'Substitution_CER': round((sum(count_substitutions(r['T_A'], r['T_GT']) for r in all_results) / gt_len), 6) if gt_len else 0.0,
+                'P95_Latency_MS': usage_metrics['P95_Latency_MS'],
+                'Avg_Token_Usage': usage_metrics['Avg_Token_Usage'],
+                'Total_Token_Usage': usage_metrics['Total_Token_Usage'],
+                'N_Latency_Valid': usage_metrics['N_Latency_Valid'],
+                'N_Token_Valid': usage_metrics['N_Token_Valid'],
                 'AER': 0.0, 'CVR': 0.0, 'N_valid': N,
             },
             'per_sample': per_sample,
@@ -566,6 +584,7 @@ def run_pipeline(
     cvr = n_rejected / n_upgraded if n_upgraded > 0 else 0.0
     
     extended_metrics = summarize_extended_metrics(per_sample)
+    usage_metrics = summarize_latency_and_token_usage(per_sample)
     return {
         'summary': {
             'Strategy': strategy, 'Target_Budget': target_budget,
@@ -573,6 +592,11 @@ def run_pipeline(
             'Overall_CER': round(overall_cer, 6),
             'Boundary_Deletion_Recall@B': extended_metrics['Boundary_Deletion_Recall@B'],
             'Substitution_CER': extended_metrics['Substitution_CER'],
+            'P95_Latency_MS': usage_metrics['P95_Latency_MS'],
+            'Avg_Token_Usage': usage_metrics['Avg_Token_Usage'],
+            'Total_Token_Usage': usage_metrics['Total_Token_Usage'],
+            'N_Latency_Valid': usage_metrics['N_Latency_Valid'],
+            'N_Token_Valid': usage_metrics['N_Token_Valid'],
             'AER': round(aer, 4), 'CVR': round(cvr, 4), 'N_valid': N,
         },
         'per_sample': per_sample,
@@ -809,9 +833,13 @@ def main():
     domain_breakdown_path = run_dir / 'domain_breakdown.csv'
     backfill_log_path = run_dir / 'backfill_log.jsonl'
     fieldnames = ['Strategy', 'Target_Budget', 'Actual_Call_Rate',
-                  'Overall_CER', 'Boundary_Deletion_Recall@B', 'Substitution_CER', 'AER', 'CVR', 'N_valid']
+                  'Overall_CER', 'Boundary_Deletion_Recall@B', 'Substitution_CER',
+                  'P95_Latency_MS', 'Avg_Token_Usage', 'Total_Token_Usage', 'N_Latency_Valid', 'N_Token_Valid',
+                  'AER', 'CVR', 'N_valid']
     offline_fieldnames = ['Strategy', 'Target_Budget', 'Actual_Call_Rate',
-                          'Overall_CER', 'Boundary_Deletion_Recall@B', 'Substitution_CER', 'AER', 'CVR', 'N_valid', 'Budget_Mode']
+                          'Overall_CER', 'Boundary_Deletion_Recall@B', 'Substitution_CER',
+                          'P95_Latency_MS', 'Avg_Token_Usage', 'Total_Token_Usage', 'N_Latency_Valid', 'N_Token_Valid',
+                          'AER', 'CVR', 'N_valid', 'Budget_Mode']
     metrics_rows = []
     all_failure_cases = []
     all_backfill_logs = []
