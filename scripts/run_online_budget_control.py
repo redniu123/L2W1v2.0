@@ -50,6 +50,9 @@ def run_online_pipeline(strategy, target_budget, all_results, router, backfill_c
         lam = bd.get('lambda_before', ctrl.current_lambda)
         win = bd.get('actual_budget', ctrl.actual_budget)
         vlm_raw_output = final_text_if_upgraded = ''
+        latency_ms = None
+        token_usage = None
+        error_type = 'not_upgraded'
         backfill_status = backfill_reason = 'not_upgraded'
         cb_stats = circuit_breaker.step_without_call()
         if upgrade:
@@ -57,8 +60,12 @@ def run_online_pipeline(strategy, target_budget, all_results, router, backfill_c
             domain_label = {'geology': '地质勘探', 'finance': '金融财会', 'medicine': '医学'}.get(r.get('domain', 'geology')) if strategy == 'SH-DA++' else None
             prompt = prompter.generate_targeted_correction_prompt(T_A=T_A, min_conf_idx=r['min_conf_idx'], domain=domain_label, image_path=r['img_path'])
             prompt['T_A'], prompt['min_conf_idx'], prompt['image_path'] = T_A, r['min_conf_idx'], r['img_path']
-            T_cand = agent_b_callable(prompt)
+            agent_b_result = agent_b_callable(prompt)
+            T_cand = agent_b_result.get('corrected_text', T_A)
             vlm_raw_output = T_cand
+            latency_ms = agent_b_result.get('latency_ms')
+            token_usage = agent_b_result.get('token_usage')
+            error_type = agent_b_result.get('error_type', 'none')
             if strategy == 'BAUR-only':
                 T_final = T_cand if isinstance(T_cand, str) and T_cand else T_A
                 final_text_if_upgraded, backfill_status, backfill_reason = T_final, 'skipped', 'baur_only_no_backfill'
@@ -76,10 +83,10 @@ def run_online_pipeline(strategy, target_budget, all_results, router, backfill_c
         else:
             T_final = T_A
         cer_num += Levenshtein.distance(T_final, T_GT); gt_len += len(T_GT)
-        row = {'sample_id': r.get('sample_id',''), 'image_path': r.get('image_path',''), 'source_image_id': r.get('source_image_id',''), 'domain': r.get('domain','geology'), 'split': r.get('split','test'), 'gt': T_GT, 'ocr_text': T_A, 'router_name': strategy, 'router_score': round(q,6), 'budget': target_budget, 'budget_mode': 'online_control', 'selected_for_upgrade': upgrade, 'lambda_current': round(lam,6), 'actual_budget_window': round(win,6), 'circuit_breaker_open': cb_stats.get('is_open', False), 'circuit_breaker_blocked': bd.get('circuit_breaker_blocked', False), 'vlm_model': agent_b_label, 'prompt_version': prompt_version, 'vlm_raw_output': vlm_raw_output, 'final_text_if_upgraded': final_text_if_upgraded, 'final_text': T_final, 'backfill_status': backfill_status, 'backfill_reason': backfill_reason, 'is_correct_ocr': T_A == T_GT, 'is_correct_final': T_final == T_GT, 'edit_distance_ocr': Levenshtein.distance(T_A, T_GT), 'edit_distance_final': Levenshtein.distance(T_final, T_GT), 'run_id': run_id}
+        row = {'sample_id': r.get('sample_id',''), 'image_path': r.get('image_path',''), 'source_image_id': r.get('source_image_id',''), 'domain': r.get('domain','geology'), 'split': r.get('split','test'), 'gt': T_GT, 'ocr_text': T_A, 'router_name': strategy, 'router_score': round(q,6), 'budget': target_budget, 'budget_mode': 'online_control', 'selected_for_upgrade': upgrade, 'lambda_current': round(lam,6), 'actual_budget_window': round(win,6), 'circuit_breaker_open': cb_stats.get('is_open', False), 'circuit_breaker_blocked': bd.get('circuit_breaker_blocked', False), 'vlm_model': agent_b_label, 'prompt_version': prompt_version, 'vlm_raw_output': vlm_raw_output, 'latency_ms': latency_ms, 'token_usage': token_usage, 'error_type': error_type, 'final_text_if_upgraded': final_text_if_upgraded, 'final_text': T_final, 'backfill_status': backfill_status, 'backfill_reason': backfill_reason, 'is_correct_ocr': T_A == T_GT, 'is_correct_final': T_final == T_GT, 'edit_distance_ocr': Levenshtein.distance(T_A, T_GT), 'edit_distance_final': Levenshtein.distance(T_final, T_GT), 'run_id': run_id}
         per_sample.append(row)
         if upgrade:
-            backfill_log.append({'sample_id': row['sample_id'], 'router_name': strategy, 'budget': target_budget, 'lambda_current': row['lambda_current'], 'actual_budget_window': row['actual_budget_window'], 'ocr_text': T_A, 'vlm_raw_output': vlm_raw_output, 'final_text': T_final, 'backfill_status': backfill_status, 'backfill_reason': backfill_reason, 'run_id': run_id})
+            backfill_log.append({'sample_id': row['sample_id'], 'router_name': strategy, 'budget': target_budget, 'lambda_current': row['lambda_current'], 'actual_budget_window': row['actual_budget_window'], 'ocr_text': T_A, 'vlm_raw_output': vlm_raw_output, 'latency_ms': latency_ms, 'token_usage': token_usage, 'error_type': error_type, 'final_text': T_final, 'backfill_status': backfill_status, 'backfill_reason': backfill_reason, 'run_id': run_id})
     return {'summary': {'Strategy': strategy, 'Target_Budget': target_budget, 'Actual_Call_Rate': round(n_upgraded / len(all_results), 4) if all_results else 0.0, 'Overall_CER': round(cer_num / gt_len, 6) if gt_len else 0.0, 'AER': round(n_accepted / n_upgraded, 4) if n_upgraded else 0.0, 'CVR': round(n_rejected / n_upgraded, 4) if n_upgraded else 0.0, 'N_valid': len(all_results)}, 'budget_stats': ctrl.get_stats(), 'per_sample': per_sample, 'backfill_log': backfill_log}
 
 
