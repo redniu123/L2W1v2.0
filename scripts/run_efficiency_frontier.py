@@ -332,6 +332,11 @@ def run_pipeline(
                 'latency_ms': None,
                 'token_usage': None,
                 'error_type': 'not_applicable',
+                'has_professional_terms': r.get('has_professional_terms', False),
+                'professional_terms': r.get('professional_terms', []),
+                'domain_risk_score': round(float(r.get('r_d', 0.0)), 6),
+                'cvr_flag': False,
+                'replay_rank': None,
                 'final_text_if_upgraded': '',
                 'final_text': r['T_A'],
                 'backfill_status': 'not_applicable',
@@ -524,6 +529,11 @@ def run_pipeline(
             'latency_ms': latency_ms,
             'token_usage': token_usage,
             'error_type': error_type,
+            'has_professional_terms': r.get('has_professional_terms', False),
+            'professional_terms': r.get('professional_terms', []),
+            'domain_risk_score': round(float(r.get('r_d', 0.0)), 6),
+            'cvr_flag': backfill_status == 'rejected',
+            'replay_rank': None,
             'final_text_if_upgraded': final_text_if_upgraded,
             'final_text': T_final,
             'backfill_status': backfill_status,
@@ -588,6 +598,7 @@ def replay_from_full_budget(
         key=lambda i: float(full_budget_items[i].get('router_score', 0.0)),
         reverse=True,
     )
+    rank_map = {idx: rank for rank, idx in enumerate(ranked_indices)}
     upgrade_set = set(ranked_indices[:n_call_target])
 
     per_sample = []
@@ -645,6 +656,8 @@ def replay_from_full_budget(
             'final_text': final_text,
             'backfill_status': backfill_status,
             'backfill_reason': backfill_reason,
+            'cvr_flag': backfill_status == 'rejected',
+            'replay_rank': rank_map.get(i),
             'is_correct_final': final_text == T_GT,
             'edit_distance_final': Levenshtein.distance(final_text, T_GT),
             'run_id': run_id,
