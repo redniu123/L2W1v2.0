@@ -1,5 +1,7 @@
 # SH-DA++ v5.1 Router Config
 
+prompt_version: "prompt_v1.0"
+
 agent_b:
   skip: false
   backend: "gemini"             # gemini | local_vlm
