@@ -19,6 +19,12 @@ backfill:
   unified_prompt_mode: true
 
 sh_da_v4:
+  circuit_breaker:
+    enabled: true
+    min_samples: 20
+    rejection_rate_threshold: 0.60
+    cooldown_steps: 50
+
   calibrated_scorer:
     enabled: false
 

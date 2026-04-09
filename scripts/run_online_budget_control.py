@@ -12,6 +12,7 @@ from tqdm import tqdm
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from modules.router.uncertainty_router import BudgetControllerConfig, OnlineBudgetController
+from modules.router.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
 from scripts.run_efficiency_frontier import build_agent_b_callable, infer_all_samples
 
 
@@ -32,7 +33,7 @@ def build_scores(strategy, all_results, router):
     return scores
 
 
-def run_online_pipeline(strategy, target_budget, all_results, router, backfill_controller, prompter, agent_b_callable, budget_cfg, run_id='', prompt_version='prompt_v1.0'):
+def run_online_pipeline(strategy, target_budget, all_results, router, backfill_controller, prompter, agent_b_callable, budget_cfg, circuit_breaker, run_id='', prompt_version='prompt_v1.0'):
     from modules.router.backfill import RouteType
     ctrl = OnlineBudgetController(budget_cfg)
     scores = build_scores(strategy, all_results, router)
@@ -41,10 +42,16 @@ def run_online_pipeline(strategy, target_budget, all_results, router, backfill_c
     for i, r in enumerate(tqdm(all_results, desc=f'{strategy} online B={target_budget:.2f}', leave=False)):
         T_A, T_GT, q = r['T_A'], r['T_GT'], float(scores[i])
         upgrade, bd = ctrl.step(q)
+        if upgrade and not circuit_breaker.allow_upgrade():
+            upgrade = False
+            bd = {**bd, 'circuit_breaker_blocked': True}
+        else:
+            bd = {**bd, 'circuit_breaker_blocked': False}
         lam = bd.get('lambda_before', ctrl.current_lambda)
         win = bd.get('actual_budget', ctrl.actual_budget)
         vlm_raw_output = final_text_if_upgraded = ''
         backfill_status = backfill_reason = 'not_upgraded'
+        cb_stats = circuit_breaker.step_without_call()
         if upgrade:
             n_upgraded += 1
             domain_label = {'geology': '地质勘探', 'finance': '金融财会', 'medicine': '医学'}.get(r.get('domain', 'geology')) if strategy == 'SH-DA++' else None
@@ -55,20 +62,21 @@ def run_online_pipeline(strategy, target_budget, all_results, router, backfill_c
             if strategy == 'BAUR-only':
                 T_final = T_cand if isinstance(T_cand, str) and T_cand else T_A
                 final_text_if_upgraded, backfill_status, backfill_reason = T_final, 'skipped', 'baur_only_no_backfill'
+                cb_stats = circuit_breaker.observe(rejected=False)
                 if T_final != T_A: n_accepted += 1
             else:
                 bf = backfill_controller.apply_backfill(T_A=T_A, T_cand=T_cand, route_type=RouteType.BOUNDARY)
                 T_final = bf.T_final
                 final_text_if_upgraded = T_final
                 if bf.is_rejected:
-                    n_rejected += 1; backfill_status, backfill_reason = 'rejected', bf.rejection_reason.value
+                    n_rejected += 1; backfill_status, backfill_reason = 'rejected', bf.rejection_reason.value; cb_stats = circuit_breaker.observe(rejected=True)
                 else:
-                    backfill_status, backfill_reason = 'accepted', bf.rejection_reason.value
+                    backfill_status, backfill_reason = 'accepted', bf.rejection_reason.value; cb_stats = circuit_breaker.observe(rejected=False)
                     if T_final != T_A: n_accepted += 1
         else:
             T_final = T_A
         cer_num += Levenshtein.distance(T_final, T_GT); gt_len += len(T_GT)
-        row = {'sample_id': r.get('sample_id',''), 'image_path': r.get('image_path',''), 'source_image_id': r.get('source_image_id',''), 'domain': r.get('domain','geology'), 'split': r.get('split','test'), 'gt': T_GT, 'ocr_text': T_A, 'router_name': strategy, 'router_score': round(q,6), 'budget': target_budget, 'budget_mode': 'online_control', 'selected_for_upgrade': upgrade, 'lambda_current': round(lam,6), 'actual_budget_window': round(win,6), 'vlm_model': 'configured_agent_b', 'prompt_version': prompt_version, 'vlm_raw_output': vlm_raw_output, 'final_text_if_upgraded': final_text_if_upgraded, 'final_text': T_final, 'backfill_status': backfill_status, 'backfill_reason': backfill_reason, 'is_correct_ocr': T_A == T_GT, 'is_correct_final': T_final == T_GT, 'edit_distance_ocr': Levenshtein.distance(T_A, T_GT), 'edit_distance_final': Levenshtein.distance(T_final, T_GT), 'run_id': run_id}
+        row = {'sample_id': r.get('sample_id',''), 'image_path': r.get('image_path',''), 'source_image_id': r.get('source_image_id',''), 'domain': r.get('domain','geology'), 'split': r.get('split','test'), 'gt': T_GT, 'ocr_text': T_A, 'router_name': strategy, 'router_score': round(q,6), 'budget': target_budget, 'budget_mode': 'online_control', 'selected_for_upgrade': upgrade, 'lambda_current': round(lam,6), 'actual_budget_window': round(win,6), 'circuit_breaker_open': cb_stats.get('is_open', False), 'circuit_breaker_blocked': bd.get('circuit_breaker_blocked', False), 'vlm_model': 'configured_agent_b', 'prompt_version': prompt_version, 'vlm_raw_output': vlm_raw_output, 'final_text_if_upgraded': final_text_if_upgraded, 'final_text': T_final, 'backfill_status': backfill_status, 'backfill_reason': backfill_reason, 'is_correct_ocr': T_A == T_GT, 'is_correct_final': T_final == T_GT, 'edit_distance_ocr': Levenshtein.distance(T_A, T_GT), 'edit_distance_final': Levenshtein.distance(T_final, T_GT), 'run_id': run_id}
         per_sample.append(row)
         if upgrade:
             backfill_log.append({'sample_id': row['sample_id'], 'router_name': strategy, 'budget': target_budget, 'lambda_current': row['lambda_current'], 'actual_budget_window': row['actual_budget_window'], 'ocr_text': T_A, 'vlm_raw_output': vlm_raw_output, 'final_text': T_final, 'backfill_status': backfill_status, 'backfill_reason': backfill_reason, 'run_id': run_id})
@@ -111,11 +119,14 @@ def main():
     (run_dir / 'config_snapshot.yaml').write_text(yaml.safe_dump({'run_id': run_id, 'args': vars(args), 'config': config}, allow_unicode=True, sort_keys=False), encoding='utf-8')
     bc = (config or {}).get('sh_da_v4', {}).get('budget_controller', {})
     budget_cfg = BudgetControllerConfig(window_size=bc.get('window_size', 500), k=bc.get('k', 0.01), lambda_min=bc.get('lambda_min', 0.0), lambda_max=bc.get('lambda_max', 2.0), lambda_init=bc.get('lambda_init', 0.5), target_budget=args.target_budget)
-    result = run_online_pipeline(args.strategy, args.target_budget, all_results, router, backfill_controller, prompter, agent_b_callable, budget_cfg, run_id=run_id)
+    cb_cfg = (config or {}).get('sh_da_v4', {}).get('circuit_breaker', {})
+    circuit_breaker = CircuitBreaker(CircuitBreakerConfig(enabled=cb_cfg.get('enabled', True), min_samples=cb_cfg.get('min_samples', 20), rejection_rate_threshold=cb_cfg.get('rejection_rate_threshold', 0.60), cooldown_steps=cb_cfg.get('cooldown_steps', 50)))
+    result = run_online_pipeline(args.strategy, args.target_budget, all_results, router, backfill_controller, prompter, agent_b_callable, budget_cfg, circuit_breaker, run_id=run_id)
     with open(run_dir / 'summary.csv', 'w', newline='', encoding='utf-8') as f:
         w = csv.DictWriter(f, fieldnames=['Strategy','Target_Budget','Actual_Call_Rate','Overall_CER','AER','CVR','N_valid']); w.writeheader(); w.writerow(result['summary'])
     (run_dir / 'metrics_summary.json').write_text(json.dumps([result['summary']], ensure_ascii=False, indent=2), encoding='utf-8')
     (run_dir / 'budget_stability.json').write_text(json.dumps(result['budget_stats'], ensure_ascii=False, indent=2), encoding='utf-8')
+    (run_dir / 'circuit_breaker.json').write_text(json.dumps(circuit_breaker.get_stats(), ensure_ascii=False, indent=2), encoding='utf-8')
     jp = run_dir / f"online_budget_{int(round(args.target_budget*100)):02d}_{args.strategy}.jsonl"
     with open(jp, 'w', encoding='utf-8') as f:
         for item in result['per_sample']: f.write(json.dumps(item, ensure_ascii=False) + '\n')
