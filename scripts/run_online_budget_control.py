@@ -76,8 +76,8 @@ def run_online_pipeline(strategy, target_budget, all_results, router, backfill_c
 
 def main():
     p = argparse.ArgumentParser(description='SH-DA++ Online Budget Control')
-    p.add_argument('--config', default='configs/router_config.yaml'); p.add_argument('--test_jsonl', default='data/raw/hctr_riskbench/test.jsonl')
-    p.add_argument('--image_root', default='data/geo'); p.add_argument('--rec_model_dir', default='./models/agent_a_ppocr/PP-OCRv5_server_rec_infer')
+    p.add_argument('--config', default='configs/router_config.yaml'); p.add_argument('--test_jsonl', default='data/l2w1data/test.jsonl')
+    p.add_argument('--image_root', default='data/l2w1data/images'); p.add_argument('--rec_model_dir', default='./models/agent_a_ppocr/PP-OCRv5_server_rec_infer')
     p.add_argument('--rec_char_dict_path', default='ppocr/utils/ppocrv5_dict.txt'); p.add_argument('--geo_dict', default='data/dicts/Geology.txt')
     p.add_argument('--output_dir', default='results/stage2_v51_online'); p.add_argument('--strategy', default='SH-DA++', choices=['GCR','BAUR','DAR','BAUR-only','SH-DA++'])
     p.add_argument('--target_budget', type=float, default=0.10); p.add_argument('--seed', type=int, default=42); p.add_argument('--n_samples', type=int, default=None)
