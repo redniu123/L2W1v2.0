@@ -48,6 +48,7 @@ def extract_features_from_output(
     conf: float,
     T_A: str,
     domain_engine: DomainKnowledgeEngine,
+    domain: str = 'geology',
 ) -> np.ndarray:
     """
     从 recognizer 输出提取 5 维特征向量
@@ -85,7 +86,7 @@ def extract_features_from_output(
         drop = 0.0
 
     # --- r_d: 地质语义风险分 ---
-    r_d = domain_engine.compute_r_d(T_A)
+    r_d = domain_engine.compute_r_d(T_A, domain=domain)
 
     return np.array([mean_conf, min_conf, b_edge, drop, r_d], dtype=np.float32)
 
@@ -138,7 +139,7 @@ def process_split(
 
     for sample in tqdm(samples, desc=f"{split_name}"):
         image_path = sample.get("image") or sample.get("image_path")
-        T_GT = sample.get("gt_text") or sample.get("text") or sample.get("label", "")
+        T_GT = sample.get("gt_text") or sample.get("gt") or sample.get("text") or sample.get("label", "")
 
         if not image_path or not T_GT:
             skip_count += 1
@@ -146,7 +147,10 @@ def process_split(
 
         img_path = Path(image_path)
         if not img_path.is_absolute():
-            img_path = data_root / img_path
+            rel_path = Path(image_path)
+            if rel_path.parts[:2] == ('dataset', 'images'):
+                rel_path = Path(*rel_path.parts[2:])
+            img_path = data_root / rel_path
 
         img = cv2.imread(str(img_path))
         if img is None:
@@ -163,7 +167,7 @@ def process_split(
             skip_count += 1
             continue
 
-        features = extract_features_from_output(output, conf, T_A, domain_engine)
+        features = extract_features_from_output(output, conf, T_A, domain_engine, domain=sample.get("domain", "geology"))
         y_deletion = generate_deletion_label(T_A, T_GT, K=K)
 
         features_list.append(features)
@@ -226,7 +230,11 @@ def main():
     recognizer = TextRecognizerWithLogits(args)
 
     print("[2/3] 初始化语义引擎...")
-    domain_engine = DomainKnowledgeEngine(args.geo_dict)
+    domain_engine = DomainKnowledgeEngine({
+        'geology': args.geo_dict,
+        'finance': args.finance_dict,
+        'medicine': args.medicine_dict,
+    })
 
     print("[3/3] 按 split 提取特征...")
     splits = [s.strip() for s in args.splits.split(",")]

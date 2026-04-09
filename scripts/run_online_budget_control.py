@@ -47,7 +47,8 @@ def run_online_pipeline(strategy, target_budget, all_results, router, backfill_c
         backfill_status = backfill_reason = 'not_upgraded'
         if upgrade:
             n_upgraded += 1
-            prompt = prompter.generate_targeted_correction_prompt(T_A=T_A, min_conf_idx=r['min_conf_idx'], domain='地质勘探' if strategy == 'SH-DA++' else None, image_path=r['img_path'])
+            domain_label = {'geology': '地质勘探', 'finance': '金融财会', 'medicine': '医学'}.get(r.get('domain', 'geology')) if strategy == 'SH-DA++' else None
+            prompt = prompter.generate_targeted_correction_prompt(T_A=T_A, min_conf_idx=r['min_conf_idx'], domain=domain_label, image_path=r['img_path'])
             prompt['T_A'], prompt['min_conf_idx'], prompt['image_path'] = T_A, r['min_conf_idx'], r['img_path']
             T_cand = agent_b_callable(prompt)
             vlm_raw_output = T_cand
@@ -79,6 +80,7 @@ def main():
     p.add_argument('--config', default='configs/router_config.yaml'); p.add_argument('--test_jsonl', default='data/l2w1data/test.jsonl')
     p.add_argument('--image_root', default='data/l2w1data/images'); p.add_argument('--rec_model_dir', default='./models/agent_a_ppocr/PP-OCRv5_server_rec_infer')
     p.add_argument('--rec_char_dict_path', default='ppocr/utils/ppocrv5_dict.txt'); p.add_argument('--geo_dict', default='data/dicts/Geology.txt')
+    p.add_argument('--finance_dict', default='data/dicts/Finance.txt'); p.add_argument('--medicine_dict', default='data/dicts/Medicine.txt')
     p.add_argument('--output_dir', default='results/stage2_v51_online'); p.add_argument('--strategy', default='SH-DA++', choices=['GCR','BAUR','DAR','BAUR-only','SH-DA++'])
     p.add_argument('--target_budget', type=float, default=0.10); p.add_argument('--seed', type=int, default=42); p.add_argument('--n_samples', type=int, default=None)
     p.add_argument('--use_gpu', action='store_true', default=False); p.add_argument('--use_cache', action='store_true', default=False); p.add_argument('--rebuild_cache', action='store_true', default=False)
@@ -91,7 +93,7 @@ def main():
     from modules.router.backfill import BackfillConfig, StrictBackfillController
     from modules.vlm_expert.constrained_prompter import ConstrainedPrompter
     from modules.router.domain_knowledge import DomainKnowledgeEngine
-    recognizer = TextRecognizerWithLogits(rec_args); router = SHDARouter.from_yaml(args.config); backfill_controller = StrictBackfillController(BackfillConfig()); prompter = ConstrainedPrompter(); domain_engine = DomainKnowledgeEngine(args.geo_dict); agent_b_callable = build_agent_b_callable(config)
+    recognizer = TextRecognizerWithLogits(rec_args); router = SHDARouter.from_yaml(args.config); backfill_controller = StrictBackfillController(BackfillConfig()); prompter = ConstrainedPrompter(); domain_engine = DomainKnowledgeEngine({'geology': args.geo_dict, 'finance': args.finance_dict, 'medicine': args.medicine_dict}); agent_b_callable = build_agent_b_callable(config)
     samples = [json.loads(line) for line in Path(args.test_jsonl).read_text(encoding='utf-8').splitlines() if line.strip()]
     cache_path = Path(args.output_dir) / 'agent_a_cache.json'
     if args.use_cache and not args.rebuild_cache and cache_path.exists(): all_results = json.loads(cache_path.read_text(encoding='utf-8'))

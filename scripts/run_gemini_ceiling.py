@@ -238,8 +238,8 @@ def main():
     parser = argparse.ArgumentParser(description="Gemini 100% 上限实验")
     parser.add_argument("--mode", choices=["correction", "ocr", "both"], default="both")
     parser.add_argument("--config", default="configs/router_config.yaml")
-    parser.add_argument("--test_jsonl", default="data/raw/hctr_riskbench/test.jsonl")
-    parser.add_argument("--image_root", default="data/geo")
+    parser.add_argument("--test_jsonl", default="data/l2w1data/test.jsonl")
+    parser.add_argument("--image_root", default="data/l2w1data/images")
     parser.add_argument("--rec_model_dir", default="./models/agent_a_ppocr/PP-OCRv5_server_rec_infer")
     parser.add_argument("--rec_char_dict_path", default="ppocr/utils/ppocrv5_dict.txt")
     parser.add_argument("--output_dir", default="results/stage2_v51")
@@ -299,11 +299,15 @@ def main():
             from modules.router.domain_knowledge import DomainKnowledgeEngine
             import cv2
             recognizer = TextRecognizerWithLogits(rec_args)
-            domain_engine = DomainKnowledgeEngine("data/dicts/Geology.txt")
+            domain_engine = DomainKnowledgeEngine({
+                'geology': 'data/dicts/Geology.txt',
+                'finance': 'data/dicts/Finance.txt',
+                'medicine': 'data/dicts/Medicine.txt',
+            })
             all_results = []
             for sample in tqdm(samples, desc="Agent A"):
                 image_path = sample.get("image") or sample.get("image_path", "")
-                T_GT = sample.get("gt_text") or sample.get("text") or sample.get("label", "")
+                T_GT = sample.get("gt_text") or sample.get("gt") or sample.get("text") or sample.get("label", "")
                 if not image_path or not T_GT:
                     continue
                 img_path = Path(image_path)
