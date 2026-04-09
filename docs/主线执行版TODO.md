@@ -208,8 +208,8 @@
 
 - [x] `Boundary Deletion Recall@B`
 - [x] `Substitution CER`
-- [ ] `p95 latency`
-- [ ] `token usage`
+- [ ] `p95 latency`（第一轮 summary 输出已完成，统计口径仍可继续严格化）
+- [ ] `token usage`（第一轮 summary 输出已完成，真实覆盖率仍可继续提升）
 - [x] `error_type` 错误桶（第一轮落盘）
 
 **验收标准**：
