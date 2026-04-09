@@ -445,6 +445,103 @@ def run_pipeline(
     }
 
 
+def replay_from_full_budget(
+    strategy: str,
+    target_budget: float,
+    full_budget_items: List[dict],
+    run_id: str = '',
+    prompt_version: str = 'prompt_v1.0',
+):
+    """基于 100% full-call 结果离线重建预算点。"""
+    N = len(full_budget_items)
+    if N == 0:
+        return None
+
+    n_call_target = int(round(N * target_budget))
+    ranked_indices = sorted(
+        range(N),
+        key=lambda i: float(full_budget_items[i].get('router_score', 0.0)),
+        reverse=True,
+    )
+    upgrade_set = set(ranked_indices[:n_call_target])
+
+    per_sample = []
+    backfill_log = []
+    cer_num = 0
+    gt_len = 0
+    n_upgraded = 0
+    n_accepted_edit = 0
+    n_rejected = 0
+
+    for i, item in enumerate(full_budget_items):
+        T_A = item.get('ocr_text', '')
+        T_GT = item.get('gt', '')
+        is_upgraded = i in upgrade_set
+        upgraded_text = item.get('final_text_if_upgraded') or item.get('final_text') or T_A
+        final_text = upgraded_text if is_upgraded else T_A
+        backfill_status = item.get('backfill_status', 'not_upgraded') if is_upgraded else 'not_upgraded'
+        backfill_reason = item.get('backfill_reason', 'not_upgraded') if is_upgraded else 'not_upgraded'
+        vlm_raw_output = item.get('vlm_raw_output', '') if is_upgraded else ''
+
+        if is_upgraded:
+            n_upgraded += 1
+            if backfill_status == 'rejected':
+                n_rejected += 1
+            if final_text != T_A:
+                n_accepted_edit += 1
+                backfill_log.append({
+                    'sample_id': item.get('sample_id', ''),
+                    'router_name': strategy,
+                    'budget': target_budget,
+                    'ocr_text': T_A,
+                    'vlm_raw_output': vlm_raw_output,
+                    'final_text': final_text,
+                    'backfill_status': backfill_status,
+                    'backfill_reason': backfill_reason,
+                    'run_id': run_id,
+                    'budget_mode': 'offline',
+                })
+
+        cer_num += Levenshtein.distance(final_text, T_GT)
+        gt_len += len(T_GT)
+        per_item = dict(item)
+        per_item.update({
+            'router_name': strategy,
+            'budget': target_budget,
+            'budget_mode': 'offline',
+            'selected_for_upgrade': is_upgraded,
+            'vlm_raw_output': vlm_raw_output,
+            'final_text': final_text,
+            'backfill_status': backfill_status,
+            'backfill_reason': backfill_reason,
+            'is_correct_final': final_text == T_GT,
+            'edit_distance_final': Levenshtein.distance(final_text, T_GT),
+            'run_id': run_id,
+            'prompt_version': prompt_version,
+        })
+        per_sample.append(per_item)
+
+    actual_rate = n_upgraded / N if N > 0 else 0.0
+    overall_cer = cer_num / gt_len if gt_len > 0 else 0.0
+    aer = n_accepted_edit / n_upgraded if n_upgraded > 0 else 0.0
+    cvr = n_rejected / n_upgraded if n_upgraded > 0 else 0.0
+
+    return {
+        'summary': {
+            'Strategy': strategy,
+            'Target_Budget': target_budget,
+            'Actual_Call_Rate': round(actual_rate, 4),
+            'Overall_CER': round(overall_cer, 6),
+            'AER': round(aer, 4),
+            'CVR': round(cvr, 4),
+            'N_valid': N,
+            'Budget_Mode': 'offline',
+        },
+        'per_sample': per_sample,
+        'backfill_log': backfill_log,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description='SH-DA++ v5.1 Phase 3')
     parser.add_argument('--config', default='configs/router_config.yaml')
@@ -457,6 +554,7 @@ def main():
     parser.add_argument('--medicine_dict', default='data/dicts/Medicine.txt')
     parser.add_argument('--output_dir', default='results/stage2_v51')
     parser.add_argument('--budgets', default='0.05,0.10,0.20,0.30')
+    parser.add_argument('--offline_replay_budgets', default='0.05,0.10,0.20,0.30,0.50,1.00', help='Offline replay budgets from full-budget results')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--n_samples', type=int, default=None, help='Limit to first N samples (for testing)')
     parser.add_argument('--use_gpu', action='store_true', default=False, help='Use GPU for Agent A (default: CPU)')
@@ -562,6 +660,8 @@ def main():
     backfill_log_path = run_dir / 'backfill_log.jsonl'
     fieldnames = ['Strategy', 'Target_Budget', 'Actual_Call_Rate',
                   'Overall_CER', 'AER', 'CVR', 'N_valid']
+    offline_fieldnames = ['Strategy', 'Target_Budget', 'Actual_Call_Rate',
+                          'Overall_CER', 'AER', 'CVR', 'N_valid', 'Budget_Mode']
     metrics_rows = []
     all_failure_cases = []
     all_backfill_logs = []
@@ -658,6 +758,56 @@ def main():
                     except Exception as e:
                         print(f"  [{strategy:10s}] ERROR: {e}")
     
+    # Offline replay：基于 100% full-call 结果离线重建预算点
+    offline_replay_budgets = [float(b) for b in args.offline_replay_budgets.split(',')]
+    print('\n=== Offline Replay from Full-Budget Results ===')
+    for strategy in ['GCR', 'BAUR', 'DAR', 'BAUR-only', 'SH-DA++']:
+        full_budget_path = run_dir / f'full_budget_results_{strategy}.jsonl'
+        full_budget_result = run_pipeline(
+            strategy, 1.0, all_results, router,
+            backfill_controller, prompter, agent_b_callable,
+            run_id, 'prompt_v1.0'
+        )
+        with open(full_budget_path, 'w', encoding='utf-8') as f:
+            for item in full_budget_result['per_sample']:
+                f.write(json.dumps(item, ensure_ascii=False) + '\n')
+
+        for B in offline_replay_budgets:
+            replay_result = replay_from_full_budget(
+                strategy=strategy,
+                target_budget=B,
+                full_budget_items=full_budget_result['per_sample'],
+                run_id=run_id,
+                prompt_version='prompt_v1.0',
+            )
+            replay_row = replay_result['summary']
+            metrics_rows.append(replay_row)
+            all_backfill_logs.extend(replay_result.get('backfill_log', []))
+            for item in replay_result['per_sample']:
+                key = (item.get('router_name', 'unknown'), item.get('domain', 'unknown'), f"offline:{item.get('budget', 0.0)}")
+                stat = domain_stats.setdefault(key, {'total': 0, 'correct_final': 0})
+                stat['total'] += 1
+                stat['correct_final'] += 1 if item.get('is_correct_final') else 0
+                if item.get('is_correct_ocr') is False and item.get('is_correct_final') is False:
+                    all_failure_cases.append({
+                        'sample_id': item.get('sample_id', ''),
+                        'router_name': item.get('router_name', ''),
+                        'budget': item.get('budget', 0.0),
+                        'domain': item.get('domain', ''),
+                        'ocr_text': item.get('ocr_text', ''),
+                        'final_text': item.get('final_text', ''),
+                        'gt': item.get('gt', ''),
+                        'backfill_status': item.get('backfill_status', ''),
+                        'backfill_reason': item.get('backfill_reason', ''),
+                        'edit_distance_final': item.get('edit_distance_final', 0),
+                    })
+            budget_tag = f"{int(round(B * 100)):02d}"
+            replay_path = run_dir / f'offline_budget_{budget_tag}_{strategy}.jsonl'
+            with open(replay_path, 'w', encoding='utf-8') as f:
+                for item in replay_result['per_sample']:
+                    f.write(json.dumps(item, ensure_ascii=False) + '\n')
+            print(f"  [offline {strategy:10s} B={B:.2f}] CER={replay_row['Overall_CER']:.4%} ActualRate={replay_row['Actual_Call_Rate']:.2%}")
+
     with open(metrics_json_path, 'w', encoding='utf-8') as f:
         json.dump(metrics_rows, f, ensure_ascii=False, indent=2)
 
@@ -691,6 +841,14 @@ def main():
                 'n_samples': total,
                 'final_accuracy': round(acc, 6),
             })
+
+    offline_summary_csv_path = run_dir / 'offline_summary.csv'
+    with open(offline_summary_csv_path, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=offline_fieldnames)
+        writer.writeheader()
+        for row in metrics_rows:
+            if row.get('Budget_Mode') == 'offline':
+                writer.writerow({k: row.get(k, '') for k in offline_fieldnames})
 
     print(f'\nDone: {csv_path}')
     print(f'Done: {metrics_json_path}')
