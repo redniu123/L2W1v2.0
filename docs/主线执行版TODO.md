@@ -114,7 +114,7 @@
   - `lambda_current`
   - `selected_for_upgrade`
   - `actual_budget_window`
-- [ ] 验证 `Actual Call Rate = B ± 0.5%`
+- [ ] 验证 `Actual Call Rate = B ± 0.5%`（执行准备已完成，等待服务器恢复后正式验证）
 
 **验收标准**：
 - 在线实验结果真实满足预算协议；
