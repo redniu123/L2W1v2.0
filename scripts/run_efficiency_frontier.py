@@ -166,7 +166,7 @@ def infer_all_samples(samples, recognizer, domain_engine, data_root, image_root)
         pr = float((boundary_stats or {}).get("blank_peak_R", 0.0))
         b_edge = max(0.6*bl + 0.4*pl, 0.6*br + 0.4*pr)
         drop = float(np.clip(abs(bl - br), 0.0, 1.0))
-        r_d = domain_engine.compute_r_d(T_A) if domain_engine else 0.0
+        r_d = domain_engine.compute_r_d(T_A, domain=sample.get("domain", "geology")) if domain_engine else 0.0
 
         results.append({
             "sample_id": sample.get("sample_id", f"sample_{len(results):06d}"),
@@ -308,10 +308,14 @@ def run_pipeline(
         
         def call_agent_b(idx, r):
             """单个样本的 Agent B 调用，无等待"""
-            domain = '地质勘探' if strategy == 'SH-DA++' else None
+            domain_label = {
+                'geology': '地质勘探',
+                'finance': '金融财会',
+                'medicine': '医学',
+            }.get(r.get('domain', 'geology')) if strategy == 'SH-DA++' else None
             prompt = prompter.generate_targeted_correction_prompt(
                 T_A=r['T_A'], min_conf_idx=r['min_conf_idx'],
-                domain=domain, image_path=r['img_path'],
+                domain=domain_label, image_path=r['img_path'],
             )
             prompt['T_A'] = r['T_A']
             return idx, agent_b_callable(prompt)
@@ -449,6 +453,8 @@ def main():
     parser.add_argument('--rec_model_dir', default='./models/agent_a_ppocr/PP-OCRv5_server_rec_infer')
     parser.add_argument('--rec_char_dict_path', default='ppocr/utils/ppocrv5_dict.txt')
     parser.add_argument('--geo_dict', default='data/dicts/Geology.txt')
+    parser.add_argument('--finance_dict', default='data/dicts/Finance.txt')
+    parser.add_argument('--medicine_dict', default='data/dicts/Medicine.txt')
     parser.add_argument('--output_dir', default='results/stage2_v51')
     parser.add_argument('--budgets', default='0.05,0.10,0.20,0.30')
     parser.add_argument('--seed', type=int, default=42)
@@ -488,7 +494,11 @@ def main():
     router = SHDARouter.from_yaml(args.config)
     backfill_controller = StrictBackfillController(BackfillConfig())
     prompter = ConstrainedPrompter()
-    domain_engine = DomainKnowledgeEngine(args.geo_dict)
+    domain_engine = DomainKnowledgeEngine({
+        'geology': args.geo_dict,
+        'finance': args.finance_dict,
+        'medicine': args.medicine_dict,
+    })
     agent_b_callable = build_agent_b_callable(config)
     print('[3/4] Load test set...')
     samples = []
