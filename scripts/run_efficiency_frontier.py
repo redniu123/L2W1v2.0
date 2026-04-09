@@ -43,10 +43,17 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
 
     if skip:
         print("[Agent B] skip=true，Mock 模式")
-        def mock_fn(prompt: dict) -> str:
+        def mock_fn(prompt: dict) -> dict:
+            t0 = time.perf_counter()
             user_prompt = prompt.get("user_prompt", "")
             m = re.search(r'\u3010\s*(.+?)\s*\u3011', user_prompt)
-            return m.group(1).strip() if m else prompt.get("T_A", "")
+            corrected_text = m.group(1).strip() if m else prompt.get("T_A", "")
+            return {
+                "corrected_text": corrected_text,
+                "latency_ms": round((time.perf_counter() - t0) * 1000, 3),
+                "token_usage": None,
+                "error_type": "none",
+            }
         return mock_fn
 
     # Gemini 后端
@@ -56,7 +63,7 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
             agent = GeminiAgentB(config=GeminiConfig())
             print(f"[Agent B] Gemini backend: {agent.config.model_name}")
 
-            def gemini_fn(prompt: dict) -> str:
+            def gemini_fn(prompt: dict) -> dict:
                 T_A = prompt.get("T_A", "")
                 image_path = prompt.get("image_path", "")
                 min_conf_idx = prompt.get("min_conf_idx", -1)
@@ -69,18 +76,35 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
                     "suspicious_char": suspicious_char,
                     "risk_level": "medium",
                 }
+                t0 = time.perf_counter()
                 try:
                     result = agent.process_hard_sample(image_path, manifest)
-                    return result["corrected_text"]
+                    return {
+                        "corrected_text": result.get("corrected_text", T_A),
+                        "latency_ms": round((time.perf_counter() - t0) * 1000, 3),
+                        "token_usage": result.get("token_usage"),
+                        "error_type": result.get("error_type", "none"),
+                    }
                 except Exception as e:
                     print(f"[Gemini] error: {e}")
-                    return T_A
+                    return {
+                        "corrected_text": T_A,
+                        "latency_ms": round((time.perf_counter() - t0) * 1000, 3),
+                        "token_usage": None,
+                        "error_type": type(e).__name__,
+                    }
 
             return gemini_fn
         except Exception as e:
             print(f"[Agent B] Gemini load failed: {e}, fallback to mock")
-            def mock_fn(prompt: dict) -> str:
-                return prompt.get("T_A", "")
+            def mock_fn(prompt: dict) -> dict:
+                t0 = time.perf_counter()
+                return {
+                    "corrected_text": prompt.get("T_A", ""),
+                    "latency_ms": round((time.perf_counter() - t0) * 1000, 3),
+                    "token_usage": None,
+                    "error_type": "gemini_load_failed",
+                }
             return mock_fn
 
     # Qwen 后端
@@ -90,7 +114,7 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
         agent = AgentBExpert(config=AgentBConfig(model_path=model_path), lazy_init=False)
         print(f"[Agent B] model loaded: {model_path}")
 
-        def real_fn(prompt: dict) -> str:
+        def real_fn(prompt: dict) -> dict:
             T_A = prompt.get("T_A", "")
             image_path = prompt.get("image_path", "")
             min_conf_idx = prompt.get("min_conf_idx", -1)
@@ -103,23 +127,42 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
                 "suspicious_char": suspicious_char,
                 "risk_level": "medium",
             }
+            t0 = time.perf_counter()
+            last_error_type = "none"
             for attempt in range(max_retries):
                 try:
                     result = agent.process_hard_sample(image_path, manifest)
-                    return result["corrected_text"]
+                    return {
+                        "corrected_text": result.get("corrected_text", T_A),
+                        "latency_ms": round((time.perf_counter() - t0) * 1000, 3),
+                        "token_usage": result.get("token_usage"),
+                        "error_type": result.get("error_type", "none"),
+                    }
                 except Exception as e:
+                    last_error_type = type(e).__name__
                     if attempt < max_retries - 1:
                         time.sleep(1.0 * (attempt + 1))
                     else:
                         print(f"[Agent B] error: {e}")
-            return T_A
+            return {
+                "corrected_text": T_A,
+                "latency_ms": round((time.perf_counter() - t0) * 1000, 3),
+                "token_usage": None,
+                "error_type": last_error_type,
+            }
 
         return real_fn
     except Exception as e:
         print(f"[Agent B] load failed: {e}, fallback to mock")
 
-        def mock_fn(prompt: dict) -> str:
-            return prompt.get("T_A", "")
+        def mock_fn(prompt: dict) -> dict:
+            t0 = time.perf_counter()
+            return {
+                "corrected_text": prompt.get("T_A", ""),
+                "latency_ms": round((time.perf_counter() - t0) * 1000, 3),
+                "token_usage": None,
+                "error_type": "agent_b_load_failed",
+            }
 
         return mock_fn
 
@@ -235,6 +278,9 @@ def run_pipeline(
                 'vlm_model': 'none',
                 'prompt_version': prompt_version,
                 'vlm_raw_output': '',
+                'latency_ms': None,
+                'token_usage': None,
+                'error_type': 'not_applicable',
                 'final_text_if_upgraded': '',
                 'final_text': r['T_A'],
                 'backfill_status': 'not_applicable',
@@ -331,11 +377,16 @@ def run_pipeline(
             for future in tqdm(as_completed(futures), total=len(upgrade_set), 
                               desc=f'{strategy} B={target_budget:.2f} [API]', leave=False):
                 try:
-                    idx, T_cand = future.result()
-                    upgrade_results[idx] = T_cand
+                    idx, agent_b_result = future.result()
+                    upgrade_results[idx] = agent_b_result
                 except Exception as e:
                     idx = futures[future]
-                    upgrade_results[idx] = all_results[idx]['T_A']  # 失败降级
+                    upgrade_results[idx] = {
+                        'corrected_text': all_results[idx]['T_A'],
+                        'latency_ms': None,
+                        'token_usage': None,
+                        'error_type': type(e).__name__,
+                    }  # 失败降级
     
     # 回填与统计
     cer_num = 0
@@ -354,11 +405,23 @@ def run_pipeline(
         final_text_if_upgraded = ''
         backfill_status = 'not_upgraded'
         backfill_reason = 'not_upgraded'
+        latency_ms = None
+        token_usage = None
+        error_type = 'not_upgraded'
         
         if i in upgrade_set:
             n_upgraded += 1
-            T_cand = upgrade_results.get(i, T_A)
+            agent_b_result = upgrade_results.get(i, {
+                'corrected_text': T_A,
+                'latency_ms': None,
+                'token_usage': None,
+                'error_type': 'missing_agent_b_result',
+            })
+            T_cand = agent_b_result.get('corrected_text', T_A)
             vlm_raw_output = T_cand
+            latency_ms = agent_b_result.get('latency_ms')
+            token_usage = agent_b_result.get('token_usage')
+            error_type = agent_b_result.get('error_type', 'none')
 
             if strategy == 'BAUR-only':
                 # BAUR-only：不启用严格回填，直接接受 Agent B 输出
@@ -405,6 +468,9 @@ def run_pipeline(
             'vlm_model': agent_b_label,
             'prompt_version': prompt_version,
             'vlm_raw_output': vlm_raw_output,
+            'latency_ms': latency_ms,
+            'token_usage': token_usage,
+            'error_type': error_type,
             'final_text_if_upgraded': final_text_if_upgraded,
             'final_text': T_final,
             'backfill_status': backfill_status,
@@ -422,6 +488,9 @@ def run_pipeline(
                 'budget': target_budget,
                 'ocr_text': T_A,
                 'vlm_raw_output': vlm_raw_output,
+                'latency_ms': latency_ms,
+                'token_usage': token_usage,
+                'error_type': error_type,
                 'final_text': T_final,
                 'backfill_status': backfill_status,
                 'backfill_reason': backfill_reason,
@@ -482,6 +551,9 @@ def replay_from_full_budget(
         backfill_status = item.get('backfill_status', 'not_upgraded') if is_upgraded else 'not_upgraded'
         backfill_reason = item.get('backfill_reason', 'not_upgraded') if is_upgraded else 'not_upgraded'
         vlm_raw_output = item.get('vlm_raw_output', '') if is_upgraded else ''
+        latency_ms = item.get('latency_ms') if is_upgraded else None
+        token_usage = item.get('token_usage') if is_upgraded else None
+        error_type = item.get('error_type', 'not_upgraded') if is_upgraded else 'not_upgraded'
 
         if is_upgraded:
             n_upgraded += 1
@@ -511,6 +583,9 @@ def replay_from_full_budget(
             'budget_mode': 'offline',
             'selected_for_upgrade': is_upgraded,
             'vlm_raw_output': vlm_raw_output,
+            'latency_ms': latency_ms,
+            'token_usage': token_usage,
+            'error_type': error_type,
             'final_text': final_text,
             'backfill_status': backfill_status,
             'backfill_reason': backfill_reason,
