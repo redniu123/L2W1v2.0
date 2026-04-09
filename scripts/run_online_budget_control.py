@@ -33,7 +33,7 @@ def build_scores(strategy, all_results, router):
     return scores
 
 
-def run_online_pipeline(strategy, target_budget, all_results, router, backfill_controller, prompter, agent_b_callable, budget_cfg, circuit_breaker, run_id='', prompt_version='prompt_v1.0'):
+def run_online_pipeline(strategy, target_budget, all_results, router, backfill_controller, prompter, agent_b_callable, budget_cfg, circuit_breaker, run_id='', prompt_version='prompt_v1.0', agent_b_label='configured_agent_b'):
     from modules.router.backfill import RouteType
     ctrl = OnlineBudgetController(budget_cfg)
     scores = build_scores(strategy, all_results, router)
@@ -76,7 +76,7 @@ def run_online_pipeline(strategy, target_budget, all_results, router, backfill_c
         else:
             T_final = T_A
         cer_num += Levenshtein.distance(T_final, T_GT); gt_len += len(T_GT)
-        row = {'sample_id': r.get('sample_id',''), 'image_path': r.get('image_path',''), 'source_image_id': r.get('source_image_id',''), 'domain': r.get('domain','geology'), 'split': r.get('split','test'), 'gt': T_GT, 'ocr_text': T_A, 'router_name': strategy, 'router_score': round(q,6), 'budget': target_budget, 'budget_mode': 'online_control', 'selected_for_upgrade': upgrade, 'lambda_current': round(lam,6), 'actual_budget_window': round(win,6), 'circuit_breaker_open': cb_stats.get('is_open', False), 'circuit_breaker_blocked': bd.get('circuit_breaker_blocked', False), 'vlm_model': 'configured_agent_b', 'prompt_version': prompt_version, 'vlm_raw_output': vlm_raw_output, 'final_text_if_upgraded': final_text_if_upgraded, 'final_text': T_final, 'backfill_status': backfill_status, 'backfill_reason': backfill_reason, 'is_correct_ocr': T_A == T_GT, 'is_correct_final': T_final == T_GT, 'edit_distance_ocr': Levenshtein.distance(T_A, T_GT), 'edit_distance_final': Levenshtein.distance(T_final, T_GT), 'run_id': run_id}
+        row = {'sample_id': r.get('sample_id',''), 'image_path': r.get('image_path',''), 'source_image_id': r.get('source_image_id',''), 'domain': r.get('domain','geology'), 'split': r.get('split','test'), 'gt': T_GT, 'ocr_text': T_A, 'router_name': strategy, 'router_score': round(q,6), 'budget': target_budget, 'budget_mode': 'online_control', 'selected_for_upgrade': upgrade, 'lambda_current': round(lam,6), 'actual_budget_window': round(win,6), 'circuit_breaker_open': cb_stats.get('is_open', False), 'circuit_breaker_blocked': bd.get('circuit_breaker_blocked', False), 'vlm_model': agent_b_label, 'prompt_version': prompt_version, 'vlm_raw_output': vlm_raw_output, 'final_text_if_upgraded': final_text_if_upgraded, 'final_text': T_final, 'backfill_status': backfill_status, 'backfill_reason': backfill_reason, 'is_correct_ocr': T_A == T_GT, 'is_correct_final': T_final == T_GT, 'edit_distance_ocr': Levenshtein.distance(T_A, T_GT), 'edit_distance_final': Levenshtein.distance(T_final, T_GT), 'run_id': run_id}
         per_sample.append(row)
         if upgrade:
             backfill_log.append({'sample_id': row['sample_id'], 'router_name': strategy, 'budget': target_budget, 'lambda_current': row['lambda_current'], 'actual_budget_window': row['actual_budget_window'], 'ocr_text': T_A, 'vlm_raw_output': vlm_raw_output, 'final_text': T_final, 'backfill_status': backfill_status, 'backfill_reason': backfill_reason, 'run_id': run_id})
@@ -96,6 +96,7 @@ def main():
     args = p.parse_args(); random.seed(args.seed); np.random.seed(args.seed)
     with open(args.config, 'r', encoding='utf-8') as f: config = yaml.safe_load(f)
     prompt_version = args.prompt_version or config.get('prompt_version', 'prompt_v1.0')
+    mainline_agent_b = config.get('mainline_agent_b', 'configured_agent_b')
     import argparse as _ap
     rec_args = _ap.Namespace(rec_model_dir=args.rec_model_dir, rec_char_dict_path=args.rec_char_dict_path, rec_image_shape='3, 48, 320', rec_batch_num=6, rec_algorithm='SVTR_LCNet', use_space_char=True, use_gpu=args.use_gpu, use_xpu=False, use_npu=False, use_mlu=False, use_metax_gpu=False, use_gcu=False, ir_optim=True, use_tensorrt=False, min_subgraph_size=15, precision='fp32', gpu_mem=500, gpu_id=0, enable_mkldnn=None, cpu_threads=10, warmup=False, benchmark=False, save_log_path='./log_output/', show_log=False, use_onnx=False, max_batch_size=10, return_word_box=False, drop_score=0.5, max_text_length=25, rec_image_inverse=True, use_det=False, det_model_dir='')
     from modules.paddle_engine.predict_rec_modified import TextRecognizerWithLogits
@@ -123,7 +124,7 @@ def main():
     budget_cfg = BudgetControllerConfig(window_size=bc.get('window_size', 500), k=bc.get('k', 0.01), lambda_min=bc.get('lambda_min', 0.0), lambda_max=bc.get('lambda_max', 2.0), lambda_init=bc.get('lambda_init', 0.5), target_budget=args.target_budget)
     cb_cfg = (config or {}).get('sh_da_v4', {}).get('circuit_breaker', {})
     circuit_breaker = CircuitBreaker(CircuitBreakerConfig(enabled=cb_cfg.get('enabled', True), min_samples=cb_cfg.get('min_samples', 20), rejection_rate_threshold=cb_cfg.get('rejection_rate_threshold', 0.60), cooldown_steps=cb_cfg.get('cooldown_steps', 50)))
-    result = run_online_pipeline(args.strategy, args.target_budget, all_results, router, backfill_controller, prompter, agent_b_callable, budget_cfg, circuit_breaker, run_id=run_id, prompt_version=prompt_version)
+    result = run_online_pipeline(args.strategy, args.target_budget, all_results, router, backfill_controller, prompter, agent_b_callable, budget_cfg, circuit_breaker, run_id=run_id, prompt_version=prompt_version, agent_b_label=mainline_agent_b)
     with open(run_dir / 'summary.csv', 'w', newline='', encoding='utf-8') as f:
         w = csv.DictWriter(f, fieldnames=['Strategy','Target_Budget','Actual_Call_Rate','Overall_CER','AER','CVR','N_valid']); w.writeheader(); w.writerow(result['summary'])
     (run_dir / 'metrics_summary.json').write_text(json.dumps([result['summary']], ensure_ascii=False, indent=2), encoding='utf-8')
