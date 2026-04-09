@@ -205,7 +205,7 @@ def infer_all_samples(samples, recognizer, domain_engine, data_root, image_root)
 def run_pipeline(
     strategy, target_budget, all_results,
     router, backfill_controller, prompter, agent_b_callable,
-    run_id: str = '', prompt_version: str = 'prompt_v1.0',
+    run_id: str = '', prompt_version: str = 'prompt_v1.0', agent_b_label: str = 'configured_agent_b',
 ):
     from concurrent.futures import ThreadPoolExecutor, as_completed
     
@@ -402,7 +402,7 @@ def run_pipeline(
             'budget': target_budget,
             'budget_mode': 'online',
             'selected_for_upgrade': i in upgrade_set,
-            'vlm_model': 'configured_agent_b',
+            'vlm_model': agent_b_label,
             'prompt_version': prompt_version,
             'vlm_raw_output': vlm_raw_output,
             'final_text_if_upgraded': final_text_if_upgraded,
@@ -567,6 +567,7 @@ def main():
     with open(args.config, 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
     prompt_version = args.prompt_version or config.get('prompt_version', 'prompt_v1.0')
+    mainline_agent_b = config.get('mainline_agent_b', 'configured_agent_b')
     print('[1/4] Init Agent A...')
     print(f'  Agent A device: {"GPU" if args.use_gpu else "CPU"}')
     import argparse as _ap
@@ -676,7 +677,7 @@ def main():
         print('\n--- AgentA_Only (Baseline 0) ---')
         result = run_pipeline('AgentA_Only', 0.0, all_results, router,
                               backfill_controller, prompter, agent_b_callable,
-                              run_id=run_id, prompt_version=prompt_version)
+                              run_id=run_id, prompt_version=prompt_version, agent_b_label=mainline_agent_b)
         row = result['summary']
         writer.writerow({k: row.get(k, '') for k in fieldnames})
         metrics_rows.append(row)
@@ -716,7 +717,7 @@ def main():
                     future = executor.submit(
                         run_pipeline, strategy, B, all_results, router,
                         backfill_controller, prompter, agent_b_callable,
-                        run_id, 'prompt_v1.0'
+                        run_id, prompt_version, mainline_agent_b
                     )
                     tasks.append((strategy, future))
                 
@@ -768,7 +769,7 @@ def main():
         full_budget_result = run_pipeline(
             strategy, 1.0, all_results, router,
             backfill_controller, prompter, agent_b_callable,
-            run_id, 'prompt_v1.0'
+            run_id, prompt_version, mainline_agent_b
         )
         with open(full_budget_path, 'w', encoding='utf-8') as f:
             for item in full_budget_result['per_sample']:
