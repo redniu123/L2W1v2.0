@@ -206,11 +206,11 @@
 ### P2-3 高级指标补齐
 **目标**：补论文级辅助指标。
 
-- [ ] `Boundary Deletion Recall@B`
-- [ ] `Substitution CER`
+- [x] `Boundary Deletion Recall@B`
+- [x] `Substitution CER`
 - [ ] `p95 latency`
 - [ ] `token usage`
-- [ ] `error_type` 错误桶
+- [x] `error_type` 错误桶（第一轮落盘）
 
 **验收标准**：
 - 主结果不只剩 CER/AER/CVR；
