@@ -11,6 +11,7 @@ SH-DA++ v5.1 Phase 3: Efficiency Frontier Grand Loop
 
 import argparse
 import csv
+import difflib
 import json
 import random
 import sys
@@ -32,6 +33,56 @@ def compute_cer(T_final: str, T_GT: str) -> float:
     if not T_GT:
         return 0.0
     return Levenshtein.distance(T_final, T_GT) / len(T_GT)
+
+
+def identify_boundary_deletion(agent_a_text: str, gt_text: str, k: int = 2) -> bool:
+    if not gt_text:
+        return False
+    matcher = difflib.SequenceMatcher(None, agent_a_text, gt_text)
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == 'insert':
+            for gt_pos in range(j1, j2):
+                if gt_pos < k or gt_pos >= len(gt_text) - k:
+                    return True
+        elif tag == 'replace':
+            pred_len = i2 - i1
+            gt_len = j2 - j1
+            if gt_len > pred_len:
+                for offset in range(gt_len - pred_len):
+                    gt_pos = j1 + pred_len + offset
+                    if gt_pos < k or gt_pos >= len(gt_text) - k:
+                        return True
+    return False
+
+
+def count_substitutions(prediction: str, reference: str) -> int:
+    matcher = difflib.SequenceMatcher(None, prediction, reference)
+    substitutions = 0
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == 'replace':
+            substitutions += min(i2 - i1, j2 - j1)
+    return substitutions
+
+
+def summarize_extended_metrics(per_sample: List[dict], boundary_k: int = 2) -> Dict[str, float]:
+    boundary_total = 0
+    boundary_upgraded = 0
+    substitution_errors = 0
+    gt_len_total = 0
+    for item in per_sample:
+        gt = item.get('gt', '')
+        ocr_text = item.get('ocr_text', '')
+        final_text = item.get('final_text', '')
+        if identify_boundary_deletion(ocr_text, gt, k=boundary_k):
+            boundary_total += 1
+            if item.get('selected_for_upgrade'):
+                boundary_upgraded += 1
+        substitution_errors += count_substitutions(final_text, gt)
+        gt_len_total += len(gt)
+    return {
+        'Boundary_Deletion_Recall@B': round((boundary_upgraded / boundary_total), 6) if boundary_total else 0.0,
+        'Substitution_CER': round((substitution_errors / gt_len_total), 6) if gt_len_total else 0.0,
+    }
 
 
 def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
@@ -292,6 +343,8 @@ def run_pipeline(
                 'Strategy': 'AgentA_Only', 'Target_Budget': 0.0,
                 'Actual_Call_Rate': 0.0,
                 'Overall_CER': round(cer_num / gt_len, 6) if gt_len else 0,
+                'Boundary_Deletion_Recall@B': 0.0,
+                'Substitution_CER': round((sum(count_substitutions(r['T_A'], r['T_GT']) for r in all_results) / gt_len), 6) if gt_len else 0.0,
                 'AER': 0.0, 'CVR': 0.0, 'N_valid': N,
             },
             'per_sample': per_sample,
@@ -502,11 +555,14 @@ def run_pipeline(
     aer = n_accepted_edit / n_upgraded if n_upgraded > 0 else 0.0
     cvr = n_rejected / n_upgraded if n_upgraded > 0 else 0.0
     
+    extended_metrics = summarize_extended_metrics(per_sample)
     return {
         'summary': {
             'Strategy': strategy, 'Target_Budget': target_budget,
             'Actual_Call_Rate': round(actual_rate, 4),
             'Overall_CER': round(overall_cer, 6),
+            'Boundary_Deletion_Recall@B': extended_metrics['Boundary_Deletion_Recall@B'],
+            'Substitution_CER': extended_metrics['Substitution_CER'],
             'AER': round(aer, 4), 'CVR': round(cvr, 4), 'N_valid': N,
         },
         'per_sample': per_sample,
@@ -600,6 +656,7 @@ def replay_from_full_budget(
     overall_cer = cer_num / gt_len if gt_len > 0 else 0.0
     aer = n_accepted_edit / n_upgraded if n_upgraded > 0 else 0.0
     cvr = n_rejected / n_upgraded if n_upgraded > 0 else 0.0
+    extended_metrics = summarize_extended_metrics(per_sample)
 
     return {
         'summary': {
@@ -607,6 +664,8 @@ def replay_from_full_budget(
             'Target_Budget': target_budget,
             'Actual_Call_Rate': round(actual_rate, 4),
             'Overall_CER': round(overall_cer, 6),
+            'Boundary_Deletion_Recall@B': extended_metrics['Boundary_Deletion_Recall@B'],
+            'Substitution_CER': extended_metrics['Substitution_CER'],
             'AER': round(aer, 4),
             'CVR': round(cvr, 4),
             'N_valid': N,
@@ -737,9 +796,9 @@ def main():
     domain_breakdown_path = run_dir / 'domain_breakdown.csv'
     backfill_log_path = run_dir / 'backfill_log.jsonl'
     fieldnames = ['Strategy', 'Target_Budget', 'Actual_Call_Rate',
-                  'Overall_CER', 'AER', 'CVR', 'N_valid']
+                  'Overall_CER', 'Boundary_Deletion_Recall@B', 'Substitution_CER', 'AER', 'CVR', 'N_valid']
     offline_fieldnames = ['Strategy', 'Target_Budget', 'Actual_Call_Rate',
-                          'Overall_CER', 'AER', 'CVR', 'N_valid', 'Budget_Mode']
+                          'Overall_CER', 'Boundary_Deletion_Recall@B', 'Substitution_CER', 'AER', 'CVR', 'N_valid', 'Budget_Mode']
     metrics_rows = []
     all_failure_cases = []
     all_backfill_logs = []

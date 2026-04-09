@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from modules.router.uncertainty_router import BudgetControllerConfig, OnlineBudgetController
 from modules.router.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
-from scripts.run_efficiency_frontier import build_agent_b_callable, infer_all_samples
+from scripts.run_efficiency_frontier import build_agent_b_callable, infer_all_samples, summarize_extended_metrics
 
 
 def build_scores(strategy, all_results, router):
@@ -87,7 +87,8 @@ def run_online_pipeline(strategy, target_budget, all_results, router, backfill_c
         per_sample.append(row)
         if upgrade:
             backfill_log.append({'sample_id': row['sample_id'], 'router_name': strategy, 'budget': target_budget, 'lambda_current': row['lambda_current'], 'actual_budget_window': row['actual_budget_window'], 'ocr_text': T_A, 'vlm_raw_output': vlm_raw_output, 'latency_ms': latency_ms, 'token_usage': token_usage, 'error_type': error_type, 'final_text': T_final, 'backfill_status': backfill_status, 'backfill_reason': backfill_reason, 'run_id': run_id})
-    return {'summary': {'Strategy': strategy, 'Target_Budget': target_budget, 'Actual_Call_Rate': round(n_upgraded / len(all_results), 4) if all_results else 0.0, 'Overall_CER': round(cer_num / gt_len, 6) if gt_len else 0.0, 'AER': round(n_accepted / n_upgraded, 4) if n_upgraded else 0.0, 'CVR': round(n_rejected / n_upgraded, 4) if n_upgraded else 0.0, 'N_valid': len(all_results)}, 'budget_stats': ctrl.get_stats(), 'per_sample': per_sample, 'backfill_log': backfill_log}
+    extended_metrics = summarize_extended_metrics(per_sample)
+    return {'summary': {'Strategy': strategy, 'Target_Budget': target_budget, 'Actual_Call_Rate': round(n_upgraded / len(all_results), 4) if all_results else 0.0, 'Overall_CER': round(cer_num / gt_len, 6) if gt_len else 0.0, 'Boundary_Deletion_Recall@B': extended_metrics['Boundary_Deletion_Recall@B'], 'Substitution_CER': extended_metrics['Substitution_CER'], 'AER': round(n_accepted / n_upgraded, 4) if n_upgraded else 0.0, 'CVR': round(n_rejected / n_upgraded, 4) if n_upgraded else 0.0, 'N_valid': len(all_results)}, 'budget_stats': ctrl.get_stats(), 'per_sample': per_sample, 'backfill_log': backfill_log}
 
 
 def main():
@@ -133,7 +134,7 @@ def main():
     circuit_breaker = CircuitBreaker(CircuitBreakerConfig(enabled=cb_cfg.get('enabled', True), min_samples=cb_cfg.get('min_samples', 20), rejection_rate_threshold=cb_cfg.get('rejection_rate_threshold', 0.60), cooldown_steps=cb_cfg.get('cooldown_steps', 50)))
     result = run_online_pipeline(args.strategy, args.target_budget, all_results, router, backfill_controller, prompter, agent_b_callable, budget_cfg, circuit_breaker, run_id=run_id, prompt_version=prompt_version, agent_b_label=mainline_agent_b)
     with open(run_dir / 'summary.csv', 'w', newline='', encoding='utf-8') as f:
-        w = csv.DictWriter(f, fieldnames=['Strategy','Target_Budget','Actual_Call_Rate','Overall_CER','AER','CVR','N_valid']); w.writeheader(); w.writerow(result['summary'])
+        w = csv.DictWriter(f, fieldnames=['Strategy','Target_Budget','Actual_Call_Rate','Overall_CER','Boundary_Deletion_Recall@B','Substitution_CER','AER','CVR','N_valid']); w.writeheader(); w.writerow(result['summary'])
     (run_dir / 'metrics_summary.json').write_text(json.dumps([result['summary']], ensure_ascii=False, indent=2), encoding='utf-8')
     (run_dir / 'budget_stability.json').write_text(json.dumps(result['budget_stats'], ensure_ascii=False, indent=2), encoding='utf-8')
     (run_dir / 'circuit_breaker.json').write_text(json.dumps(circuit_breaker.get_stats(), ensure_ascii=False, indent=2), encoding='utf-8')
