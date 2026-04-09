@@ -130,12 +130,15 @@ def infer_all_samples(samples, recognizer, domain_engine, data_root, image_root)
     results = []
     for sample in tqdm(samples, desc="Agent A 全量推理"):
         image_path = sample.get("image") or sample.get("image_path", "")
-        T_GT = sample.get("gt_text") or sample.get("text") or sample.get("label", "")
+        T_GT = sample.get("gt_text") or sample.get("gt") or sample.get("text") or sample.get("label", "")
         if not image_path or not T_GT:
             continue
         img_path = Path(image_path)
         if not img_path.is_absolute():
-            img_path = Path(image_root).resolve() / img_path
+            rel_path = Path(image_path)
+            if rel_path.parts[:2] == ('dataset', 'images'):
+                rel_path = Path(*rel_path.parts[2:])
+            img_path = Path(image_root).resolve() / rel_path
         img = cv2.imread(str(img_path))
         if img is None:
             continue
@@ -441,8 +444,8 @@ def run_pipeline(
 def main():
     parser = argparse.ArgumentParser(description='SH-DA++ v5.1 Phase 3')
     parser.add_argument('--config', default='configs/router_config.yaml')
-    parser.add_argument('--test_jsonl', default='data/raw/hctr_riskbench/test.jsonl')
-    parser.add_argument('--image_root', default='data/geo')
+    parser.add_argument('--test_jsonl', default='data/l2w1data/test.jsonl')
+    parser.add_argument('--image_root', default='data/l2w1data/images')
     parser.add_argument('--rec_model_dir', default='./models/agent_a_ppocr/PP-OCRv5_server_rec_infer')
     parser.add_argument('--rec_char_dict_path', default='ppocr/utils/ppocrv5_dict.txt')
     parser.add_argument('--geo_dict', default='data/dicts/Geology.txt')
