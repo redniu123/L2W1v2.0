@@ -1,5 +1,6 @@
 # SH-DA++ v5.1 Router Config
 
+mainline_agent_b: "Gemini 3 Flash Preview"
 prompt_version: "prompt_v1.0"
 
 agent_b:
