@@ -92,8 +92,10 @@ def main():
     p.add_argument('--output_dir', default='results/stage2_v51_online'); p.add_argument('--strategy', default='SH-DA++', choices=['GCR','BAUR','DAR','BAUR-only','SH-DA++'])
     p.add_argument('--target_budget', type=float, default=0.10); p.add_argument('--seed', type=int, default=42); p.add_argument('--n_samples', type=int, default=None)
     p.add_argument('--use_gpu', action='store_true', default=False); p.add_argument('--use_cache', action='store_true', default=False); p.add_argument('--rebuild_cache', action='store_true', default=False)
+    p.add_argument('--prompt_version', default=None, help='Override frozen prompt version')
     args = p.parse_args(); random.seed(args.seed); np.random.seed(args.seed)
     with open(args.config, 'r', encoding='utf-8') as f: config = yaml.safe_load(f)
+    prompt_version = args.prompt_version or config.get('prompt_version', 'prompt_v1.0')
     import argparse as _ap
     rec_args = _ap.Namespace(rec_model_dir=args.rec_model_dir, rec_char_dict_path=args.rec_char_dict_path, rec_image_shape='3, 48, 320', rec_batch_num=6, rec_algorithm='SVTR_LCNet', use_space_char=True, use_gpu=args.use_gpu, use_xpu=False, use_npu=False, use_mlu=False, use_metax_gpu=False, use_gcu=False, ir_optim=True, use_tensorrt=False, min_subgraph_size=15, precision='fp32', gpu_mem=500, gpu_id=0, enable_mkldnn=None, cpu_threads=10, warmup=False, benchmark=False, save_log_path='./log_output/', show_log=False, use_onnx=False, max_batch_size=10, return_word_box=False, drop_score=0.5, max_text_length=25, rec_image_inverse=True, use_det=False, det_model_dir='')
     from modules.paddle_engine.predict_rec_modified import TextRecognizerWithLogits
@@ -121,7 +123,7 @@ def main():
     budget_cfg = BudgetControllerConfig(window_size=bc.get('window_size', 500), k=bc.get('k', 0.01), lambda_min=bc.get('lambda_min', 0.0), lambda_max=bc.get('lambda_max', 2.0), lambda_init=bc.get('lambda_init', 0.5), target_budget=args.target_budget)
     cb_cfg = (config or {}).get('sh_da_v4', {}).get('circuit_breaker', {})
     circuit_breaker = CircuitBreaker(CircuitBreakerConfig(enabled=cb_cfg.get('enabled', True), min_samples=cb_cfg.get('min_samples', 20), rejection_rate_threshold=cb_cfg.get('rejection_rate_threshold', 0.60), cooldown_steps=cb_cfg.get('cooldown_steps', 50)))
-    result = run_online_pipeline(args.strategy, args.target_budget, all_results, router, backfill_controller, prompter, agent_b_callable, budget_cfg, circuit_breaker, run_id=run_id)
+    result = run_online_pipeline(args.strategy, args.target_budget, all_results, router, backfill_controller, prompter, agent_b_callable, budget_cfg, circuit_breaker, run_id=run_id, prompt_version=prompt_version)
     with open(run_dir / 'summary.csv', 'w', newline='', encoding='utf-8') as f:
         w = csv.DictWriter(f, fieldnames=['Strategy','Target_Budget','Actual_Call_Rate','Overall_CER','AER','CVR','N_valid']); w.writeheader(); w.writerow(result['summary'])
     (run_dir / 'metrics_summary.json').write_text(json.dumps([result['summary']], ensure_ascii=False, indent=2), encoding='utf-8')

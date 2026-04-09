@@ -560,11 +560,13 @@ def main():
     parser.add_argument('--use_gpu', action='store_true', default=False, help='Use GPU for Agent A (default: CPU)')
     parser.add_argument('--use_cache', action='store_true', default=False, help='Load Agent A results from cache instead of re-inferring')
     parser.add_argument('--rebuild_cache', action='store_true', default=False, help='Force rebuild Agent A cache even if it exists')
+    parser.add_argument('--prompt_version', default=None, help='Override frozen prompt version')
     args = parser.parse_args()
     random.seed(args.seed)
     np.random.seed(args.seed)
     with open(args.config, 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
+    prompt_version = args.prompt_version or config.get('prompt_version', 'prompt_v1.0')
     print('[1/4] Init Agent A...')
     print(f'  Agent A device: {"GPU" if args.use_gpu else "CPU"}')
     import argparse as _ap
@@ -674,7 +676,7 @@ def main():
         print('\n--- AgentA_Only (Baseline 0) ---')
         result = run_pipeline('AgentA_Only', 0.0, all_results, router,
                               backfill_controller, prompter, agent_b_callable,
-                              run_id=run_id, prompt_version='prompt_v1.0')
+                              run_id=run_id, prompt_version=prompt_version)
         row = result['summary']
         writer.writerow({k: row.get(k, '') for k in fieldnames})
         metrics_rows.append(row)
