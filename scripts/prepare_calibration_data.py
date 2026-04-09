@@ -9,7 +9,7 @@ SH-DA++ v5.1 Phase 1: 特征工程 2.0
 变更说明：
   - 彻底删除 v_edge 及 v_edge * b_edge
   - 新增 Mean_Confidence、Min_Confidence
-  - 激活 r_d（基于 ahocorasick 地质词典匹配）
+  - 激活 r_d（基于多领域词典匹配）
   - 按 train/val/test 三个 split 分别提取，严格隔离
   - 支持 --image_root 参数显式指定图像路径基准目录
 """
@@ -85,7 +85,7 @@ def extract_features_from_output(
         b_edge = float(np.clip(1.0 - conf, 0.0, 1.0))
         drop = 0.0
 
-    # --- r_d: 地质语义风险分 ---
+    # --- r_d: 多领域语义风险分 ---
     r_d = domain_engine.compute_r_d(T_A, domain=domain)
 
     return np.array([mean_conf, min_conf, b_edge, drop, r_d], dtype=np.float32)
@@ -173,6 +173,9 @@ def process_split(
         features_list.append(features)
         labels_list.append(y_deletion)
         metadata_list.append({
+            "sample_id": sample.get("sample_id", ""),
+            "domain": sample.get("domain", "geology"),
+            "split": sample.get("split", split_name),
             "image": str(image_path),
             "T_A": T_A,
             "T_GT": T_GT,
@@ -207,14 +210,18 @@ def main():
     from tools.infer.utility import init_args
 
     parser = init_args()
-    parser.add_argument("--data_dir", type=str, default="data/raw/hctr_riskbench",
+    parser.add_argument("--data_dir", type=str, default="data/l2w1data",
                         help="包含 train/val/test.jsonl 的目录")
     parser.add_argument("--output_dir", type=str, default="results/stage2_v51",
                         help="特征输出目录")
-    parser.add_argument("--image_root", type=str, default="data/geo",
+    parser.add_argument("--image_root", type=str, default="data/l2w1data/images",
                         help="图像路径基准目录（JSONL 中图像路径相对于此目录）")
     parser.add_argument("--geo_dict", type=str, default="data/dicts/Geology.txt",
                         help="地质词典路径")
+    parser.add_argument("--finance_dict", type=str, default="data/dicts/Finance.txt",
+                        help="金融词典路径")
+    parser.add_argument("--medicine_dict", type=str, default="data/dicts/Medicine.txt",
+                        help="医学词典路径")
     parser.add_argument("--K", type=int, default=2, help="边界窗口大小")
     parser.add_argument("--use_det", action="store_true")
     parser.add_argument("--det_model_dir", type=str, default="")
