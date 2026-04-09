@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-SH-DA++ Stage 2 Cloud Execution Script (Simplified)
+SH-DA++ Stage 2 Simplified Execution Script
 
-完整执行流程：
+简化执行流程（legacy runner，对齐 L2W1 多领域底盘）：
 1. 数据适配
 2. 特征提取
 3. 校准训练
@@ -28,8 +28,8 @@ def generate_deletion_label_simple(T_A: str, T_GT: str, K: int = 2) -> int:
     return 0
 
 
-def adapt_geology_data(input_jsonl: str, output_jsonl: str) -> dict:
-    """适配地质数据到 V2.0 格式"""
+def adapt_l2w1_data(input_jsonl: str, output_jsonl: str) -> dict:
+    """适配 L2W1 多领域数据到当前简化执行格式"""
     print("\n[Step 1] 数据适配")
     print("=" * 60)
 
@@ -47,21 +47,24 @@ def adapt_geology_data(input_jsonl: str, output_jsonl: str) -> dict:
                 stats["total"] += 1
                 record = json.loads(line.strip())
 
-                record_id = record.get("id") or f"geo_{line_idx:05d}"
+                record_id = record.get("sample_id") or record.get("id") or f"l2w1_{line_idx:05d}"
                 image_path = record.get("image") or record.get("image_path")
-                gt_text = record.get("gt_text") or record.get("text")
+                gt_text = record.get("gt_text") or record.get("gt") or record.get("text")
                 confidence = record.get("confidence", 0.95)
+                domain = record.get("domain", "geology")
 
                 if not image_path or not gt_text:
                     stats["invalid"] += 1
                     continue
 
                 v2_record = {
-                    "id": str(record_id),
+                    "sample_id": str(record_id),
                     "image": str(image_path),
                     "gt_text": str(gt_text),
-                    "source": "geology",
-                    "metadata": {"confidence": float(confidence), "domain": "geology"},
+                    "domain": domain,
+                    "split": record.get("split", "train"),
+                    "source": "l2w1data",
+                    "metadata": {"confidence": float(confidence), "domain": domain},
                 }
 
                 fout.write(json.dumps(v2_record, ensure_ascii=False) + "\n")
@@ -300,17 +303,17 @@ def generate_execution_report(
 def main():
     """主函数"""
     print("\n" + "=" * 60)
-    print("SH-DA++ Stage 2 云端执行脚本")
+    print("SH-DA++ Stage 2 简化执行脚本（legacy runner，对齐 L2W1 多领域底盘）")
     print("=" * 60)
 
     # Step 1: 数据适配
-    adapt_stats = adapt_geology_data(
-        "data/geo/geotext.jsonl", "data/geo/geotext_v2.jsonl"
+    adapt_stats = adapt_l2w1_data(
+        "data/l2w1data/train.jsonl", "results/stage2/l2w1_train_adapted.jsonl"
     )
 
     # Step 2: 特征提取
     extract_stats, X, Y = extract_features(
-        "data/geo/geotext_v2.jsonl", "results/stage2/calibration_features.npy"
+        "results/stage2/l2w1_train_adapted.jsonl", "results/stage2/calibration_features.npy"
     )
 
     # Step 3: 校准训练
