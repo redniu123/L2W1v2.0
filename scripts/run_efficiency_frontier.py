@@ -123,8 +123,17 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
     if backend == "gemini":
         try:
             from modules.vlm_expert.gemini_expert import GeminiAgentB, GeminiConfig
-            agent = GeminiAgentB(config=GeminiConfig())
-            print(f"[Agent B] Gemini backend: {agent.config.model_name}")
+            gemini_cfg = GeminiConfig(
+                base_url=agent_b_cfg.get("base_url", "https://new.lemonapi.site/v1"),
+                model_name=agent_b_cfg.get("model_name", "gemini-3-flash-preview"),
+                key_file=agent_b_cfg.get("key_file", "key.txt"),
+                temperature=agent_b_cfg.get("temperature", 0.1),
+                max_tokens=agent_b_cfg.get("max_tokens", 256),
+                max_retries=agent_b_cfg.get("max_retries", 3),
+                timeout=agent_b_cfg.get("timeout", 60),
+            )
+            agent = GeminiAgentB(config=gemini_cfg)
+            print(f"[Agent B] Gemini backend: {agent.config.model_name} @ {agent.config.base_url}")
 
             def gemini_fn(prompt: dict) -> dict:
                 T_A = prompt.get("T_A", "")

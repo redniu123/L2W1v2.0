@@ -27,6 +27,12 @@ agent_b:
   torch_dtype: "float16"
   max_new_tokens: 128
   # --- Gemini API settings (backend=gemini 时生效) ---
+  base_url: "https://new.lemonapi.site/v1"
+  key_file: "key.txt"
+  temperature: 0.1
+  max_tokens: 256
+  max_retries: 3
+  timeout: 60
   model_name: "gemini-3-flash-preview"
 
 backfill:
