@@ -97,6 +97,40 @@ def summarize_latency_and_token_usage(per_sample: List[dict]) -> Dict[str, float
     }
 
 
+def ensure_agent_a_result_schema(all_results: List[dict]) -> List[dict]:
+    """兼容旧版 cache：补齐正式主线所需字段。"""
+    normalized = []
+    for item in all_results:
+        r = dict(item)
+        r.setdefault('sample_id', '')
+        r.setdefault('source_image_id', '')
+        r.setdefault('domain', 'geology')
+        r.setdefault('split', 'test')
+        r.setdefault('professional_terms', [])
+        r.setdefault('has_professional_terms', False)
+        r.setdefault('image_path', r.get('img_path', ''))
+        r.setdefault('img_path', r.get('image_path', ''))
+        r.setdefault('boundary_stats', {})
+        r.setdefault('top2_info', {})
+        if r.get('conf') is None:
+            conf = r.get('mean_conf', r.get('min_conf', 0.0))
+            r['conf'] = float(conf) if conf is not None else 0.0
+        if r.get('mean_conf') is None:
+            r['mean_conf'] = float(r.get('conf', 0.0))
+        if r.get('min_conf') is None:
+            r['min_conf'] = float(r.get('conf', 0.0))
+        if 'min_conf_idx' not in r:
+            r['min_conf_idx'] = None
+        if r.get('r_d') is None:
+            r['r_d'] = 0.0
+        if r.get('b_edge') is None:
+            r['b_edge'] = 0.0
+        if r.get('drop') is None:
+            r['drop'] = 0.0
+        normalized.append(r)
+    return normalized
+
+
 def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
     """构建 Agent B 调用函数（含重试）"""
     import re
@@ -804,10 +838,12 @@ def main():
         print(f'[4/4] Agent A cache HIT: loading from {cache_path}')
         with open(cache_path, 'r', encoding='utf-8') as f:
             all_results = json.load(f)
+        all_results = ensure_agent_a_result_schema(all_results)
         print(f'  Loaded {len(all_results)} cached results')
     else:
         print('[4/4] Agent A full inference...')
         all_results = infer_all_samples(samples, recognizer, domain_engine, None, args.image_root)
+        all_results = ensure_agent_a_result_schema(all_results)
         # 保存缓存（完整集，不限制 n_samples）
         Path(args.output_dir).mkdir(parents=True, exist_ok=True)
         # top2_info/boundary_stats 中可能含 numpy，序列化前转 list
