@@ -1,0 +1,2 @@
+Strategy,Target_Budget,Actual_Call_Rate,Overall_CER,Boundary_Deletion_Recall@B,Substitution_CER,P95_Latency_MS,Avg_Token_Usage,Total_Token_Usage,N_Latency_Valid,N_Token_Valid,AER,CVR,N_valid
+BAUR-only,0.1,0.99,0.117057,0.966667,0.051282,181044.527,0.0,0.0,99,0,0.4848,0.0,100

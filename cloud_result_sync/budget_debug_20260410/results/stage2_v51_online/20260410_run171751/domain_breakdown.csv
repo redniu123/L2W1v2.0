@@ -1,0 +1,2 @@
+router_name,domain,budget,n_samples,final_accuracy
+BAUR-only,geology,0.1,100,0.41

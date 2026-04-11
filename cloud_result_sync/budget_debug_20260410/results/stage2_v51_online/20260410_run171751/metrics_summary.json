@@ -1,0 +1,18 @@
+[
+  {
+    "Strategy": "BAUR-only",
+    "Target_Budget": 0.1,
+    "Actual_Call_Rate": 0.99,
+    "Overall_CER": 0.117057,
+    "Boundary_Deletion_Recall@B": 0.966667,
+    "Substitution_CER": 0.051282,
+    "P95_Latency_MS": 181044.527,
+    "Avg_Token_Usage": 0.0,
+    "Total_Token_Usage": 0.0,
+    "N_Latency_Valid": 99,
+    "N_Token_Valid": 0,
+    "AER": 0.4848,
+    "CVR": 0.0,
+    "N_valid": 100
+  }
+]
