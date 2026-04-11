@@ -100,6 +100,11 @@ def main():
     p.add_argument('--finance_dict', default='data/dicts/Finance.txt'); p.add_argument('--medicine_dict', default='data/dicts/Medicine.txt')
     p.add_argument('--output_dir', default='results/stage2_v51_online'); p.add_argument('--strategy', default='SH-DA++', choices=['GCR','BAUR','DAR','BAUR-only','SH-DA++'])
     p.add_argument('--target_budget', type=float, default=0.10); p.add_argument('--seed', type=int, default=42); p.add_argument('--n_samples', type=int, default=None)
+    p.add_argument('--budget_window_size', type=int, default=None, help='Override budget controller window_size for debug/validation')
+    p.add_argument('--budget_k', type=float, default=None, help='Override budget controller k for debug/validation')
+    p.add_argument('--budget_lambda_init', type=float, default=None, help='Override budget controller lambda_init for debug/validation')
+    p.add_argument('--budget_lambda_min', type=float, default=None, help='Override budget controller lambda_min for debug/validation')
+    p.add_argument('--budget_lambda_max', type=float, default=None, help='Override budget controller lambda_max for debug/validation')
     p.add_argument('--use_gpu', action='store_true', default=False); p.add_argument('--use_cache', action='store_true', default=False); p.add_argument('--rebuild_cache', action='store_true', default=False)
     p.add_argument('--prompt_version', default=None, help='Override frozen prompt version')
     args = p.parse_args(); random.seed(args.seed); np.random.seed(args.seed)
@@ -130,7 +135,14 @@ def main():
     run_id = datetime.now().strftime('%Y%m%d_run%H%M%S'); run_dir = Path(args.output_dir) / run_id; run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / 'config_snapshot.yaml').write_text(yaml.safe_dump({'run_id': run_id, 'args': vars(args), 'config': config}, allow_unicode=True, sort_keys=False), encoding='utf-8')
     bc = (config or {}).get('sh_da_v4', {}).get('budget_controller', {})
-    budget_cfg = BudgetControllerConfig(window_size=bc.get('window_size', 500), k=bc.get('k', 0.01), lambda_min=bc.get('lambda_min', 0.0), lambda_max=bc.get('lambda_max', 2.0), lambda_init=bc.get('lambda_init', 0.5), target_budget=args.target_budget)
+    budget_cfg = BudgetControllerConfig(
+        window_size=args.budget_window_size or bc.get('window_size', 500),
+        k=args.budget_k if args.budget_k is not None else bc.get('k', 0.01),
+        lambda_min=args.budget_lambda_min if args.budget_lambda_min is not None else bc.get('lambda_min', 0.0),
+        lambda_max=args.budget_lambda_max if args.budget_lambda_max is not None else bc.get('lambda_max', 2.0),
+        lambda_init=args.budget_lambda_init if args.budget_lambda_init is not None else bc.get('lambda_init', 0.5),
+        target_budget=args.target_budget,
+    )
     cb_cfg = (config or {}).get('sh_da_v4', {}).get('circuit_breaker', {})
     circuit_breaker = CircuitBreaker(CircuitBreakerConfig(enabled=cb_cfg.get('enabled', True), min_samples=cb_cfg.get('min_samples', 20), rejection_rate_threshold=cb_cfg.get('rejection_rate_threshold', 0.60), cooldown_steps=cb_cfg.get('cooldown_steps', 50)))
     result = run_online_pipeline(args.strategy, args.target_budget, all_results, router, backfill_controller, prompter, agent_b_callable, budget_cfg, circuit_breaker, run_id=run_id, prompt_version=prompt_version, agent_b_label=mainline_agent_b)

@@ -57,8 +57,8 @@ def build_steps(args: argparse.Namespace) -> List[Dict[str, Any]]:
     if args.use_gpu:
         common.append("--use_gpu")
 
-    smoke_shda = common + ["--strategy", "SH-DA++", "--n_samples", str(args.smoke_samples)]
-    smoke_baur = common + ["--strategy", "BAUR-only", "--n_samples", str(args.smoke_samples)]
+    smoke_shda = common + ["--strategy", "SH-DA++", "--n_samples", str(args.smoke_samples), "--budget_window_size", str(args.smoke_window_size)]
+    smoke_baur = common + ["--strategy", "BAUR-only", "--n_samples", str(args.smoke_samples), "--budget_window_size", str(args.smoke_window_size)]
     full_shda = common + ["--strategy", "SH-DA++"]
     full_baur = common + ["--strategy", "BAUR-only"]
 
@@ -148,6 +148,7 @@ def main() -> int:
     parser.add_argument("--python_executable", default=None, help="Python executable to use; defaults to current interpreter")
     parser.add_argument("--online_budget", default="0.10")
     parser.add_argument("--smoke_samples", type=int, default=100)
+    parser.add_argument("--smoke_window_size", type=int, default=50)
     parser.add_argument("--batch_budgets", default="0.10,0.20,0.30")
     parser.add_argument("--offline_replay_budgets", default="0.10,0.20,0.30,1.00")
     parser.add_argument("--timeout_minutes_per_step", type=int, default=0, help="0 means no timeout")
@@ -177,6 +178,7 @@ def main() -> int:
             "batch_output_dir": args.batch_output_dir,
             "online_budget": args.online_budget,
             "smoke_samples": args.smoke_samples,
+            "smoke_window_size": args.smoke_window_size,
             "batch_budgets": args.batch_budgets,
             "offline_replay_budgets": args.offline_replay_budgets,
             "use_cache": args.use_cache,
