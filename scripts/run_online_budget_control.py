@@ -101,6 +101,7 @@ def main():
     p.add_argument('--output_dir', default='results/stage2_v51_online'); p.add_argument('--strategy', default='SH-DA++', choices=['GCR','BAUR','DAR','BAUR-only','SH-DA++'])
     p.add_argument('--target_budget', type=float, default=0.10); p.add_argument('--seed', type=int, default=42); p.add_argument('--n_samples', type=int, default=None)
     p.add_argument('--budget_window_size', type=int, default=None, help='Override budget controller window_size for debug/validation')
+    p.add_argument('--budget_warmup_samples', type=int, default=None, help='Override budget controller warmup_samples for debug/validation')
     p.add_argument('--budget_k', type=float, default=None, help='Override budget controller k for debug/validation')
     p.add_argument('--budget_lambda_init', type=float, default=None, help='Override budget controller lambda_init for debug/validation')
     p.add_argument('--budget_lambda_min', type=float, default=None, help='Override budget controller lambda_min for debug/validation')
@@ -135,9 +136,11 @@ def main():
     run_id = datetime.now().strftime('%Y%m%d_run%H%M%S'); run_dir = Path(args.output_dir) / run_id; run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / 'config_snapshot.yaml').write_text(yaml.safe_dump({'run_id': run_id, 'args': vars(args), 'config': config}, allow_unicode=True, sort_keys=False), encoding='utf-8')
     bc = (config or {}).get('sh_da_v4', {}).get('budget_controller', {})
+    budget_k = args.budget_k if args.budget_k is not None else bc.get('k', bc.get('alpha', 0.01))
     budget_cfg = BudgetControllerConfig(
         window_size=args.budget_window_size or bc.get('window_size', 500),
-        k=args.budget_k if args.budget_k is not None else bc.get('k', 0.01),
+        warmup_samples=args.budget_warmup_samples if args.budget_warmup_samples is not None else bc.get('warmup_samples'),
+        k=budget_k,
         lambda_min=args.budget_lambda_min if args.budget_lambda_min is not None else bc.get('lambda_min', 0.0),
         lambda_max=args.budget_lambda_max if args.budget_lambda_max is not None else bc.get('lambda_max', 2.0),
         lambda_init=args.budget_lambda_init if args.budget_lambda_init is not None else bc.get('lambda_init', 0.5),

@@ -1267,6 +1267,7 @@ class BudgetControllerConfig:
     
     Attributes:
         window_size: 滑动窗口大小 W，用于计算实际调用率
+        warmup_samples: warmup 样本数，默认取 min(50, window_size)
         k: 比例系数，控制阈值更新步长
         lambda_min: 阈值下界
         lambda_max: 阈值上界
@@ -1274,6 +1275,7 @@ class BudgetControllerConfig:
         target_budget: 目标调用率 B ∈ [0, 1]
     """
     window_size: int = 200          # W: 滑动窗口大小
+    warmup_samples: Optional[int] = None  # warmup 样本数，默认 min(50, W)
     k: float = 0.05                 # 比例系数
     lambda_min: float = 0.0         # λ_min
     lambda_max: float = 2.0         # λ_max
@@ -1311,6 +1313,7 @@ class OnlineBudgetController:
             config: 预算控制器配置
         """
         self.config = config or BudgetControllerConfig()
+        self._warmup_samples = max(0, min(self.config.window_size, self.config.warmup_samples if self.config.warmup_samples is not None else min(50, self.config.window_size)))
         
         # 当前阈值
         self._lambda = self.config.lambda_init
@@ -1333,7 +1336,7 @@ class OnlineBudgetController:
     @property
     def is_warmup(self) -> bool:
         """是否处于 warmup 阶段"""
-        return self._sample_count < self.config.window_size
+        return self._sample_count < self._warmup_samples
     
     @property
     def actual_budget(self) -> float:
@@ -1481,6 +1484,7 @@ class OnlineBudgetController:
             "target_budget": self.config.target_budget,
             "is_warmup": self.is_warmup,
             "window_size": self.config.window_size,
+            "warmup_samples": self._warmup_samples,
             "k": self.config.k,
         }
 
