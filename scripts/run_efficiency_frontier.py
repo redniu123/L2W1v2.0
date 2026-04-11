@@ -734,8 +734,11 @@ def main():
     parser.add_argument('--finance_dict', default='data/dicts/Finance.txt')
     parser.add_argument('--medicine_dict', default='data/dicts/Medicine.txt')
     parser.add_argument('--output_dir', default='results/stage2_v51')
-    parser.add_argument('--budgets', default='0.05,0.10,0.20,0.30')
+    parser.add_argument('--budgets', default=None, help='Comma-separated online budgets. Defaults to config.mainline.formal_budgets')
+    parser.add_argument('--strategies', default='GCR,BAUR,DAR,BAUR-only,SH-DA++', help='Comma-separated strategies to run online')
     parser.add_argument('--offline_replay_budgets', default='0.05,0.10,0.20,0.30,0.50,1.00', help='Offline replay budgets from full-budget results')
+    parser.add_argument('--offline_strategies', default='GCR,BAUR,DAR,BAUR-only,SH-DA++', help='Comma-separated strategies to run offline replay')
+    parser.add_argument('--skip_offline_replay', action='store_true', help='Skip offline replay stage')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--n_samples', type=int, default=None, help='Limit to first N samples (for testing)')
     parser.add_argument('--use_gpu', action='store_true', default=False, help='Use GPU for Agent A (default: CPU)')
@@ -749,6 +752,10 @@ def main():
         config = yaml.safe_load(f)
     prompt_version = args.prompt_version or config.get('prompt_version', 'prompt_v1.0')
     mainline_agent_b = config.get('mainline_agent_b', 'configured_agent_b')
+    formal_budgets = config.get('mainline', {}).get('formal_budgets', [0.10, 0.20, 0.30])
+    budgets = [float(b) for b in (args.budgets.split(',') if args.budgets else formal_budgets)]
+    online_strategies = [s.strip() for s in args.strategies.split(',') if s.strip()]
+    offline_strategies = [s.strip() for s in args.offline_strategies.split(',') if s.strip()]
     print('[1/4] Init Agent A...')
     print(f'  Agent A device: {"GPU" if args.use_gpu else "CPU"}')
     import argparse as _ap
@@ -857,7 +864,6 @@ def main():
     with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
-        budgets = [float(b) for b in args.budgets.split(',')]
         
         print('\n--- AgentA_Only (Baseline 0) ---')
         result = run_pipeline('AgentA_Only', 0.0, all_results, router,
@@ -897,8 +903,8 @@ def main():
         for B in budgets:
             print(f'\n=== Budget B={B:.2f} ===')
             tasks = []
-            with ThreadPoolExecutor(max_workers=5) as executor:
-                for strategy in ['GCR', 'BAUR', 'DAR', 'BAUR-only', 'SH-DA++']:
+            with ThreadPoolExecutor(max_workers=len(online_strategies)) as executor:
+                for strategy in online_strategies:
                     future = executor.submit(
                         run_pipeline, strategy, B, all_results, router,
                         backfill_controller, prompter, agent_b_callable,
@@ -948,53 +954,56 @@ def main():
     
     # Offline replay：基于 100% full-call 结果离线重建预算点
     offline_replay_budgets = [float(b) for b in args.offline_replay_budgets.split(',')]
-    print('\n=== Offline Replay from Full-Budget Results ===')
-    for strategy in ['GCR', 'BAUR', 'DAR', 'BAUR-only', 'SH-DA++']:
-        full_budget_path = run_dir / f'full_budget_results_{strategy}.jsonl'
-        full_budget_result = run_pipeline(
-            strategy, 1.0, all_results, router,
-            backfill_controller, prompter, agent_b_callable,
-            run_id, prompt_version, mainline_agent_b
-        )
-        with open(full_budget_path, 'w', encoding='utf-8') as f:
-            for item in full_budget_result['per_sample']:
-                f.write(json.dumps(item, ensure_ascii=False) + '\n')
-
-        for B in offline_replay_budgets:
-            replay_result = replay_from_full_budget(
-                strategy=strategy,
-                target_budget=B,
-                full_budget_items=full_budget_result['per_sample'],
-                run_id=run_id,
-                prompt_version='prompt_v1.0',
+    if not args.skip_offline_replay:
+        print('\n=== Offline Replay from Full-Budget Results ===')
+        for strategy in offline_strategies:
+            full_budget_path = run_dir / f'full_budget_results_{strategy}.jsonl'
+            full_budget_result = run_pipeline(
+                strategy, 1.0, all_results, router,
+                backfill_controller, prompter, agent_b_callable,
+                run_id, prompt_version, mainline_agent_b
             )
-            replay_row = replay_result['summary']
-            metrics_rows.append(replay_row)
-            all_backfill_logs.extend(replay_result.get('backfill_log', []))
-            for item in replay_result['per_sample']:
-                key = (item.get('router_name', 'unknown'), item.get('domain', 'unknown'), f"offline:{item.get('budget', 0.0)}")
-                stat = domain_stats.setdefault(key, {'total': 0, 'correct_final': 0})
-                stat['total'] += 1
-                stat['correct_final'] += 1 if item.get('is_correct_final') else 0
-                if item.get('is_correct_ocr') is False and item.get('is_correct_final') is False:
-                    all_failure_cases.append({
-                        'sample_id': item.get('sample_id', ''),
-                        'router_name': item.get('router_name', ''),
-                        'budget': item.get('budget', 0.0),
-                        'domain': item.get('domain', ''),
-                        'ocr_text': item.get('ocr_text', ''),
-                        'final_text': item.get('final_text', ''),
-                        'gt': item.get('gt', ''),
-                        'backfill_status': item.get('backfill_status', ''),
-                        'backfill_reason': item.get('backfill_reason', ''),
-                        'edit_distance_final': item.get('edit_distance_final', 0),
-                    })
-            budget_tag = f"{int(round(B * 100)):02d}"
-            replay_path = run_dir / f'offline_budget_{budget_tag}_{strategy}.jsonl'
-            with open(replay_path, 'w', encoding='utf-8') as f:
-                for item in replay_result['per_sample']:
+            with open(full_budget_path, 'w', encoding='utf-8') as f:
+                for item in full_budget_result['per_sample']:
                     f.write(json.dumps(item, ensure_ascii=False) + '\n')
-            print(f"  [offline {strategy:10s} B={B:.2f}] CER={replay_row['Overall_CER']:.4%} ActualRate={replay_row['Actual_Call_Rate']:.2%}")
+
+            for B in offline_replay_budgets:
+                replay_result = replay_from_full_budget(
+                    strategy=strategy,
+                    target_budget=B,
+                    full_budget_items=full_budget_result['per_sample'],
+                    run_id=run_id,
+                    prompt_version=prompt_version,
+                )
+                replay_row = replay_result['summary']
+                metrics_rows.append(replay_row)
+                all_backfill_logs.extend(replay_result.get('backfill_log', []))
+                for item in replay_result['per_sample']:
+                    key = (item.get('router_name', 'unknown'), item.get('domain', 'unknown'), f"offline:{item.get('budget', 0.0)}")
+                    stat = domain_stats.setdefault(key, {'total': 0, 'correct_final': 0})
+                    stat['total'] += 1
+                    stat['correct_final'] += 1 if item.get('is_correct_final') else 0
+                    if item.get('is_correct_ocr') is False and item.get('is_correct_final') is False:
+                        all_failure_cases.append({
+                            'sample_id': item.get('sample_id', ''),
+                            'router_name': item.get('router_name', ''),
+                            'budget': item.get('budget', 0.0),
+                            'domain': item.get('domain', ''),
+                            'ocr_text': item.get('ocr_text', ''),
+                            'final_text': item.get('final_text', ''),
+                            'gt': item.get('gt', ''),
+                            'backfill_status': item.get('backfill_status', ''),
+                            'backfill_reason': item.get('backfill_reason', ''),
+                            'edit_distance_final': item.get('edit_distance_final', 0),
+                        })
+                budget_tag = f"{int(round(B * 100)):02d}"
+                replay_path = run_dir / f'offline_budget_{budget_tag}_{strategy}.jsonl'
+                with open(replay_path, 'w', encoding='utf-8') as f:
+                    for item in replay_result['per_sample']:
+                        f.write(json.dumps(item, ensure_ascii=False) + '\n')
+                print(f"  [offline {strategy:10s} B={B:.2f}] CER={replay_row['Overall_CER']:.4%} ActualRate={replay_row['Actual_Call_Rate']:.2%}")
+    else:
+        print('\n=== Offline Replay skipped by flag ===')
 
     with open(metrics_json_path, 'w', encoding='utf-8') as f:
         json.dump(metrics_rows, f, ensure_ascii=False, indent=2)
