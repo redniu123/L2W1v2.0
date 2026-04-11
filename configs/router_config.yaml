@@ -29,6 +29,7 @@ agent_b:
   # --- Gemini API settings (backend=gemini 时生效) ---
   base_url: "https://new.lemonapi.site/v1"
   key_file: "key.txt"
+  provider_pool: "gemini_wending_3x"
   temperature: 0.1
   max_tokens: 256
   max_retries: 3

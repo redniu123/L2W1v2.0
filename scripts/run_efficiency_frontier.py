@@ -127,6 +127,7 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
                 base_url=agent_b_cfg.get("base_url", "https://new.lemonapi.site/v1"),
                 model_name=agent_b_cfg.get("model_name", "gemini-3-flash-preview"),
                 key_file=agent_b_cfg.get("key_file", "key.txt"),
+                provider_pool=agent_b_cfg.get("provider_pool", "gemini_1x"),
                 temperature=agent_b_cfg.get("temperature", 0.1),
                 max_tokens=agent_b_cfg.get("max_tokens", 256),
                 max_retries=agent_b_cfg.get("max_retries", 3),

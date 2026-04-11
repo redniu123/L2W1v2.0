@@ -21,62 +21,40 @@ import numpy as np
 import requests
 from PIL import Image
 
+from modules.vlm_expert.provider_pools import get_provider_pool
+
 
 class APIKeyManager:
     """
     API Key 管理器（并发安全）
     
     功能：
-    - 从 key.txt 读取 100 个 API Key
+    - 从 key.txt 读取指定 provider pool 的 API Keys
     - Round-robin 轮询
     - 线程安全（使用 threading.Lock）
     """
     
-    def __init__(self, key_file: str = "key.txt"):
+    def __init__(self, key_file: str = "key.txt", provider_pool: str = "gemini_1x"):
         """
         Args:
             key_file: Key 文件路径（相对于项目根目录）
+            provider_pool: provider pool 名称
         """
         self.key_file = Path(key_file)
+        self.provider_pool = provider_pool
         self.keys = self._load_keys()
         self._index = 0
         self._lock = threading.Lock()
         
         if not self.keys:
-            raise ValueError(f"No API keys found in {key_file}")
+            raise ValueError(f"No API keys found for provider pool '{provider_pool}' in {key_file}")
         
-        print(f"[APIKeyManager] Loaded {len(self.keys)} API keys")
+        print(f"[APIKeyManager] Loaded {len(self.keys)} API keys from pool '{provider_pool}'")
     
     def _load_keys(self) -> List[str]:
-        """从 key.txt 读取 API Keys"""
-        keys = []
-        
-        if not self.key_file.exists():
-            print(f"[Warning] Key file not found: {self.key_file}")
-            return keys
-        
-        with open(self.key_file, "r", encoding="utf-8") as f:
-            in_list = False
-            for line in f:
-                line = line.strip()
-                
-                # 检测 API_KEYS = [ 开始
-                if "API_KEYS" in line and "[" in line:
-                    in_list = True
-                    continue
-                
-                # 检测 ] 结束
-                if in_list and "]" in line:
-                    break
-                
-                # 提取 Key
-                if in_list and line.startswith('"sk-'):
-                    # 移除引号和逗号
-                    key = line.strip('",')
-                    if key.startswith("sk-"):
-                        keys.append(key)
-        
-        return keys
+        """从 key.txt 读取指定 provider pool 的 API Keys"""
+        pool = get_provider_pool(self.provider_pool, self.key_file)
+        return list(pool.keys)
     
     def get_next_key(self) -> str:
         """
@@ -107,6 +85,7 @@ class GeminiConfig:
     base_url: str = "https://new.lemonapi.site/v1"
     model_name: str = "gemini-3-flash-preview"
     key_file: str = "key.txt"  # Key 文件路径（项目根目录）
+    provider_pool: str = "gemini_1x"  # provider pool 名称
     temperature: float = 0.1
     max_tokens: int = 256
     max_retries: int = 3  # 增加重试次数（快速跳过失效 Key）
@@ -114,8 +93,8 @@ class GeminiConfig:
 
     def __post_init__(self):
         # 初始化 APIKeyManager
-        self.key_manager = APIKeyManager(self.key_file)
-        print(f"[GeminiConfig] Using {self.key_manager.get_key_count()} API keys")
+        self.key_manager = APIKeyManager(self.key_file, provider_pool=self.provider_pool)
+        print(f"[GeminiConfig] Using pool={self.provider_pool}, keys={self.key_manager.get_key_count()}")
 
 
 class GeminiAgentB:
