@@ -19,6 +19,10 @@ models/
 # 忽略结果文件
 results/
 
+# 允许 GitHub 中转云端结果
+!cloud_result_sync/
+!cloud_result_sync/**
+
 # 忽略日志
 log_output/
 *.log
