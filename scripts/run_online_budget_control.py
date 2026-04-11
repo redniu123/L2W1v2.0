@@ -13,34 +13,82 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from modules.router.uncertainty_router import BudgetControllerConfig, OnlineBudgetController
 from modules.router.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
-from scripts.run_efficiency_frontier import build_agent_b_callable, infer_all_samples, summarize_extended_metrics, summarize_latency_and_token_usage
+from scripts.run_efficiency_frontier import build_agent_b_callable, ensure_agent_a_result_schema, infer_all_samples, summarize_extended_metrics, summarize_latency_and_token_usage
 
 
 def build_scores(strategy, all_results, router):
-    scores = []
+    score_entries = []
     for r in all_results:
         if strategy == 'GCR':
-            scores.append(1.0 - r['conf'])
+            q = 1.0 - r['conf']
+            score_entries.append({
+                'q': q,
+                'score_base': q,
+                's_b': None,
+                's_a': None,
+                'route_type': None,
+                'r_d_total': 0.0,
+                'r_d_base': 0.0,
+                'r_d_geology': 0.0,
+                's_d': 0.0,
+                'scoring_details': {},
+            })
         elif strategy == 'BAUR':
             d = router.route(r['boundary_stats'], r['top2_info'], r_d=0.0, agent_a_text=r['T_A'])
-            scores.append(max(d.s_b, d.s_a))
+            score_entries.append({
+                'q': max(d.s_b, d.s_a),
+                'score_base': max(d.s_b, d.s_a),
+                's_b': d.s_b,
+                's_a': d.s_a,
+                'route_type': d.route_type.value,
+                'r_d_total': 0.0,
+                'r_d_base': 0.0,
+                'r_d_geology': 0.0,
+                's_d': 0.0,
+                'scoring_details': d.details.get('scoring_details', {}),
+            })
         elif strategy == 'DAR':
             d = router.route(r['boundary_stats'], r['top2_info'], r_d=r['r_d'], agent_a_text=r['T_A'])
-            scores.append(d.q)
+            sd = d.details.get('scoring_details', {})
+            score_entries.append({
+                'q': d.q,
+                'score_base': max(d.s_b, d.s_a),
+                's_b': d.s_b,
+                's_a': d.s_a,
+                'route_type': d.route_type.value,
+                'r_d_total': sd.get('r_d', r.get('r_d', 0.0)),
+                'r_d_base': sd.get('r_d_base', r.get('r_d', 0.0)),
+                'r_d_geology': sd.get('r_d_geology', 0.0),
+                's_d': sd.get('s_d', 0.0),
+                'scoring_details': sd,
+            })
         else:
             d = router.route(r['boundary_stats'], r['top2_info'], r_d=0.0, agent_a_text=r['T_A'])
-            scores.append(max(d.s_b, d.s_a))
-    return scores
+            sd = d.details.get('scoring_details', {})
+            score_entries.append({
+                'q': max(d.s_b, d.s_a),
+                'score_base': max(d.s_b, d.s_a),
+                's_b': d.s_b,
+                's_a': d.s_a,
+                'route_type': d.route_type.value,
+                'r_d_total': sd.get('r_d', 0.0),
+                'r_d_base': sd.get('r_d_base', 0.0),
+                'r_d_geology': sd.get('r_d_geology', 0.0),
+                's_d': sd.get('s_d', 0.0),
+                'scoring_details': sd,
+            })
+    return score_entries
 
 
 def run_online_pipeline(strategy, target_budget, all_results, router, backfill_controller, prompter, agent_b_callable, budget_cfg, circuit_breaker, run_id='', prompt_version='prompt_v1.0', agent_b_label='configured_agent_b'):
     from modules.router.backfill import RouteType
     ctrl = OnlineBudgetController(budget_cfg)
-    scores = build_scores(strategy, all_results, router)
+    score_entries = build_scores(strategy, all_results, router)
     cer_num = gt_len = n_upgraded = n_accepted = n_rejected = 0
     per_sample, backfill_log = [], []
     for i, r in enumerate(tqdm(all_results, desc=f'{strategy} online B={target_budget:.2f}', leave=False)):
-        T_A, T_GT, q = r['T_A'], r['T_GT'], float(scores[i])
+        T_A, T_GT, score_entry = r['T_A'], r['T_GT'], score_entries[i]
+        q = float(score_entry['q'])
         upgrade, bd = ctrl.step(q)
         if upgrade and not circuit_breaker.allow_upgrade():
             upgrade = False
@@ -83,7 +131,53 @@ def run_online_pipeline(strategy, target_budget, all_results, router, backfill_c
         else:
             T_final = T_A
         cer_num += Levenshtein.distance(T_final, T_GT); gt_len += len(T_GT)
-        row = {'sample_id': r.get('sample_id',''), 'image_path': r.get('image_path',''), 'source_image_id': r.get('source_image_id',''), 'domain': r.get('domain','geology'), 'split': r.get('split','test'), 'gt': T_GT, 'ocr_text': T_A, 'router_name': strategy, 'router_score': round(q,6), 'budget': target_budget, 'budget_mode': 'online_control', 'selected_for_upgrade': upgrade, 'lambda_current': round(lam,6), 'actual_budget_window': round(win,6), 'circuit_breaker_open': cb_stats.get('is_open', False), 'circuit_breaker_blocked': bd.get('circuit_breaker_blocked', False), 'vlm_model': agent_b_label, 'prompt_version': prompt_version, 'vlm_raw_output': vlm_raw_output, 'latency_ms': latency_ms, 'token_usage': token_usage, 'error_type': error_type, 'has_professional_terms': r.get('has_professional_terms', False), 'professional_terms': r.get('professional_terms', []), 'domain_risk_score': round(float(r.get('r_d', 0.0)), 6), 'cvr_flag': backfill_status == 'rejected', 'replay_rank': None, 'final_text_if_upgraded': final_text_if_upgraded, 'final_text': T_final, 'backfill_status': backfill_status, 'backfill_reason': backfill_reason, 'is_correct_ocr': T_A == T_GT, 'is_correct_final': T_final == T_GT, 'edit_distance_ocr': Levenshtein.distance(T_A, T_GT), 'edit_distance_final': Levenshtein.distance(T_final, T_GT), 'run_id': run_id}
+        row = {
+            'sample_id': r.get('sample_id',''),
+            'image_path': r.get('image_path',''),
+            'source_image_id': r.get('source_image_id',''),
+            'domain': r.get('domain','geology'),
+            'split': r.get('split','test'),
+            'gt': T_GT,
+            'ocr_text': T_A,
+            'router_name': strategy,
+            'router_score': round(q,6),
+            'router_score_base': round(float(score_entry.get('score_base', q)), 6),
+            'router_s_b': None if score_entry.get('s_b') is None else round(float(score_entry['s_b']), 6),
+            'router_s_a': None if score_entry.get('s_a') is None else round(float(score_entry['s_a']), 6),
+            'router_route_type': score_entry.get('route_type'),
+            'router_r_d_total': round(float(score_entry.get('r_d_total', 0.0)), 6),
+            'router_r_d_base': round(float(score_entry.get('r_d_base', 0.0)), 6),
+            'router_r_d_geology': round(float(score_entry.get('r_d_geology', 0.0)), 6),
+            'router_s_d': round(float(score_entry.get('s_d', 0.0)), 6),
+            'router_scoring_details': score_entry.get('scoring_details', {}),
+            'budget': target_budget,
+            'budget_mode': 'online_control',
+            'selected_for_upgrade': upgrade,
+            'lambda_current': round(lam,6),
+            'actual_budget_window': round(win,6),
+            'circuit_breaker_open': cb_stats.get('is_open', False),
+            'circuit_breaker_blocked': bd.get('circuit_breaker_blocked', False),
+            'vlm_model': agent_b_label,
+            'prompt_version': prompt_version,
+            'vlm_raw_output': vlm_raw_output,
+            'latency_ms': latency_ms,
+            'token_usage': token_usage,
+            'error_type': error_type,
+            'has_professional_terms': r.get('has_professional_terms', False),
+            'professional_terms': r.get('professional_terms', []),
+            'domain_risk_score': round(float(r.get('r_d', 0.0)), 6),
+            'cvr_flag': backfill_status == 'rejected',
+            'replay_rank': None,
+            'final_text_if_upgraded': final_text_if_upgraded,
+            'final_text': T_final,
+            'backfill_status': backfill_status,
+            'backfill_reason': backfill_reason,
+            'is_correct_ocr': T_A == T_GT,
+            'is_correct_final': T_final == T_GT,
+            'edit_distance_ocr': Levenshtein.distance(T_A, T_GT),
+            'edit_distance_final': Levenshtein.distance(T_final, T_GT),
+            'run_id': run_id,
+        }
         per_sample.append(row)
         if upgrade:
             backfill_log.append({'sample_id': row['sample_id'], 'router_name': strategy, 'budget': target_budget, 'lambda_current': row['lambda_current'], 'actual_budget_window': row['actual_budget_window'], 'ocr_text': T_A, 'vlm_raw_output': vlm_raw_output, 'latency_ms': latency_ms, 'token_usage': token_usage, 'error_type': error_type, 'final_text': T_final, 'backfill_status': backfill_status, 'backfill_reason': backfill_reason, 'run_id': run_id})
@@ -122,9 +216,9 @@ def main():
     recognizer = TextRecognizerWithLogits(rec_args); router = SHDARouter.from_yaml(args.config); backfill_controller = StrictBackfillController(BackfillConfig()); prompter = ConstrainedPrompter(); domain_engine = DomainKnowledgeEngine({'geology': args.geo_dict, 'finance': args.finance_dict, 'medicine': args.medicine_dict}); agent_b_callable = build_agent_b_callable(config)
     samples = [json.loads(line) for line in Path(args.test_jsonl).read_text(encoding='utf-8').splitlines() if line.strip()]
     cache_path = Path(args.output_dir) / 'agent_a_cache.json'
-    if args.use_cache and not args.rebuild_cache and cache_path.exists(): all_results = json.loads(cache_path.read_text(encoding='utf-8'))
+    if args.use_cache and not args.rebuild_cache and cache_path.exists(): all_results = ensure_agent_a_result_schema(json.loads(cache_path.read_text(encoding='utf-8')))
     else:
-        all_results = infer_all_samples(samples, recognizer, domain_engine, None, args.image_root); Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+        all_results = infer_all_samples(samples, recognizer, domain_engine, None, args.image_root); all_results = ensure_agent_a_result_schema(all_results); Path(args.output_dir).mkdir(parents=True, exist_ok=True)
         cache_data = []
         for r in all_results:
             rc = dict(r)
