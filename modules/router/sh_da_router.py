@@ -366,7 +366,12 @@ class SHDARouter:
             window_size=sh_da_config.get("budget_controller", {}).get(
                 "window_size", 500
             ),
-            k=sh_da_config.get("budget_controller", {}).get("k", 0.01),
+            warmup_samples=sh_da_config.get("budget_controller", {}).get(
+                "warmup_samples"
+            ),
+            k=sh_da_config.get("budget_controller", {}).get(
+                "k", sh_da_config.get("budget_controller", {}).get("alpha", 0.01)
+            ),
             lambda_min=sh_da_config.get("budget_controller", {}).get("lambda_min", 0.0),
             lambda_max=sh_da_config.get("budget_controller", {}).get("lambda_max", 2.0),
             lambda_init=sh_da_config.get("budget_controller", {}).get(
