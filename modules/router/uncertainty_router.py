@@ -854,10 +854,13 @@ class RuleScorerConfig:
     # 综合优先级权重
     eta: float = 0.5        # η: r_d 权重系数
 
-    # 地质语义风险
-    geology_dict_path: str = "data/dicts/Geology.txt"
-    geology_min_len: int = 2
-    geology_risk_weight: float = 1.0
+    # WUR 固定规则参数
+    wur_mean_weight: float = 0.5
+    wur_min_weight: float = 0.3
+    wur_drop_weight: float = 0.2
+    wur_min_conf_gate_threshold: float = 0.35
+    wur_drop_gate_threshold: float = 0.20
+    wur_gate_bonus: float = 0.10
 
 
 @dataclass
@@ -1009,10 +1012,9 @@ class RuleOnlyScorer:
         if v_edge is not None:
             v_edge_norm = self._normalize_v_edge(v_edge)
         else:
-            # 若未提供 v_edge，使用 blank 峰值作为代理指标
-            v_edge_proxy = max(blank_peak_L, blank_peak_R) * 5.0  # 映射到 [0, 5] 范围
-            v_edge_norm = self._normalize_v_edge(v_edge_proxy)
-            details["v_edge_proxy"] = float(v_edge_proxy)
+            # 未提供真实 v_edge 时，不再使用 blank peak 作为代理，避免与 b_edge 重复计分
+            v_edge_norm = 0.0
+            details["v_edge_missing"] = True
         
         details["v_edge_norm"] = float(v_edge_norm)
         

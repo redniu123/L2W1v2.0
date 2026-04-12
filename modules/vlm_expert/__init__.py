@@ -7,7 +7,7 @@ SH-DA++ v5.1: VLM Expert Factory
 
   model_type       expert class        典型模型
   -----------      ----------------    --------------------------------
-  qwen2.5_vl       QwenVLExpert        Qwen2.5-VL-7B-Instruct
+  qwen2.5_vl       QwenVLExpert        Qwen2.5-VL-7B-Instruct / Qwen3-VL-8B
   qwen3.5          Qwen35Expert        Qwen3.5-9B
   internvl2        InternVL2Expert     InternVL2-8B-AWQ
   internvl2_5      InternVL2Expert     InternVL2_5-8B-AWQ

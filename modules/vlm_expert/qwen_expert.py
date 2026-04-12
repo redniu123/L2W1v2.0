@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 SH-DA++ v5.1: Qwen Expert
-兼容 Qwen2.5-VL-7B-Instruct 和 Qwen3.5-9B。
+兼容 Qwen2.5-VL-7B-Instruct、Qwen3-VL-8B 和 Qwen3.5-9B。
 显存策略: float16 + device_map=auto (2080Ti Turing 禁用 bfloat16)。
 """
 from typing import Dict, Union
@@ -11,7 +11,7 @@ from .base_expert import BaseVLMExpert
 
 
 class QwenVLExpert(BaseVLMExpert):
-    """Qwen2.5-VL 多模态专家"""
+    """Qwen 系列多模态专家（Qwen2.5-VL / Qwen3-VL）"""
 
     def __init__(self, model_path: str, torch_dtype: str = "float16", max_new_tokens: int = 128):
         self.model_path = model_path
@@ -19,11 +19,12 @@ class QwenVLExpert(BaseVLMExpert):
         self.max_new_tokens = max_new_tokens
         self.model = None
         self.processor = None
+        self._model_family = "qwen2.5_vl"
         self._init_model()
 
     def _init_model(self):
         import torch
-        from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
+        from transformers import AutoProcessor
         dtype = torch.float16 if self.torch_dtype == "float16" else torch.bfloat16
         print(f"[QwenVL] Loading {self.model_path} ({self.torch_dtype})...")
         attn = "sdpa"
@@ -33,15 +34,36 @@ class QwenVLExpert(BaseVLMExpert):
             print("[QwenVL] Flash Attention 2 enabled")
         except ImportError:
             pass
-        self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-            self.model_path, torch_dtype=dtype, device_map="auto",
-            attn_implementation=attn, trust_remote_code=True,
-        ).eval()
+
+        model_path_lower = str(self.model_path).lower()
+        if "qwen3-vl" in model_path_lower or "qwen3_vl" in model_path_lower:
+            from transformers import AutoModelForImageTextToText
+            self.model = AutoModelForImageTextToText.from_pretrained(
+                self.model_path,
+                torch_dtype=dtype,
+                device_map="auto",
+                trust_remote_code=True,
+                attn_implementation=attn,
+            ).eval()
+            self._model_family = "qwen3_vl"
+        else:
+            from transformers import Qwen2_5_VLForConditionalGeneration
+            self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                self.model_path,
+                torch_dtype=dtype,
+                device_map="auto",
+                attn_implementation=attn,
+                trust_remote_code=True,
+            ).eval()
+            self._model_family = "qwen2.5_vl"
+
         self.processor = AutoProcessor.from_pretrained(
-            self.model_path, trust_remote_code=True,
-            min_pixels=256 * 28 * 28, max_pixels=1280 * 28 * 28,
+            self.model_path,
+            trust_remote_code=True,
+            min_pixels=256 * 28 * 28,
+            max_pixels=1280 * 28 * 28,
         )
-        print("[QwenVL] Ready.")
+        print(f"[QwenVL] Ready. family={self._model_family}")
 
     def chat_with_image(self, image_path: Union[str, np.ndarray], prompt_text: str) -> str:
         import torch
@@ -68,8 +90,12 @@ class QwenVLExpert(BaseVLMExpert):
             torch.cuda.empty_cache()
 
     def get_model_info(self) -> Dict:
-        return {"backend": "local_vlm", "model_type": "qwen2.5_vl",
-                "model_path": self.model_path, "torch_dtype": self.torch_dtype}
+        return {
+            "backend": "local_vlm",
+            "model_type": self._model_family,
+            "model_path": self.model_path,
+            "torch_dtype": self.torch_dtype,
+        }
 
 
 class Qwen35Expert(BaseVLMExpert):
