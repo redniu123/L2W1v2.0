@@ -5,7 +5,7 @@ SH-DA++ v5.1 Phase 3: Efficiency Frontier Grand Loop
 
 评测数据集: Test 集
 目标预算: [0.05, 0.10, 0.20, 0.30]
-策略: AgentA_Only / GCR / BAUR / DAR / BAUR-only / SH-DA++
+策略: AgentA_Only / GCR / WUR / DGCR / DWUR / BAUR / DAR / Router-only / SH-DA++
 输出: results/stage2_v51/efficiency_frontier.csv
 """
 
@@ -418,43 +418,77 @@ def run_pipeline(
             'backfill_log': [],
         }
 
-    # 计算路由分数
-    if strategy == 'GCR':
-        # Global Confidence Router：仅用全局置信度
-        scores = [(1.0 - r['conf']) for r in all_results]
-    elif strategy == 'BAUR':
-        # Budget-Aware Uncertainty Router：轻量不确定性，不含领域项
-        scores = []
-        for r in all_results:
-            dec = router.route(
-                boundary_stats=r['boundary_stats'],
-                top2_info=r['top2_info'],
-                r_d=0.0,
-                agent_a_text=r['T_A'],
-            )
-            scores.append(max(dec.s_b, dec.s_a))
-    elif strategy == 'DAR':
-        # Domain-Augmented Router：在 BAUR 基础上显式加入领域项
-        scores = []
-        for r in all_results:
-            dec = router.route(
-                boundary_stats=r['boundary_stats'],
-                top2_info=r['top2_info'],
-                r_d=r['r_d'],
-                agent_a_text=r['T_A'],
-            )
-            scores.append(dec.q)
-    else:  # SH-DA++ or BAUR-only
-        # BAUR-only / SH-DA++ 当前都基于 BAUR 路由（不含领域项）
-        scores = []
-        for r in all_results:
-            dec = router.route(
-                boundary_stats=r['boundary_stats'],
-                top2_info=r['top2_info'],
-                r_d=0.0,
-                agent_a_text=r['T_A'],
-            )
-            scores.append(max(dec.s_b, dec.s_a))
+        # 主线路由：GCR / WUR / DGCR / DWUR
+        # 补充路线：BAUR / DAR
+        # 系统对照：Router-only / SH-DA++
+        if strategy == 'GCR':
+            scores = [1.0 - float(r.get('conf', r.get('mean_conf', 0.0))) for r in all_results]
+        elif strategy == 'DGCR':
+            scores = [
+                (1.0 - float(r.get('conf', r.get('mean_conf', 0.0)))) + float(r.get('r_d', 0.0))
+                for r in all_results
+            ]
+        elif strategy == 'WUR':
+            scores = []
+            for r in all_results:
+                mean_conf = float(r.get('mean_conf', r.get('conf', 0.0)))
+                min_conf = float(r.get('min_conf', r.get('conf', 0.0)))
+                drop = float(r.get('drop', 0.0))
+                q = 0.5 * (1.0 - mean_conf) + 0.3 * (1.0 - min_conf) + 0.2 * drop
+                if min_conf < 0.35:
+                    q += 0.10
+                if drop > 0.20:
+                    q += 0.10
+                scores.append(float(q))
+        elif strategy == 'DWUR':
+            scores = []
+            eta = float(getattr(router.config.rule_scorer, 'eta', 0.5))
+            for r in all_results:
+                mean_conf = float(r.get('mean_conf', r.get('conf', 0.0)))
+                min_conf = float(r.get('min_conf', r.get('conf', 0.0)))
+                drop = float(r.get('drop', 0.0))
+                q = 0.5 * (1.0 - mean_conf) + 0.3 * (1.0 - min_conf) + 0.2 * drop
+                if min_conf < 0.35:
+                    q += 0.10
+                if drop > 0.20:
+                    q += 0.10
+                q += eta * float(r.get('r_d', 0.0))
+                scores.append(float(q))
+        elif strategy == 'BAUR':
+            # Budget-Aware Uncertainty Router：轻量不确定性，不含领域项
+            scores = []
+            for r in all_results:
+                dec = router.route(
+                    boundary_stats=r['boundary_stats'],
+                    top2_info=r['top2_info'],
+                    r_d=0.0,
+                    agent_a_text=r['T_A'],
+                )
+                scores.append(max(dec.s_b, dec.s_a))
+        elif strategy == 'DAR':
+            # Domain-Augmented Router：在 BAUR 基础上显式加入领域项
+            scores = []
+            for r in all_results:
+                dec = router.route(
+                    boundary_stats=r['boundary_stats'],
+                    top2_info=r['top2_info'],
+                    r_d=r['r_d'],
+                    agent_a_text=r['T_A'],
+                )
+                scores.append(dec.q)
+        else:  # Router-only or SH-DA++
+            # 系统对照默认使用 WUR 作为当前固定规则主路由
+            scores = []
+            for r in all_results:
+                mean_conf = float(r.get('mean_conf', r.get('conf', 0.0)))
+                min_conf = float(r.get('min_conf', r.get('conf', 0.0)))
+                drop = float(r.get('drop', 0.0))
+                q = 0.5 * (1.0 - mean_conf) + 0.3 * (1.0 - min_conf) + 0.2 * drop
+                if min_conf < 0.35:
+                    q += 0.10
+                if drop > 0.20:
+                    q += 0.10
+                scores.append(float(q))
 
     upgrade_set = set(
         sorted(range(N), key=lambda i: scores[i], reverse=True)[:n_call_target]
@@ -543,12 +577,12 @@ def run_pipeline(
             token_usage = agent_b_result.get('token_usage')
             error_type = agent_b_result.get('error_type', 'none')
 
-            if strategy == 'BAUR-only':
-                # BAUR-only：不启用严格回填，直接接受 Agent B 输出
+            if strategy == 'Router-only':
+                # Router-only：不启用严格回填，直接接受 Agent B 输出
                 T_final = T_cand if isinstance(T_cand, str) and T_cand else T_A
                 final_text_if_upgraded = T_final
                 backfill_status = 'skipped'
-                backfill_reason = 'baur_only_no_backfill'
+                backfill_reason = 'router_only_no_backfill'
                 if T_final != T_A:
                     n_accepted_edit += 1
             else:
@@ -769,9 +803,9 @@ def main():
     parser.add_argument('--medicine_dict', default='data/dicts/Medicine.txt')
     parser.add_argument('--output_dir', default='results/stage2_v51')
     parser.add_argument('--budgets', default=None, help='Comma-separated online budgets. Defaults to config.mainline.formal_budgets')
-    parser.add_argument('--strategies', default='GCR,BAUR,DAR,BAUR-only,SH-DA++', help='Comma-separated strategies to run online')
+    parser.add_argument('--strategies', default='GCR,WUR,DGCR,DWUR,BAUR,DAR,Router-only,SH-DA++', help='Comma-separated strategies to run online')
     parser.add_argument('--offline_replay_budgets', default='0.05,0.10,0.20,0.30,0.50,1.00', help='Offline replay budgets from full-budget results')
-    parser.add_argument('--offline_strategies', default='GCR,BAUR,DAR,BAUR-only,SH-DA++', help='Comma-separated strategies to run offline replay')
+    parser.add_argument('--offline_strategies', default='GCR,WUR,DGCR,DWUR,BAUR,DAR,Router-only,SH-DA++', help='Comma-separated strategies to run offline replay')
     parser.add_argument('--skip_offline_replay', action='store_true', help='Skip offline replay stage')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--n_samples', type=int, default=None, help='Limit to first N samples (for testing)')

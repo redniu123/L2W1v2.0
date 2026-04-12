@@ -18,11 +18,10 @@ prompt_version: "prompt_v1.0"
 agent_b:
   skip: false
   backend: "gemini"             # gemini | local_vlm
-  # 可选 model_type:
-  #   qwen2.5_vl, qwen3.5, internvl2, internvl2_5,
-  #   minicpm_v, paddleocr_vl, llava, smolvlm
+  # 默认主力仍是 Gemini；本地 Qwen3-VL-8B 仅用于 API 不可用时的临时 router 对比验证
+  # 临时切本地时：backend 改为 local_vlm，并将 model_path 指到服务器上的离线模型目录
   model_type: "qwen2.5_vl"
-  model_path: "./models/agent_b_vlm/Qwen2.5-VL-7B-Instruct"
+  model_path: "./models/agent_b_vlm/Qwen3-VL-8B"
   # 绝对红线: 2080Ti (Turing) 禁用 bfloat16，强制 float16
   torch_dtype: "float16"
   max_new_tokens: 128
@@ -58,6 +57,12 @@ sh_da_v4:
     geology_dict_path: "data/dicts/Geology.txt"
     geology_min_len: 2
     geology_risk_weight: 1.0
+    wur_mean_weight: 0.5
+    wur_min_weight: 0.3
+    wur_drop_weight: 0.2
+    wur_min_conf_gate_threshold: 0.35
+    wur_drop_gate_threshold: 0.20
+    wur_gate_bonus: 0.10
 
   budget_controller:
     target_budget: 0.1

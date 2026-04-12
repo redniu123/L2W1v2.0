@@ -9,6 +9,7 @@ SH-DA++ v5.1: Multi-VLM Smoke Test
   python scripts/smoke_test_multi_vlm.py
   python scripts/smoke_test_multi_vlm.py --model_type smolvlm --model_path ./models/agent_b_vlm/SmolVLM-500M-Instruct
   python scripts/smoke_test_multi_vlm.py --model_type qwen2.5_vl --model_path ./models/agent_b_vlm/Qwen2.5-VL-7B-Instruct
+  python scripts/smoke_test_multi_vlm.py --model_type qwen2.5_vl --model_path ./models/agent_b_vlm/Qwen3-VL-8B
   python scripts/smoke_test_multi_vlm.py --model_type internvl2 --model_path ./models/agent_b_vlm/InternVL2-8B-AWQ
 """
 

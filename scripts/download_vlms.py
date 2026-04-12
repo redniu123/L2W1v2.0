@@ -9,6 +9,7 @@ SH-DA++ v5.1: VLM Weight Downloader (9-model edition)
 用法:
   python scripts/download_vlms.py --all
   python scripts/download_vlms.py --model qwen2.5_vl
+  python scripts/download_vlms.py --model qwen3_vl_8b
   python scripts/download_vlms.py --model internvl2_awq
   python scripts/download_vlms.py --source huggingface --model llava
 """
@@ -23,56 +24,62 @@ from pathlib import Path
 # ============================================================
 MODEL_REGISTRY = {
     "paddleocr_vl_15": {
-        "hf_id":   "PaddlePaddle/PaddleOCR-VL-1.5",
-        "ms_id":   "PaddlePaddle/PaddleOCR-VL-1.5",
+        "hf_id": "PaddlePaddle/PaddleOCR-VL-1.5",
+        "ms_id": "PaddlePaddle/PaddleOCR-VL-1.5",
         "local_dir": "PaddleOCR-VL-1.5",
         "desc": "PaddleOCR-VL-1.5",
     },
     "paddleocr_vl": {
-        "hf_id":   "PaddlePaddle/PaddleOCR-VL",
-        "ms_id":   "PaddlePaddle/PaddleOCR-VL",
+        "hf_id": "PaddlePaddle/PaddleOCR-VL",
+        "ms_id": "PaddlePaddle/PaddleOCR-VL",
         "local_dir": "PaddleOCR-VL",
         "desc": "PaddleOCR-VL",
     },
     "minicpm_v_int4": {
-        "hf_id":   "openbmb/MiniCPM-V-2_6-int4",
-        "ms_id":   "OpenBMB/MiniCPM-V-2_6-int4",
+        "hf_id": "openbmb/MiniCPM-V-2_6-int4",
+        "ms_id": "OpenBMB/MiniCPM-V-2_6-int4",
         "local_dir": "MiniCPM-V-2_6-int4",
         "desc": "MiniCPM-V-2.6-int4 (native int4, ~8GB)",
     },
     "qwen2.5_vl": {
-        "hf_id":   "Qwen/Qwen2.5-VL-7B-Instruct",
-        "ms_id":   "Qwen/Qwen2.5-VL-7B-Instruct",
+        "hf_id": "Qwen/Qwen2.5-VL-7B-Instruct",
+        "ms_id": "Qwen/Qwen2.5-VL-7B-Instruct",
         "local_dir": "Qwen2.5-VL-7B-Instruct",
         "desc": "Qwen2.5-VL-7B-Instruct (~15GB fp16)",
     },
+    "qwen3_vl_8b": {
+        "hf_id": "Qwen/Qwen3-VL-8B",
+        "ms_id": "Qwen/Qwen3-VL-8B",
+        "local_dir": "Qwen3-VL-8B",
+        "desc": "Qwen3-VL-8B (~16GB fp16)",
+    },
     "internvl2_5_awq": {
-        "hf_id":   "OpenGVLab/InternVL2_5-8B-AWQ",
-        "ms_id":   "OpenGVLab/InternVL2_5-8B-AWQ",
+        "hf_id": "OpenGVLab/InternVL2_5-8B-AWQ",
+        "ms_id": "OpenGVLab/InternVL2_5-8B-AWQ",
         "local_dir": "InternVL2_5-8B-AWQ",
         "desc": "InternVL2.5-8B-AWQ (~8GB AWQ int4)",
     },
     "internvl2_awq": {
-        "hf_id":   "OpenGVLab/InternVL2-8B-AWQ",
-        "ms_id":   "OpenGVLab/InternVL2-8B-AWQ",
+        "hf_id": "OpenGVLab/InternVL2-8B-AWQ",
+        "ms_id": "OpenGVLab/InternVL2-8B-AWQ",
         "local_dir": "InternVL2-8B-AWQ",
         "desc": "InternVL2-8B-AWQ (~8GB AWQ int4)",
     },
     "qwen3.5": {
-        "hf_id":   "Qwen/Qwen3.5-9B",
-        "ms_id":   "Qwen/Qwen3.5-9B",
+        "hf_id": "Qwen/Qwen3.5-9B",
+        "ms_id": "Qwen/Qwen3.5-9B",
         "local_dir": "Qwen3.5-9B",
         "desc": "Qwen3.5-9B (~18GB fp16)",
     },
     "llava": {
-        "hf_id":   "llava-hf/llava-1.5-7b-hf",
-        "ms_id":   "llava-hf/llava-1.5-7b-hf",
+        "hf_id": "llava-hf/llava-1.5-7b-hf",
+        "ms_id": "llava-hf/llava-1.5-7b-hf",
         "local_dir": "llava-1.5-7b-hf",
         "desc": "LLaVA-1.5-7B (~14GB fp16)",
     },
     "smolvlm": {
-        "hf_id":   "HuggingFaceTB/SmolVLM-500M-Instruct",
-        "ms_id":   "HuggingFaceTB/SmolVLM-500M-Instruct",
+        "hf_id": "HuggingFaceTB/SmolVLM-500M-Instruct",
+        "ms_id": "HuggingFaceTB/SmolVLM-500M-Instruct",
         "local_dir": "SmolVLM-500M-Instruct",
         "desc": "SmolVLM-500M-Instruct (~1GB fp16, 极速冒烟)",
     },
@@ -93,13 +100,11 @@ def download_modelscope(model_key: str, cfg: dict) -> bool:
     local_dir.mkdir(parents=True, exist_ok=True)
     print(f"[ModelScope] {cfg['desc']} -> {local_dir}")
 
-    # AWQ/int4 量化模型可能只有 .bin 格式，不能排除
     is_quantized = any(k in cfg["local_dir"].lower() for k in ["awq", "int4", "gptq"])
     ignore = [] if is_quantized else ["*.bin"]
 
     try:
-        snapshot_download(model_id=cfg["ms_id"], local_dir=str(local_dir),
-                          ignore_patterns=ignore)
+        snapshot_download(model_id=cfg["ms_id"], local_dir=str(local_dir), ignore_patterns=ignore)
         print(f"[OK] {model_key}")
         return True
     except Exception as e:
@@ -131,8 +136,7 @@ def download_huggingface(model_key: str, cfg: dict) -> bool:
     ignore = [] if is_quantized else ["*.bin"]
 
     try:
-        snapshot_download(repo_id=cfg["hf_id"], local_dir=str(local_dir),
-                          ignore_patterns=ignore)
+        snapshot_download(repo_id=cfg["hf_id"], local_dir=str(local_dir), ignore_patterns=ignore)
         print(f"[OK] {model_key}")
         return True
     except Exception as e:
@@ -148,12 +152,20 @@ def download_huggingface(model_key: str, cfg: dict) -> bool:
 
 def main():
     parser = argparse.ArgumentParser(description="SH-DA++ VLM Downloader (9-model)")
-    parser.add_argument("--model", choices=list(MODEL_REGISTRY.keys()),
-                        action="append", dest="models",
-                        help="下载指定模型（可多次指定，如 --model qwen2.5_vl --model internvl2_awq）")
+    parser.add_argument(
+        "--model",
+        choices=list(MODEL_REGISTRY.keys()),
+        action="append",
+        dest="models",
+        help="下载指定模型（可多次指定，如 --model qwen3_vl_8b --model internvl2_awq）",
+    )
     parser.add_argument("--all", action="store_true", help="下载全部 9 款模型")
-    parser.add_argument("--source", choices=["modelscope", "huggingface"],
-                        default="modelscope", help="下载源（默认 modelscope）")
+    parser.add_argument(
+        "--source",
+        choices=["modelscope", "huggingface"],
+        default="modelscope",
+        help="下载源（默认 modelscope）",
+    )
     args = parser.parse_args()
 
     if not args.models and not args.all:
@@ -179,10 +191,11 @@ def main():
             results[key] = download_huggingface(key, cfg)
 
     print("\n" + "=" * 60)
-    print("Summary:")
-    for k, ok in results.items():
-        print(f"  [{'OK    ' if ok else 'FAILED'}] {k}")
+    print("Summary")
     print("=" * 60)
+    for key, ok in results.items():
+        print(f"  {key:20s} {'OK' if ok else 'FAIL'}")
+
     if not all(results.values()):
         sys.exit(1)
 

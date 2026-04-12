@@ -354,6 +354,24 @@ class SHDARouter:
             geology_risk_weight=sh_da_config.get("rule_scorer", {}).get(
                 "geology_risk_weight", 1.0
             ),
+            wur_mean_weight=sh_da_config.get("rule_scorer", {}).get(
+                "wur_mean_weight", 0.5
+            ),
+            wur_min_weight=sh_da_config.get("rule_scorer", {}).get(
+                "wur_min_weight", 0.3
+            ),
+            wur_drop_weight=sh_da_config.get("rule_scorer", {}).get(
+                "wur_drop_weight", 0.2
+            ),
+            wur_min_conf_gate_threshold=sh_da_config.get("rule_scorer", {}).get(
+                "wur_min_conf_gate_threshold", 0.35
+            ),
+            wur_drop_gate_threshold=sh_da_config.get("rule_scorer", {}).get(
+                "wur_drop_gate_threshold", 0.20
+            ),
+            wur_gate_bonus=sh_da_config.get("rule_scorer", {}).get(
+                "wur_gate_bonus", 0.10
+            ),
         )
 
         calibrated_scorer_config = CalibratedScorerConfig(
