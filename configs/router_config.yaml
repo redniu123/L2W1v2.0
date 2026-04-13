@@ -26,7 +26,7 @@ agent_b:
   torch_dtype: "float16"
   max_new_tokens: 128
   # --- Gemini API settings (backend=gemini 时生效) ---
-  base_url: "https://new.lemonapi.site/v1"
+  base_url: "https://www.lemonapi.site/v1"
   key_file: "key.txt"
   provider_pool: "gemini_1x"
   temperature: 0.1
