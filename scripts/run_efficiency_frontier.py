@@ -30,7 +30,7 @@ import Levenshtein
 
 
 def normalize_eval_text(text: str) -> str:
-    """评测前做轻量字符归一化，避免全/半角括号等格式差异放大 CER。"""
+    """评测前做轻量字符归一化，避免全/半角括号、句号等格式差异放大 CER。"""
     if not text:
         return ""
     translation = str.maketrans({
@@ -45,6 +45,7 @@ def normalize_eval_text(text: str) -> str:
         '；': ';',
         '！': '!',
         '？': '?',
+        '。': '.',
     })
     return text.translate(translation)
 
