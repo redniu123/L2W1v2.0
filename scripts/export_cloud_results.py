@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""将云端结果从 results/ 导出到可提交的 cloud_result_sync/ 目录。"""
+"""将实验结果从 results/ 导出到默认同步目录或共享目录。"""
 
 from __future__ import annotations
 
@@ -25,14 +25,40 @@ def copy_path(src: Path, dst: Path) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Export selected cloud run artifacts into cloud_result_sync/")
-    parser.add_argument("--source", action="append", required=True, help="Path relative to repo root, e.g. results/stage2_v51_online/20260410_run171751")
-    parser.add_argument("--tag", default=None, help="Optional export tag; defaults to timestamp")
-    parser.add_argument("--clean", action="store_true", help="Remove target export directory before copying")
+    parser = argparse.ArgumentParser(
+        description="Export selected run artifacts into cloud_result_sync/ or a shared folder"
+    )
+    parser.add_argument(
+        "--source",
+        action="append",
+        required=True,
+        help="Path relative to repo root, e.g. results/stage2_v51/20260413_run041342",
+    )
+    parser.add_argument(
+        "--tag",
+        default=None,
+        help="Optional export tag; defaults to timestamp",
+    )
+    parser.add_argument(
+        "--shared_root",
+        default=None,
+        help="Optional absolute shared folder root; if omitted, export to cloud_result_sync/",
+    )
+    parser.add_argument(
+        "--clean",
+        action="store_true",
+        help="Remove target export directory before copying",
+    )
     args = parser.parse_args()
 
     tag = args.tag or datetime.now().strftime("%Y%m%d_export%H%M%S")
-    export_dir = EXPORT_ROOT / tag
+    export_root = EXPORT_ROOT
+    if args.shared_root:
+        export_root = Path(args.shared_root).expanduser()
+        if not export_root.is_absolute():
+            raise ValueError("--shared_root must be an absolute path")
+
+    export_dir = export_root / tag
     if args.clean and export_dir.exists():
         shutil.rmtree(export_dir)
     export_dir.mkdir(parents=True, exist_ok=True)
@@ -40,6 +66,7 @@ def main() -> int:
     manifest = {
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "tag": tag,
+        "export_root": str(export_root),
         "sources": [],
     }
 
