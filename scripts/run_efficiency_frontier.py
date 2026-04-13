@@ -136,7 +136,7 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
     import re
     agent_b_cfg = config.get("agent_b", {})
     skip = agent_b_cfg.get("skip", True)
-    backend = agent_b_cfg.get("backend", "qwen")
+    backend = agent_b_cfg.get("backend", "gemini")
 
     if skip:
         print("[Agent B] skip=true，Mock 模式")
@@ -153,7 +153,6 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
             }
         return mock_fn
 
-    # Gemini 后端
     if backend == "gemini":
         try:
             from modules.vlm_expert.gemini_expert import GeminiAgentB, GeminiConfig
@@ -169,39 +168,6 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
             )
             agent = GeminiAgentB(config=gemini_cfg)
             print(f"[Agent B] Gemini backend: {agent.config.model_name} @ {agent.config.base_url}")
-
-            def gemini_fn(prompt: dict) -> dict:
-                T_A = prompt.get("T_A", "")
-                image_path = prompt.get("image_path", "")
-                min_conf_idx = prompt.get("min_conf_idx", -1)
-                if min_conf_idx is None:
-                    min_conf_idx = -1
-                suspicious_char = T_A[min_conf_idx] if (0 <= min_conf_idx < len(T_A)) else ""
-                manifest = {
-                    "ocr_text": T_A,
-                    "suspicious_index": min_conf_idx,
-                    "suspicious_char": suspicious_char,
-                    "risk_level": "medium",
-                }
-                t0 = time.perf_counter()
-                try:
-                    result = agent.process_hard_sample(image_path, manifest)
-                    return {
-                        "corrected_text": result.get("corrected_text", T_A),
-                        "latency_ms": round((time.perf_counter() - t0) * 1000, 3),
-                        "token_usage": result.get("token_usage"),
-                        "error_type": result.get("error_type", "none"),
-                    }
-                except Exception as e:
-                    print(f"[Gemini] error: {e}")
-                    return {
-                        "corrected_text": T_A,
-                        "latency_ms": round((time.perf_counter() - t0) * 1000, 3),
-                        "token_usage": None,
-                        "error_type": type(e).__name__,
-                    }
-
-            return gemini_fn
         except Exception as e:
             print(f"[Agent B] Gemini load failed: {e}, fallback to mock")
             def mock_fn(prompt: dict) -> dict:
@@ -213,65 +179,73 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
                     "error_type": "gemini_load_failed",
                 }
             return mock_fn
-
-    # Qwen 后端
-    model_path = agent_b_cfg.get("model_path") or agent_b_cfg.get("model_name", "Qwen/Qwen2.5-VL-3B-Instruct")
-    try:
-        from modules.vlm_expert.agent_b_expert import AgentBExpert, AgentBConfig
-        agent = AgentBExpert(config=AgentBConfig(model_path=model_path), lazy_init=False)
-        print(f"[Agent B] model loaded: {model_path}")
-
-        def real_fn(prompt: dict) -> dict:
-            T_A = prompt.get("T_A", "")
-            image_path = prompt.get("image_path", "")
-            min_conf_idx = prompt.get("min_conf_idx", -1)
-            if min_conf_idx is None:
-                min_conf_idx = -1
-            suspicious_char = T_A[min_conf_idx] if (0 <= min_conf_idx < len(T_A)) else ""
-            manifest = {
-                "ocr_text": T_A,
-                "suspicious_index": min_conf_idx,
-                "suspicious_char": suspicious_char,
-                "risk_level": "medium",
-            }
-            t0 = time.perf_counter()
-            last_error_type = "none"
-            for attempt in range(max_retries):
-                try:
-                    result = agent.process_hard_sample(image_path, manifest)
-                    return {
-                        "corrected_text": result.get("corrected_text", T_A),
-                        "latency_ms": round((time.perf_counter() - t0) * 1000, 3),
-                        "token_usage": result.get("token_usage"),
-                        "error_type": result.get("error_type", "none"),
-                    }
-                except Exception as e:
-                    last_error_type = type(e).__name__
-                    if attempt < max_retries - 1:
-                        time.sleep(1.0 * (attempt + 1))
-                    else:
-                        print(f"[Agent B] error: {e}")
-            return {
-                "corrected_text": T_A,
-                "latency_ms": round((time.perf_counter() - t0) * 1000, 3),
-                "token_usage": None,
-                "error_type": last_error_type,
-            }
-
-        return real_fn
-    except Exception as e:
-        print(f"[Agent B] load failed: {e}, fallback to mock")
-
+    elif backend == "local_vlm":
+        try:
+            from modules.vlm_expert import AgentBFactory
+            agent = AgentBFactory.create(config)
+            info = agent.get_model_info() if hasattr(agent, "get_model_info") else {"backend": "local_vlm"}
+            print(f"[Agent B] Local backend ready: {info}")
+        except Exception as e:
+            print(f"[Agent B] local_vlm load failed: {e}, fallback to mock")
+            def mock_fn(prompt: dict) -> dict:
+                t0 = time.perf_counter()
+                return {
+                    "corrected_text": prompt.get("T_A", ""),
+                    "latency_ms": round((time.perf_counter() - t0) * 1000, 3),
+                    "token_usage": None,
+                    "error_type": "local_vlm_load_failed",
+                }
+            return mock_fn
+    else:
+        print(f"[Agent B] Unknown backend: {backend}, fallback to mock")
         def mock_fn(prompt: dict) -> dict:
             t0 = time.perf_counter()
             return {
                 "corrected_text": prompt.get("T_A", ""),
                 "latency_ms": round((time.perf_counter() - t0) * 1000, 3),
                 "token_usage": None,
-                "error_type": "agent_b_load_failed",
+                "error_type": "unknown_backend",
             }
-
         return mock_fn
+
+    def real_fn(prompt: dict) -> dict:
+        T_A = prompt.get("T_A", "")
+        image_path = prompt.get("image_path", "")
+        min_conf_idx = prompt.get("min_conf_idx", -1)
+        if min_conf_idx is None:
+            min_conf_idx = -1
+        suspicious_char = T_A[min_conf_idx] if (0 <= min_conf_idx < len(T_A)) else ""
+        manifest = {
+            "ocr_text": T_A,
+            "suspicious_index": min_conf_idx,
+            "suspicious_char": suspicious_char,
+            "risk_level": "medium",
+        }
+        t0 = time.perf_counter()
+        last_error_type = "none"
+        for attempt in range(max_retries):
+            try:
+                result = agent.process_hard_sample(image_path, manifest)
+                return {
+                    "corrected_text": result.get("corrected_text", T_A),
+                    "latency_ms": round((time.perf_counter() - t0) * 1000, 3),
+                    "token_usage": result.get("token_usage"),
+                    "error_type": result.get("error_type", "none"),
+                }
+            except Exception as e:
+                last_error_type = type(e).__name__
+                if attempt < max_retries - 1:
+                    time.sleep(1.0 * (attempt + 1))
+                else:
+                    print(f"[Agent B] error: {e}")
+        return {
+            "corrected_text": T_A,
+            "latency_ms": round((time.perf_counter() - t0) * 1000, 3),
+            "token_usage": None,
+            "error_type": last_error_type,
+        }
+
+    return real_fn
 
 
 def infer_all_samples(samples, recognizer, domain_engine, data_root, image_root):
