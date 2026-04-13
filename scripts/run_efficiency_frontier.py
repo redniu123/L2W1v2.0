@@ -151,6 +151,8 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
                 "token_usage": None,
                 "error_type": "none",
             }
+        mock_fn._backend = "mock"
+        mock_fn._supports_parallel = False
         return mock_fn
 
     if backend == "gemini":
@@ -168,6 +170,8 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
             )
             agent = GeminiAgentB(config=gemini_cfg)
             print(f"[Agent B] Gemini backend: {agent.config.model_name} @ {agent.config.base_url}")
+            setattr(agent, "_backend", "gemini")
+            setattr(agent, "_supports_parallel", True)
         except Exception as e:
             print(f"[Agent B] Gemini load failed: {e}, fallback to mock")
             def mock_fn(prompt: dict) -> dict:
@@ -178,6 +182,8 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
                     "token_usage": None,
                     "error_type": "gemini_load_failed",
                 }
+            mock_fn._backend = "mock"
+            mock_fn._supports_parallel = False
             return mock_fn
     elif backend == "local_vlm":
         try:
@@ -185,6 +191,8 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
             agent = AgentBFactory.create(config)
             info = agent.get_model_info() if hasattr(agent, "get_model_info") else {"backend": "local_vlm"}
             print(f"[Agent B] Local backend ready: {info}")
+            setattr(agent, "_backend", "local_vlm")
+            setattr(agent, "_supports_parallel", False)
         except Exception as e:
             print(f"[Agent B] local_vlm load failed: {e}, fallback to mock")
             def mock_fn(prompt: dict) -> dict:
@@ -195,6 +203,8 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
                     "token_usage": None,
                     "error_type": "local_vlm_load_failed",
                 }
+            mock_fn._backend = "mock"
+            mock_fn._supports_parallel = False
             return mock_fn
     else:
         print(f"[Agent B] Unknown backend: {backend}, fallback to mock")
@@ -206,6 +216,8 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
                 "token_usage": None,
                 "error_type": "unknown_backend",
             }
+        mock_fn._backend = "mock"
+        mock_fn._supports_parallel = False
         return mock_fn
 
     def real_fn(prompt: dict) -> dict:
@@ -245,6 +257,8 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
             "error_type": last_error_type,
         }
 
+    real_fn._backend = getattr(agent, "_backend", backend)
+    real_fn._supports_parallel = bool(getattr(agent, "_supports_parallel", backend == "gemini"))
     return real_fn
 
 
@@ -473,13 +487,17 @@ def run_pipeline(
     upgrade_results = {}  # {index: T_cand}
     
     if upgrade_set:
-        # 自动根据 Key 数量设置并发数
-        try:
-            n_keys = agent_b_callable.__self__.config.key_manager.get_key_count()
-        except Exception:
-            n_keys = 10
-        print(f"  [{strategy}] Calling Agent B for {len(upgrade_set)} samples ({n_keys} concurrent)...")
-        
+        supports_parallel = bool(getattr(agent_b_callable, '_supports_parallel', False))
+        backend_name = getattr(agent_b_callable, '_backend', 'unknown')
+        if supports_parallel:
+            try:
+                n_workers = agent_b_callable.__self__.config.key_manager.get_key_count()
+            except Exception:
+                n_workers = 10
+        else:
+            n_workers = 1
+        print(f"  [{strategy}] Calling Agent B for {len(upgrade_set)} samples ({n_workers} concurrent, backend={backend_name})...")
+
         def call_agent_b(idx, r):
             """单个样本的 Agent B 调用，无等待"""
             domain_label = {
@@ -493,28 +511,41 @@ def run_pipeline(
             )
             prompt['T_A'] = r['T_A']
             return idx, agent_b_callable(prompt)
-        
-        # 并发调用（Key 数量个线程，每个线程独占一个 Key）
-        with ThreadPoolExecutor(max_workers=n_keys) as executor:
-            futures = {
-                executor.submit(call_agent_b, i, all_results[i]): i
-                for i in upgrade_set
-            }
-            
-            # 收集结果（带进度条）
-            for future in tqdm(as_completed(futures), total=len(upgrade_set), 
-                              desc=f'{strategy} B={target_budget:.2f} [API]', leave=False):
+
+        if supports_parallel and n_workers > 1:
+            with ThreadPoolExecutor(max_workers=n_workers) as executor:
+                futures = {
+                    executor.submit(call_agent_b, i, all_results[i]): i
+                    for i in upgrade_set
+                }
+
+                for future in tqdm(as_completed(futures), total=len(upgrade_set), 
+                                  desc=f'{strategy} B={target_budget:.2f} [API]', leave=False):
+                    try:
+                        idx, agent_b_result = future.result()
+                        upgrade_results[idx] = agent_b_result
+                    except Exception as e:
+                        idx = futures[future]
+                        upgrade_results[idx] = {
+                            'corrected_text': all_results[idx]['T_A'],
+                            'latency_ms': None,
+                            'token_usage': None,
+                            'error_type': type(e).__name__,
+                        }
+        else:
+            ordered_indices = sorted(upgrade_set)
+            for idx in tqdm(ordered_indices, total=len(ordered_indices),
+                            desc=f'{strategy} B={target_budget:.2f} [local]', leave=False):
                 try:
-                    idx, agent_b_result = future.result()
+                    _, agent_b_result = call_agent_b(idx, all_results[idx])
                     upgrade_results[idx] = agent_b_result
                 except Exception as e:
-                    idx = futures[future]
                     upgrade_results[idx] = {
                         'corrected_text': all_results[idx]['T_A'],
                         'latency_ms': None,
                         'token_usage': None,
                         'error_type': type(e).__name__,
-                    }  # 失败降级
+                    }
     
     # 回填与统计
     cer_num = 0
