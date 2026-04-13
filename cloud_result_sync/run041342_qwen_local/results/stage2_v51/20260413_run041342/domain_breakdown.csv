@@ -1,0 +1,14 @@
+router_name,domain,budget,n_samples,final_accuracy
+AgentA_Only,geology,0.0,20,0.0
+DGCR,geology,0.1,20,0.4
+DGCR,geology,0.2,20,0.35
+DGCR,geology,0.3,20,0.35
+DWUR,geology,0.1,20,0.35
+DWUR,geology,0.2,20,0.3
+DWUR,geology,0.3,20,0.3
+GCR,geology,0.1,20,0.4
+GCR,geology,0.2,20,0.4
+GCR,geology,0.3,20,0.4
+WUR,geology,0.1,20,0.4
+WUR,geology,0.2,20,0.4
+WUR,geology,0.3,20,0.35
