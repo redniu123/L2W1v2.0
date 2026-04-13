@@ -755,6 +755,7 @@ def collect_case_rows(item: dict, failure_rows: List[dict], degradation_rows: Li
             })
 
 
+def replay_from_full_budget(
     strategy: str,
     target_budget: float,
     full_budget_items: List[dict],
