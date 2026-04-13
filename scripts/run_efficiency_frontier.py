@@ -158,10 +158,11 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
     """构建 Agent B 调用函数（含重试）"""
     import re
 
-    def attach_callable_meta(fn: Callable, backend_name: str, model_label: str, supports_parallel: bool) -> Callable:
+    def attach_callable_meta(fn: Callable, backend_name: str, model_label: str, supports_parallel: bool, max_concurrency: int = 1) -> Callable:
         fn._backend = backend_name
         fn._model_label = model_label
         fn._supports_parallel = supports_parallel
+        fn._max_concurrency = max_concurrency
         return fn
 
     agent_b_cfg = config.get("agent_b", {})
@@ -181,7 +182,7 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
                 "token_usage": None,
                 "error_type": "none",
             }
-        return attach_callable_meta(mock_fn, "mock", "mock", False)
+        return attach_callable_meta(mock_fn, "mock", "mock", False, 1)
 
     if backend == "gemini":
         try:
@@ -199,6 +200,7 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
             agent = GeminiAgentB(config=gemini_cfg)
             print(f"[Agent B] Gemini backend: {agent.config.model_name} @ {agent.config.base_url}")
             agent_model_label = f"gemini:{agent.config.model_name}"
+            max_concurrency = int(agent_b_cfg.get("max_concurrency", 4) or 4)
         except Exception as e:
             print(f"[Agent B] Gemini load failed: {e}, fallback to mock")
             def mock_fn(prompt: dict) -> dict:
@@ -245,7 +247,7 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
                 "token_usage": None,
                 "error_type": "unknown_backend",
             }
-        return attach_callable_meta(mock_fn, "mock", "mock", False)
+        return attach_callable_meta(mock_fn, "mock", "mock", False, 1)
 
     def real_fn(prompt: dict) -> dict:
         T_A = prompt.get("T_A", "")
@@ -289,6 +291,7 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
         backend_name=backend,
         model_label=locals().get("agent_model_label", backend),
         supports_parallel=(backend == "gemini"),
+        max_concurrency=locals().get("max_concurrency", 1),
     )
     return real_fn
 
@@ -522,9 +525,11 @@ def run_pipeline(
         backend_name = getattr(agent_b_callable, '_backend', 'unknown')
         if supports_parallel:
             try:
-                n_workers = agent_b_callable.__self__.config.key_manager.get_key_count()
+                key_count = agent_b_callable.__self__.config.key_manager.get_key_count()
             except Exception:
-                n_workers = 10
+                key_count = 10
+            max_concurrency = int(getattr(agent_b_callable, '_max_concurrency', 4) or 4)
+            n_workers = max(1, min(key_count, max_concurrency))
         else:
             n_workers = 1
         print(f"  [{strategy}] Calling Agent B for {len(upgrade_set)} samples ({n_workers} concurrent, backend={backend_name})...")
@@ -892,8 +897,8 @@ def main():
     np.random.seed(args.seed)
     with open(args.config, 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
-    prompt_version = args.prompt_version or config.get('prompt_version', 'prompt_v1.0')
-    mainline_agent_b = config.get('mainline_agent_b', 'configured_agent_b')
+    prompt_version = args.prompt_version or config.get('prompt_version') or config.get('mainline', {}).get('prompt_version', 'prompt_v1.1')
+    mainline_agent_b = config.get('mainline_agent_b') or config.get('mainline', {}).get('mainline_agent_b', 'configured_agent_b')
     formal_budgets = config.get('mainline', {}).get('formal_budgets', [0.10, 0.20, 0.30])
     budgets = [float(b) for b in (args.budgets.split(',') if args.budgets else formal_budgets)]
     online_strategies = [s.strip() for s in args.strategies.split(',') if s.strip()]

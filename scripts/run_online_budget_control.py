@@ -204,8 +204,8 @@ def main():
     p.add_argument('--prompt_version', default=None, help='Override frozen prompt version')
     args = p.parse_args(); random.seed(args.seed); np.random.seed(args.seed)
     with open(args.config, 'r', encoding='utf-8') as f: config = yaml.safe_load(f)
-    prompt_version = args.prompt_version or config.get('prompt_version', 'prompt_v1.0')
-    mainline_agent_b = config.get('mainline_agent_b', 'configured_agent_b')
+    prompt_version = args.prompt_version or config.get('prompt_version') or config.get('mainline', {}).get('prompt_version', 'prompt_v1.1')
+    mainline_agent_b = config.get('mainline_agent_b') or config.get('mainline', {}).get('mainline_agent_b', 'configured_agent_b')
     import argparse as _ap
     rec_args = _ap.Namespace(rec_model_dir=args.rec_model_dir, rec_char_dict_path=args.rec_char_dict_path, rec_image_shape='3, 48, 320', rec_batch_num=6, rec_algorithm='SVTR_LCNet', use_space_char=True, use_gpu=args.use_gpu, use_xpu=False, use_npu=False, use_mlu=False, use_metax_gpu=False, use_gcu=False, ir_optim=True, use_tensorrt=False, min_subgraph_size=15, precision='fp32', gpu_mem=500, gpu_id=0, enable_mkldnn=None, cpu_threads=10, warmup=False, benchmark=False, save_log_path='./log_output/', show_log=False, use_onnx=False, max_batch_size=10, return_word_box=False, drop_score=0.5, max_text_length=25, rec_image_inverse=True, use_det=False, det_model_dir='')
     from modules.paddle_engine.predict_rec_modified import TextRecognizerWithLogits
