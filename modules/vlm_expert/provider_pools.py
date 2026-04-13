@@ -98,6 +98,25 @@ def _extract_payg_gemini_pool(text: str, base_url: str) -> Optional[ProviderPool
     )
 
 
+def _extract_gemini_1x_pool(text: str, base_url: str) -> Optional[ProviderPool]:
+    model_match = re.search(r'MODEL_NAME_1x\s*=\s*["\']([^"\']+)["\']', text, flags=re.IGNORECASE)
+    if not model_match:
+        return None
+
+    model_name = model_match.group(1).strip()
+    tail = text[model_match.end():]
+    keys = re.findall(r"(?m)^\s*(sk-[A-Za-z0-9]+)\s*$", tail)
+    if not keys:
+        return None
+
+    return ProviderPool(
+        name="gemini_1x",
+        model_name=model_name,
+        keys=keys,
+        base_url=base_url,
+    )
+
+
 def load_provider_pools(key_file: str | Path = "key.txt") -> Dict[str, ProviderPool]:
     path = Path(key_file)
     if not path.exists():
@@ -124,6 +143,10 @@ def load_provider_pools(key_file: str | Path = "key.txt") -> Dict[str, ProviderP
             keys=keys,
             base_url=base_url,
         )
+
+    standalone_gemini_1x = _extract_gemini_1x_pool(text, base_url)
+    if standalone_gemini_1x is not None:
+        pools[standalone_gemini_1x.name] = standalone_gemini_1x
 
     claude_pool = _extract_claude_pool(text, base_url)
     if claude_pool is not None:
