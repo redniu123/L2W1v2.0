@@ -1,0 +1,10 @@
+sample_id,router_name,budget,domain,ocr_text,vlm_raw_output,final_text,gt,backfill_status,backfill_reason,edit_distance_ocr,edit_distance_final,delta_edit_distance,vlm_model
+GeoP0199_L020,GCR,0.2,geology,夹南为侧伏角,夹南为例伏角,夹南为例伏角,夹角为侧伏角,accepted,accepted,1,2,1,local_vlm:qwen3_vl:Qwen3-VL-8B
+GeoP0199_L020,WUR,0.2,geology,夹南为侧伏角,夹南为例伏角,夹南为例伏角,夹角为侧伏角,accepted,accepted,1,2,1,local_vlm:qwen3_vl:Qwen3-VL-8B
+GeoP0199_L011,DGCR,0.2,geology,{深部 韧性剪切带,{深部 韧性剪切带},{深部 韧性剪切带},{深部韧性剪切带,accepted,accepted,1,2,1,local_vlm:qwen3_vl:Qwen3-VL-8B
+GeoP0199_L001,DWUR,0.2,geology,5.褶皱的形成因素.,5.褶皱的形成因素。,5.褶皱的形成因素。,5.褶皱的形成因素.,accepted,accepted,0,1,1,local_vlm:qwen3_vl:Qwen3-VL-8B
+GeoP0199_L020,GCR,0.3,geology,夹南为侧伏角,夹南为例伏角,夹南为例伏角,夹角为侧伏角,accepted,accepted,1,2,1,local_vlm:qwen3_vl:Qwen3-VL-8B
+GeoP0199_L020,WUR,0.3,geology,夹南为侧伏角,夹南为例伏角,夹南为例伏角,夹角为侧伏角,accepted,accepted,1,2,1,local_vlm:qwen3_vl:Qwen3-VL-8B
+GeoP0199_L011,DGCR,0.3,geology,{深部 韧性剪切带,{深部 韧性剪切带},{深部 韧性剪切带},{深部韧性剪切带,accepted,accepted,1,2,1,local_vlm:qwen3_vl:Qwen3-VL-8B
+GeoP0199_L001,DWUR,0.3,geology,5.褶皱的形成因素.,5.褶皱的形成因素。,5.褶皱的形成因素。,5.褶皱的形成因素.,accepted,accepted,0,1,1,local_vlm:qwen3_vl:Qwen3-VL-8B
+GeoP0199_L011,DWUR,0.3,geology,{深部 韧性剪切带,{深部 韧性剪切带},{深部 韧性剪切带},{深部韧性剪切带,accepted,accepted,1,2,1,local_vlm:qwen3_vl:Qwen3-VL-8B
