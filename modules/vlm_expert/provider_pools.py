@@ -38,24 +38,60 @@ def _extract_key_list_block(text: str, variable_name: str) -> List[str]:
     return re.findall(r'["\'](sk-[^"\']+)["\']', block)
 
 
-def _extract_claude_pool(text: str, base_url: str) -> Optional[ProviderPool]:
-    marker_match = re.search(
-        r"模型名称为[：:]\s*([A-Za-z0-9_.\-]+)",
-        text,
-        flags=re.IGNORECASE,
-    )
-    marker_start = marker_match.end() if marker_match else -1
-    model_name = marker_match.group(1).strip() if marker_match else _DEFAULT_CLAUDE_MODEL
-    if marker_start < 0:
+def _extract_standalone_pool(
+    text: str,
+    *,
+    name: str,
+    marker_pattern: str,
+    model_pattern: str,
+    default_model: str,
+    base_url: str,
+) -> Optional[ProviderPool]:
+    marker_match = re.search(marker_pattern, text, flags=re.IGNORECASE)
+    if not marker_match:
         return None
 
-    tail = text[marker_start:]
+    tail = text[marker_match.end():]
+    model_match = re.search(model_pattern, tail, flags=re.IGNORECASE)
+    model_name = model_match.group(1).strip() if model_match else default_model
     keys = re.findall(r"(?m)^\s*(sk-[A-Za-z0-9]+)\s*$", tail)
     if not keys:
         return None
 
     return ProviderPool(
+        name=name,
+        model_name=model_name,
+        keys=keys,
+        base_url=base_url,
+    )
+
+
+def _extract_claude_pool(text: str, base_url: str) -> Optional[ProviderPool]:
+    return _extract_standalone_pool(
+        text,
         name="claude_sonnet_46",
+        marker_pattern=r"模型名称为[：:]\s*[A-Za-z0-9_.\-]+",
+        model_pattern=r"^\s*(?:模型名称为[：:]\s*)?([A-Za-z0-9_.\-]+)",
+        default_model=_DEFAULT_CLAUDE_MODEL,
+        base_url=base_url,
+    )
+
+
+def _extract_payg_gemini_pool(text: str, base_url: str) -> Optional[ProviderPool]:
+    model_match = re.search(r'MODEL_NAME_liang\s*=\s*["\']([^"\']+)["\']', text, flags=re.IGNORECASE)
+    if not model_match:
+        model_match = re.search(r'按量gemini分组[\s\S]{0,200}?模型名称为[：:]\s*([^\n\r]+)', text, flags=re.IGNORECASE)
+    if not model_match:
+        return None
+
+    model_name = model_match.group(1).strip()
+    tail = text[model_match.end():]
+    keys = re.findall(r"(?m)^\s*(sk-[A-Za-z0-9]+)\s*$", tail)
+    if not keys:
+        return None
+
+    return ProviderPool(
+        name="gemini_payg",
         model_name=model_name,
         keys=keys,
         base_url=base_url,
@@ -92,6 +128,10 @@ def load_provider_pools(key_file: str | Path = "key.txt") -> Dict[str, ProviderP
     claude_pool = _extract_claude_pool(text, base_url)
     if claude_pool is not None:
         pools[claude_pool.name] = claude_pool
+
+    payg_gemini_pool = _extract_payg_gemini_pool(text, base_url)
+    if payg_gemini_pool is not None:
+        pools[payg_gemini_pool.name] = payg_gemini_pool
 
     if not pools:
         raise ValueError(f"No provider pools found in {path}")
