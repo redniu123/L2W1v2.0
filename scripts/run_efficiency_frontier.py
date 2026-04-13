@@ -211,9 +211,7 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
                     "token_usage": None,
                     "error_type": "gemini_load_failed",
                 }
-            mock_fn._backend = "mock"
-            mock_fn._supports_parallel = False
-            return mock_fn
+            return attach_callable_meta(mock_fn, "mock", f"mock:gemini_load_failed:{type(e).__name__}", False, 1)
     elif backend == "local_vlm":
         try:
             from modules.vlm_expert import AgentBFactory
@@ -234,9 +232,7 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
                     "token_usage": None,
                     "error_type": "local_vlm_load_failed",
                 }
-            mock_fn._backend = "mock"
-            mock_fn._supports_parallel = False
-            return mock_fn
+            return attach_callable_meta(mock_fn, "mock", f"mock:local_vlm_load_failed:{type(e).__name__}", False, 1)
     else:
         print(f"[Agent B] Unknown backend: {backend}, fallback to mock")
         def mock_fn(prompt: dict) -> dict:
