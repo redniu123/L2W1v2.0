@@ -392,10 +392,10 @@ def run_pipeline(
             'backfill_log': [],
         }
 
-        # 主线路由：GCR / WUR / DGCR / DWUR
-        # 补充路线：BAUR / DAR
-        # 系统对照：Router-only / SH-DA++
-        if strategy == 'GCR':
+    # 主线路由：GCR / WUR / DGCR / DWUR
+    # 补充路线：BAUR / DAR
+    # 系统对照：Router-only / SH-DA++
+    if strategy == 'GCR':
             scores = [1.0 - float(r.get('conf', r.get('mean_conf', 0.0))) for r in all_results]
         elif strategy == 'DGCR':
             scores = [
