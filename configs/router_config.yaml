@@ -34,7 +34,7 @@ agent_b:
   max_retries: 3
   timeout: 360
   model_name: "gemini-3-flash-preview"
-  max_concurrency: 4
+  max_concurrency: 30
 
 backfill:
   max_edit_distance: 3
