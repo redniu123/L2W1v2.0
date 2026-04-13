@@ -854,6 +854,11 @@ class RuleScorerConfig:
     # 综合优先级权重
     eta: float = 0.5        # η: r_d 权重系数
 
+    # 地质语义风险
+    geology_dict_path: str = "data/dicts/Geology.txt"
+    geology_min_len: int = 2
+    geology_risk_weight: float = 1.0
+
     # WUR 固定规则参数
     wur_mean_weight: float = 0.5
     wur_min_weight: float = 0.3
