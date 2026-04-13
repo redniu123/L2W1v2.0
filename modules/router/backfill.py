@@ -7,6 +7,7 @@ SH-DA++ v5.1: Strict Backfill Controller
   - 废除 BOUNDARY / AMBIGUITY 路径专属约束
   - 统一提示词模式下只保留全局拒改红线
   - 全局红线：ED > 3 或长度变化 > 20%
+  - 新增：拦截纯格式规范化改写（括号 / 句号 / 常见全半角标点）
 
 公式：
   Reject(T_cand) = I[ED(T_A, T_cand) > 3 ∨ |len(T_cand)-len(T_A)|/len(T_A) > 0.2]
@@ -14,9 +15,25 @@ SH-DA++ v5.1: Strict Backfill Controller
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 import Levenshtein
+
+
+_FORMAT_EQUIVALENCE = str.maketrans({
+    '（': '(',
+    '）': ')',
+    '【': '[',
+    '】': ']',
+    '｛': '{',
+    '｝': '}',
+    '，': ',',
+    '：': ':',
+    '；': ';',
+    '！': '!',
+    '？': '?',
+    '。': '.',
+})
 
 
 class RouteType(Enum):
@@ -34,6 +51,7 @@ class RejectionReason(Enum):
     ACCEPTED = "accepted"
     GLOBAL_ED_EXCEEDED = "rejected_global_ed_exceeded"
     GLOBAL_LENGTH_CHANGE = "rejected_global_length_change"
+    PURE_FORMATTING_EDIT = "rejected_pure_formatting_edit"
     # 以下保留供兼容，v5.1 统一模式下不会触发
     BOUNDARY_VIOLATION = "rejected_boundary_violation"
     AMBIGUITY_VIOLATION = "rejected_ambiguity_violation"
@@ -50,6 +68,7 @@ class BackfillConfig:
     max_length_change_ratio: float = 0.2  # 最大长度变化比例
     boundary_K: int = 2  # 边界窗口大小（保留供兼容）
     unified_prompt_mode: bool = True  # v5.1: 使用统一提示词模式，跳过路径专属约束
+    reject_pure_formatting_edit: bool = True  # 拦截纯格式规范化改写
 
 
 @dataclass
@@ -82,17 +101,8 @@ class StrictBackfillController:
 
         v5.1 逻辑：
           1. 全局拒改红线（ED>3 或长度变化>20%）
-          2. unified_prompt_mode=True 时，跳过路径专属约束
-
-        Args:
-            T_A:        Agent A 原始文本
-            T_cand:     VLM 候选修正文本
-            route_type: 路由类型（v5.1 下不再用于约束判断）
-            idx_susp:   存疑字符位置（保留接口兼容）
-            top2_chars: Top-2 候选字符（保留接口兼容）
-
-        Returns:
-            BackfillResult
+          2. 拦截纯格式规范化改写
+          3. unified_prompt_mode=True 时，跳过路径专属约束
         """
         if not self.config.strict_mode:
             return BackfillResult(
@@ -103,12 +113,14 @@ class StrictBackfillController:
                 length_change_ratio=self._compute_length_change_ratio(T_A, T_cand),
             )
 
-        # Rule 1: 全局拒改红线（v5.1 唯一约束）
         rejection = self._check_global_rejection(T_A, T_cand)
         if rejection is not None:
             return rejection
 
-        # Rule 2: 路径专属约束（仅在 unified_prompt_mode=False 时生效）
+        formatting_rejection = self._check_pure_formatting_edit(T_A, T_cand)
+        if formatting_rejection is not None:
+            return formatting_rejection
+
         if not self.config.unified_prompt_mode:
             path_rejection = None
             if route_type == RouteType.BOUNDARY:
@@ -120,7 +132,6 @@ class StrictBackfillController:
             if path_rejection is not None:
                 return path_rejection
 
-        # 通过所有检查：接受修正
         return BackfillResult(
             T_final=T_cand,
             is_rejected=False,
@@ -132,9 +143,6 @@ class StrictBackfillController:
     def _check_global_rejection(
         self, T_A: str, T_cand: str
     ) -> Optional[BackfillResult]:
-        """
-        全局拒改红线：ED > max_edit_distance 或长度变化 > max_length_change_ratio
-        """
         ed = Levenshtein.distance(T_A, T_cand)
         len_change_ratio = self._compute_length_change_ratio(T_A, T_cand)
 
@@ -158,10 +166,26 @@ class StrictBackfillController:
 
         return None
 
+    def _check_pure_formatting_edit(
+        self, T_A: str, T_cand: str
+    ) -> Optional[BackfillResult]:
+        if not self.config.reject_pure_formatting_edit:
+            return None
+        if not T_cand or T_cand == T_A:
+            return None
+        if self._normalize_format_equivalence(T_A) != self._normalize_format_equivalence(T_cand):
+            return None
+        return BackfillResult(
+            T_final=T_A,
+            is_rejected=True,
+            rejection_reason=RejectionReason.PURE_FORMATTING_EDIT,
+            edit_distance=Levenshtein.distance(T_A, T_cand),
+            length_change_ratio=self._compute_length_change_ratio(T_A, T_cand),
+        )
+
     def _check_boundary_constraint(
         self, T_A: str, T_cand: str
     ) -> Optional[BackfillResult]:
-        """BOUNDARY 路径约束（仅 unified_prompt_mode=False 时调用）"""
         K = self.config.boundary_K
         N = len(T_A)
         ops = Levenshtein.editops(T_A, T_cand)
@@ -194,7 +218,6 @@ class StrictBackfillController:
         idx_susp: Optional[int],
         top2_chars: Optional[List[str]],
     ) -> Optional[BackfillResult]:
-        """AMBIGUITY 路径约束（仅 unified_prompt_mode=False 时调用）"""
         if idx_susp is None or top2_chars is None:
             return BackfillResult(
                 T_final=T_A,
@@ -247,10 +270,14 @@ class StrictBackfillController:
         return None
 
     def _compute_length_change_ratio(self, T_A: str, T_cand: str) -> float:
-        """计算长度变化比例"""
         if len(T_A) == 0:
             return 0.0
         return abs(len(T_cand) - len(T_A)) / len(T_A)
+
+    def _normalize_format_equivalence(self, text: str) -> str:
+        if not text:
+            return ""
+        return text.translate(_FORMAT_EQUIVALENCE)
 
 
 def apply_strict_backfill(
