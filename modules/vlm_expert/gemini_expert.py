@@ -82,7 +82,7 @@ class APIKeyManager:
 class GeminiConfig:
     """Gemini API 配置"""
 
-    base_url: str = "https://new.lemonapi.site/v1"
+    base_url: str = "https://www.lemonapi.site/v1"
     model_name: str = "gemini-3-flash-preview"
     key_file: str = "key.txt"  # Key 文件路径（项目根目录）
     provider_pool: str = "gemini_1x"  # provider pool 名称

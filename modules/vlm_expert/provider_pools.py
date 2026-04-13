@@ -14,7 +14,7 @@ class ProviderPool:
     base_url: str
 
 
-_DEFAULT_BASE_URL = "https://new.lemonapi.site/v1"
+_DEFAULT_BASE_URL = "https://www.lemonapi.site/v1"
 _DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6-thinking"
 
 
