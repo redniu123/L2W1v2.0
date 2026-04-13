@@ -29,7 +29,29 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import Levenshtein
 
 
+def normalize_eval_text(text: str) -> str:
+    """评测前做轻量字符归一化，避免全/半角括号等格式差异放大 CER。"""
+    if not text:
+        return ""
+    translation = str.maketrans({
+        '（': '(',
+        '）': ')',
+        '【': '[',
+        '】': ']',
+        '｛': '{',
+        '｝': '}',
+        '，': ',',
+        '：': ':',
+        '；': ';',
+        '！': '!',
+        '？': '?',
+    })
+    return text.translate(translation)
+
+
 def compute_cer(T_final: str, T_GT: str) -> float:
+    T_final = normalize_eval_text(T_final)
+    T_GT = normalize_eval_text(T_GT)
     if not T_GT:
         return 0.0
     return Levenshtein.distance(T_final, T_GT) / len(T_GT)
@@ -134,6 +156,13 @@ def ensure_agent_a_result_schema(all_results: List[dict]) -> List[dict]:
 def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
     """构建 Agent B 调用函数（含重试）"""
     import re
+
+    def attach_callable_meta(fn: Callable, backend_name: str, model_label: str, supports_parallel: bool) -> Callable:
+        fn._backend = backend_name
+        fn._model_label = model_label
+        fn._supports_parallel = supports_parallel
+        return fn
+
     agent_b_cfg = config.get("agent_b", {})
     skip = agent_b_cfg.get("skip", True)
     backend = agent_b_cfg.get("backend", "gemini")
@@ -151,9 +180,7 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
                 "token_usage": None,
                 "error_type": "none",
             }
-        mock_fn._backend = "mock"
-        mock_fn._supports_parallel = False
-        return mock_fn
+        return attach_callable_meta(mock_fn, "mock", "mock", False)
 
     if backend == "gemini":
         try:
@@ -170,8 +197,7 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
             )
             agent = GeminiAgentB(config=gemini_cfg)
             print(f"[Agent B] Gemini backend: {agent.config.model_name} @ {agent.config.base_url}")
-            setattr(agent, "_backend", "gemini")
-            setattr(agent, "_supports_parallel", True)
+            agent_model_label = f"gemini:{agent.config.model_name}"
         except Exception as e:
             print(f"[Agent B] Gemini load failed: {e}, fallback to mock")
             def mock_fn(prompt: dict) -> dict:
@@ -191,8 +217,10 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
             agent = AgentBFactory.create(config)
             info = agent.get_model_info() if hasattr(agent, "get_model_info") else {"backend": "local_vlm"}
             print(f"[Agent B] Local backend ready: {info}")
-            setattr(agent, "_backend", "local_vlm")
-            setattr(agent, "_supports_parallel", False)
+            model_type = info.get("model_type", agent_b_cfg.get("model_type", "local_vlm"))
+            model_path = info.get("model_path", agent_b_cfg.get("model_path", ""))
+            model_name = Path(model_path).name if model_path else model_type
+            agent_model_label = f"local_vlm:{model_type}:{model_name}"
         except Exception as e:
             print(f"[Agent B] local_vlm load failed: {e}, fallback to mock")
             def mock_fn(prompt: dict) -> dict:
@@ -216,9 +244,7 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
                 "token_usage": None,
                 "error_type": "unknown_backend",
             }
-        mock_fn._backend = "mock"
-        mock_fn._supports_parallel = False
-        return mock_fn
+        return attach_callable_meta(mock_fn, "mock", "mock", False)
 
     def real_fn(prompt: dict) -> dict:
         T_A = prompt.get("T_A", "")
@@ -257,8 +283,12 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
             "error_type": last_error_type,
         }
 
-    real_fn._backend = getattr(agent, "_backend", backend)
-    real_fn._supports_parallel = bool(getattr(agent, "_supports_parallel", backend == "gemini"))
+    real_fn = attach_callable_meta(
+        real_fn,
+        backend_name=backend,
+        model_label=locals().get("agent_model_label", backend),
+        supports_parallel=(backend == "gemini"),
+    )
     return real_fn
 
 
@@ -353,8 +383,8 @@ def run_pipeline(
     n_call_target = int(round(N * target_budget))
 
     if strategy == 'AgentA_Only':
-        cer_num = sum(Levenshtein.distance(r['T_A'], r['T_GT']) for r in all_results)
-        gt_len = sum(len(r['T_GT']) for r in all_results)
+        cer_num = sum(Levenshtein.distance(normalize_eval_text(r['T_A']), normalize_eval_text(r['T_GT'])) for r in all_results)
+        gt_len = sum(len(normalize_eval_text(r['T_GT'])) for r in all_results)
         per_sample = []
         for r in all_results:
             per_sample.append({
@@ -609,8 +639,8 @@ def run_pipeline(
         else:
             T_final = T_A
         
-        cer_num += Levenshtein.distance(T_final, T_GT)
-        gt_len += len(T_GT)
+        cer_num += Levenshtein.distance(normalize_eval_text(T_final), normalize_eval_text(T_GT))
+        gt_len += len(normalize_eval_text(T_GT))
         per_sample.append({
             'sample_id': r.get('sample_id', ''),
             'image_path': r.get('image_path', ''),
@@ -624,7 +654,7 @@ def run_pipeline(
             'budget': target_budget,
             'budget_mode': 'online',
             'selected_for_upgrade': i in upgrade_set,
-            'vlm_model': agent_b_label,
+            'vlm_model': getattr(agent_b_callable, '_model_label', agent_b_label),
             'prompt_version': prompt_version,
             'vlm_raw_output': vlm_raw_output,
             'latency_ms': latency_ms,
@@ -641,8 +671,8 @@ def run_pipeline(
             'backfill_reason': backfill_reason,
             'is_correct_ocr': T_A == T_GT,
             'is_correct_final': T_final == T_GT,
-            'edit_distance_ocr': Levenshtein.distance(T_A, T_GT),
-            'edit_distance_final': Levenshtein.distance(T_final, T_GT),
+            'edit_distance_ocr': Levenshtein.distance(normalize_eval_text(T_A), normalize_eval_text(T_GT)),
+            'edit_distance_final': Levenshtein.distance(normalize_eval_text(T_final), normalize_eval_text(T_GT)),
             'run_id': run_id,
         })
         if i in upgrade_set:
@@ -687,7 +717,44 @@ def run_pipeline(
     }
 
 
-def replay_from_full_budget(
+def collect_case_rows(item: dict, failure_rows: List[dict], degradation_rows: List[dict]) -> None:
+    if item.get('is_correct_ocr') is False and item.get('is_correct_final') is False:
+        failure_rows.append({
+            'sample_id': item.get('sample_id', ''),
+            'router_name': item.get('router_name', ''),
+            'budget': item.get('budget', 0.0),
+            'domain': item.get('domain', ''),
+            'ocr_text': item.get('ocr_text', ''),
+            'final_text': item.get('final_text', ''),
+            'gt': item.get('gt', ''),
+            'backfill_status': item.get('backfill_status', ''),
+            'backfill_reason': item.get('backfill_reason', ''),
+            'edit_distance_ocr': item.get('edit_distance_ocr', 0),
+            'edit_distance_final': item.get('edit_distance_final', 0),
+        })
+
+    if item.get('selected_for_upgrade') and item.get('final_text') != item.get('ocr_text'):
+        ed_ocr = int(item.get('edit_distance_ocr', 0))
+        ed_final = int(item.get('edit_distance_final', 0))
+        if ed_final > ed_ocr:
+            degradation_rows.append({
+                'sample_id': item.get('sample_id', ''),
+                'router_name': item.get('router_name', ''),
+                'budget': item.get('budget', 0.0),
+                'domain': item.get('domain', ''),
+                'ocr_text': item.get('ocr_text', ''),
+                'vlm_raw_output': item.get('vlm_raw_output', ''),
+                'final_text': item.get('final_text', ''),
+                'gt': item.get('gt', ''),
+                'backfill_status': item.get('backfill_status', ''),
+                'backfill_reason': item.get('backfill_reason', ''),
+                'edit_distance_ocr': ed_ocr,
+                'edit_distance_final': ed_final,
+                'delta_edit_distance': ed_final - ed_ocr,
+                'vlm_model': item.get('vlm_model', ''),
+            })
+
+
     strategy: str,
     target_budget: float,
     full_budget_items: List[dict],
@@ -748,8 +815,8 @@ def replay_from_full_budget(
                     'budget_mode': 'offline',
                 })
 
-        cer_num += Levenshtein.distance(final_text, T_GT)
-        gt_len += len(T_GT)
+        cer_num += Levenshtein.distance(normalize_eval_text(final_text), normalize_eval_text(T_GT))
+        gt_len += len(normalize_eval_text(T_GT))
         per_item = dict(item)
         per_item.update({
             'router_name': strategy,
@@ -766,7 +833,7 @@ def replay_from_full_budget(
             'cvr_flag': backfill_status == 'rejected',
             'replay_rank': rank_map.get(i),
             'is_correct_final': final_text == T_GT,
-            'edit_distance_final': Levenshtein.distance(final_text, T_GT),
+            'edit_distance_final': Levenshtein.distance(normalize_eval_text(final_text), normalize_eval_text(T_GT)),
             'run_id': run_id,
             'prompt_version': prompt_version,
         })
@@ -922,6 +989,7 @@ def main():
     csv_path = run_dir / 'summary.csv'
     metrics_json_path = run_dir / 'metrics_summary.json'
     failure_cases_path = run_dir / 'failure_cases.csv'
+    degradation_cases_path = run_dir / 'degradation_cases.csv'
     domain_breakdown_path = run_dir / 'domain_breakdown.csv'
     backfill_log_path = run_dir / 'backfill_log.jsonl'
     fieldnames = ['Strategy', 'Target_Budget', 'Actual_Call_Rate',
@@ -934,6 +1002,7 @@ def main():
                           'AER', 'CVR', 'N_valid', 'Budget_Mode']
     metrics_rows = []
     all_failure_cases = []
+    all_degradation_cases = []
     all_backfill_logs = []
     domain_stats = {}
     with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
@@ -953,19 +1022,7 @@ def main():
             stat = domain_stats.setdefault(key, {'total': 0, 'correct_final': 0})
             stat['total'] += 1
             stat['correct_final'] += 1 if item.get('is_correct_final') else 0
-            if item.get('is_correct_ocr') is False and item.get('is_correct_final') is False:
-                all_failure_cases.append({
-                    'sample_id': item.get('sample_id', ''),
-                    'router_name': item.get('router_name', ''),
-                    'budget': item.get('budget', 0.0),
-                    'domain': item.get('domain', ''),
-                    'ocr_text': item.get('ocr_text', ''),
-                    'final_text': item.get('final_text', ''),
-                    'gt': item.get('gt', ''),
-                    'backfill_status': item.get('backfill_status', ''),
-                    'backfill_reason': item.get('backfill_reason', ''),
-                    'edit_distance_final': item.get('edit_distance_final', 0),
-                })
+            collect_case_rows(item, all_failure_cases, all_degradation_cases)
         with open(run_dir / 'online_budget_00_results.jsonl', 'w', encoding='utf-8') as f:
             for item in result['per_sample']:
                 f.write(json.dumps(item, ensure_ascii=False) + '\n')
@@ -999,19 +1056,7 @@ def main():
                             stat = domain_stats.setdefault(key, {'total': 0, 'correct_final': 0})
                             stat['total'] += 1
                             stat['correct_final'] += 1 if item.get('is_correct_final') else 0
-                            if item.get('is_correct_ocr') is False and item.get('is_correct_final') is False:
-                                all_failure_cases.append({
-                                    'sample_id': item.get('sample_id', ''),
-                                    'router_name': item.get('router_name', ''),
-                                    'budget': item.get('budget', 0.0),
-                                    'domain': item.get('domain', ''),
-                                    'ocr_text': item.get('ocr_text', ''),
-                                    'final_text': item.get('final_text', ''),
-                                    'gt': item.get('gt', ''),
-                                    'backfill_status': item.get('backfill_status', ''),
-                                    'backfill_reason': item.get('backfill_reason', ''),
-                                    'edit_distance_final': item.get('edit_distance_final', 0),
-                                })
+                            collect_case_rows(item, all_failure_cases, all_degradation_cases)
                         budget_tag = f"{int(round(B * 100)):02d}"
                         jsonl_path = run_dir / f'online_budget_{budget_tag}_{strategy}.jsonl'
                         with open(jsonl_path, 'w', encoding='utf-8') as f:
@@ -1058,19 +1103,7 @@ def main():
                     stat = domain_stats.setdefault(key, {'total': 0, 'correct_final': 0})
                     stat['total'] += 1
                     stat['correct_final'] += 1 if item.get('is_correct_final') else 0
-                    if item.get('is_correct_ocr') is False and item.get('is_correct_final') is False:
-                        all_failure_cases.append({
-                            'sample_id': item.get('sample_id', ''),
-                            'router_name': item.get('router_name', ''),
-                            'budget': item.get('budget', 0.0),
-                            'domain': item.get('domain', ''),
-                            'ocr_text': item.get('ocr_text', ''),
-                            'final_text': item.get('final_text', ''),
-                            'gt': item.get('gt', ''),
-                            'backfill_status': item.get('backfill_status', ''),
-                            'backfill_reason': item.get('backfill_reason', ''),
-                            'edit_distance_final': item.get('edit_distance_final', 0),
-                        })
+                    collect_case_rows(item, all_failure_cases, all_degradation_cases)
                 budget_tag = f"{int(round(B * 100)):02d}"
                 replay_path = run_dir / f'offline_budget_{budget_tag}_{strategy}.jsonl'
                 with open(replay_path, 'w', encoding='utf-8') as f:
@@ -1091,10 +1124,21 @@ def main():
         writer = csv.DictWriter(
             f,
             fieldnames=['sample_id', 'router_name', 'budget', 'domain', 'ocr_text', 'final_text', 'gt',
-                        'backfill_status', 'backfill_reason', 'edit_distance_final']
+                        'backfill_status', 'backfill_reason', 'edit_distance_ocr', 'edit_distance_final']
         )
         writer.writeheader()
         for row in all_failure_cases:
+            writer.writerow(row)
+
+    with open(degradation_cases_path, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=['sample_id', 'router_name', 'budget', 'domain', 'ocr_text', 'vlm_raw_output', 'final_text', 'gt',
+                        'backfill_status', 'backfill_reason', 'edit_distance_ocr', 'edit_distance_final',
+                        'delta_edit_distance', 'vlm_model']
+        )
+        writer.writeheader()
+        for row in all_degradation_cases:
             writer.writerow(row)
 
     with open(domain_breakdown_path, 'w', newline='', encoding='utf-8') as f:
@@ -1125,6 +1169,7 @@ def main():
     print(f'\nDone: {csv_path}')
     print(f'Done: {metrics_json_path}')
     print(f'Done: {failure_cases_path}')
+    print(f'Done: {degradation_cases_path}')
     print(f'Done: {domain_breakdown_path}')
     print(f'Done: {backfill_log_path}')
     print(f'Done: {run_dir}')
