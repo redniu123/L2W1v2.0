@@ -1,0 +1,7 @@
+router_name,domain,budget,n_samples,final_accuracy
+AgentA_Only,finance,0.0,929,0.0
+AgentA_Only,geology,0.0,1385,0.0
+AgentA_Only,medicine,0.0,1110,0.0
+GCR,finance,0.1,929,0.393972
+GCR,geology,0.1,1385,0.356679
+GCR,medicine,0.1,1110,0.372072

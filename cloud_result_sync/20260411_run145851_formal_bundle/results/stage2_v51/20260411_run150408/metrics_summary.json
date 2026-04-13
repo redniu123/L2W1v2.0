@@ -1,0 +1,34 @@
+[
+  {
+    "Strategy": "AgentA_Only",
+    "Target_Budget": 0.0,
+    "Actual_Call_Rate": 0.0,
+    "Overall_CER": 0.099561,
+    "Boundary_Deletion_Recall@B": 0.0,
+    "Substitution_CER": 0.055109,
+    "P95_Latency_MS": 0.0,
+    "Avg_Token_Usage": 0.0,
+    "Total_Token_Usage": 0.0,
+    "N_Latency_Valid": 0,
+    "N_Token_Valid": 0,
+    "AER": 0.0,
+    "CVR": 0.0,
+    "N_valid": 3424
+  },
+  {
+    "Strategy": "GCR",
+    "Target_Budget": 0.1,
+    "Actual_Call_Rate": 0.0999,
+    "Overall_CER": 0.09681,
+    "Boundary_Deletion_Recall@B": 0.233474,
+    "Substitution_CER": 0.053124,
+    "P95_Latency_MS": 180759.066,
+    "Avg_Token_Usage": 0.0,
+    "Total_Token_Usage": 0.0,
+    "N_Latency_Valid": 342,
+    "N_Token_Valid": 0,
+    "AER": 0.3889,
+    "CVR": 0.5,
+    "N_valid": 3424
+  }
+]

@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "total_calls": 99,
+  "total_rejections": 8,
+  "rejection_rate": 0.080808,
+  "cooldown_remaining": 0,
+  "is_open": false
+}

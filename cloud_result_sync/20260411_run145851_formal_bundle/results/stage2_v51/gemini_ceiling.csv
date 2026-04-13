@@ -1,0 +1,3 @@
+Mode,N,Overall_CER,AgentA_CER,Change_Rate,Improve_Rate,Worsen_Rate,Same_Rate
+Gemini_Correction_100pct,977,0.069549,0.118785,0.7042,0.4545,0.1515,0.2958
+Gemini_PureOCR_100pct,977,0.07731,N/A,0.695,0.4237,0.1842,0.305

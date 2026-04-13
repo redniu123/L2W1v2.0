@@ -1,0 +1,18 @@
+{
+  "lambda_current": 0.5,
+  "lambda_init": 0.5,
+  "lambda_min": 0.0,
+  "lambda_max": 1.0,
+  "lambda_history_len": 1,
+  "lambda_history_last_10": [
+    0.5
+  ],
+  "sample_count": 100,
+  "total_upgrades": 99,
+  "actual_budget_window": 0.99,
+  "total_budget": 0.99,
+  "target_budget": 0.1,
+  "is_warmup": true,
+  "window_size": 500,
+  "k": 0.01
+}

@@ -1,0 +1,28 @@
+{
+  "lambda_current": 0.8888999999999994,
+  "lambda_init": 0.5,
+  "lambda_min": 0.0,
+  "lambda_max": 1.0,
+  "lambda_history_len": 3376,
+  "lambda_history_last_10": [
+    0.8978999999999994,
+    0.8968999999999994,
+    0.8958999999999994,
+    0.8948999999999994,
+    0.8938999999999994,
+    0.8928999999999994,
+    0.8918999999999994,
+    0.8908999999999994,
+    0.8898999999999994,
+    0.8888999999999994
+  ],
+  "sample_count": 3424,
+  "total_upgrades": 343,
+  "actual_budget_window": 0.0,
+  "total_budget": 0.1001752336448598,
+  "target_budget": 0.1,
+  "is_warmup": false,
+  "window_size": 500,
+  "warmup_samples": 50,
+  "k": 0.01
+}

@@ -1,0 +1,2 @@
+Strategy,Target_Budget,Actual_Call_Rate,Overall_CER,Boundary_Deletion_Recall@B,Substitution_CER,P95_Latency_MS,Avg_Token_Usage,Total_Token_Usage,N_Latency_Valid,N_Token_Valid,AER,CVR,N_valid
+SH-DA++,0.1,0.99,0.125975,0.966667,0.053512,180993.108,0.0,0.0,99,0,0.3535,0.0808,100
