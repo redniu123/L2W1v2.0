@@ -5,15 +5,15 @@ mainline:
   test_jsonl: "data/l2w1data/test.jsonl"
   image_root: "data/l2w1data/images"
   agent_a_rec_model_dir: "./models/agent_a_ppocr/PP-OCRv5_server_rec_infer"
-  mainline_agent_b: "Gemini 3 Flash Preview"
-  prompt_version: "prompt_v1.0"
+  mainline_agent_b: "Gemini Flash Preview PAYG"
+  prompt_version: "prompt_v1.1"
   formal_budgets: [0.10, 0.20, 0.30]
   frontier_entry: "scripts/run_efficiency_frontier.py"
   online_entry: "scripts/run_online_budget_control.py"
   cross_model_entry: "scripts/run_all_frontiers.py"
 
-mainline_agent_b: "Gemini 3 Flash Preview"
-prompt_version: "prompt_v1.0"
+mainline_agent_b: "Gemini Flash Preview PAYG"
+prompt_version: "prompt_v1.1"
 
 agent_b:
   skip: false
@@ -28,12 +28,13 @@ agent_b:
   # --- Gemini API settings (backend=gemini 时生效) ---
   base_url: "https://new.lemonapi.site/v1"
   key_file: "key.txt"
-  provider_pool: "gemini_wending_3x"
+  provider_pool: "gemini_payg"
   temperature: 0.1
   max_tokens: 256
   max_retries: 3
   timeout: 60
-  model_name: "gemini-3-flash-preview"
+  model_name: "[V]gemini-3-flash-preview"
+  max_concurrency: 4
 
 backfill:
   max_edit_distance: 3
