@@ -396,73 +396,73 @@ def run_pipeline(
     # 补充路线：BAUR / DAR
     # 系统对照：Router-only / SH-DA++
     if strategy == 'GCR':
-            scores = [1.0 - float(r.get('conf', r.get('mean_conf', 0.0))) for r in all_results]
-        elif strategy == 'DGCR':
-            scores = [
-                (1.0 - float(r.get('conf', r.get('mean_conf', 0.0)))) + float(r.get('r_d', 0.0))
-                for r in all_results
-            ]
-        elif strategy == 'WUR':
-            scores = []
-            for r in all_results:
-                mean_conf = float(r.get('mean_conf', r.get('conf', 0.0)))
-                min_conf = float(r.get('min_conf', r.get('conf', 0.0)))
-                drop = float(r.get('drop', 0.0))
-                q = 0.5 * (1.0 - mean_conf) + 0.3 * (1.0 - min_conf) + 0.2 * drop
-                if min_conf < 0.35:
-                    q += 0.10
-                if drop > 0.20:
-                    q += 0.10
-                scores.append(float(q))
-        elif strategy == 'DWUR':
-            scores = []
-            eta = float(getattr(router.config.rule_scorer, 'eta', 0.5))
-            for r in all_results:
-                mean_conf = float(r.get('mean_conf', r.get('conf', 0.0)))
-                min_conf = float(r.get('min_conf', r.get('conf', 0.0)))
-                drop = float(r.get('drop', 0.0))
-                q = 0.5 * (1.0 - mean_conf) + 0.3 * (1.0 - min_conf) + 0.2 * drop
-                if min_conf < 0.35:
-                    q += 0.10
-                if drop > 0.20:
-                    q += 0.10
-                q += eta * float(r.get('r_d', 0.0))
-                scores.append(float(q))
-        elif strategy == 'BAUR':
-            # Budget-Aware Uncertainty Router：轻量不确定性，不含领域项
-            scores = []
-            for r in all_results:
-                dec = router.route(
-                    boundary_stats=r['boundary_stats'],
-                    top2_info=r['top2_info'],
-                    r_d=0.0,
-                    agent_a_text=r['T_A'],
-                )
-                scores.append(max(dec.s_b, dec.s_a))
-        elif strategy == 'DAR':
-            # Domain-Augmented Router：在 BAUR 基础上显式加入领域项
-            scores = []
-            for r in all_results:
-                dec = router.route(
-                    boundary_stats=r['boundary_stats'],
-                    top2_info=r['top2_info'],
-                    r_d=r['r_d'],
-                    agent_a_text=r['T_A'],
-                )
-                scores.append(dec.q)
-        else:  # Router-only or SH-DA++
-            # 系统对照默认使用 WUR 作为当前固定规则主路由
-            scores = []
-            for r in all_results:
-                mean_conf = float(r.get('mean_conf', r.get('conf', 0.0)))
-                min_conf = float(r.get('min_conf', r.get('conf', 0.0)))
-                drop = float(r.get('drop', 0.0))
-                q = 0.5 * (1.0 - mean_conf) + 0.3 * (1.0 - min_conf) + 0.2 * drop
-                if min_conf < 0.35:
-                    q += 0.10
-                if drop > 0.20:
-                    q += 0.10
-                scores.append(float(q))
+        scores = [1.0 - float(r.get('conf', r.get('mean_conf', 0.0))) for r in all_results]
+    elif strategy == 'DGCR':
+        scores = [
+            (1.0 - float(r.get('conf', r.get('mean_conf', 0.0)))) + float(r.get('r_d', 0.0))
+            for r in all_results
+        ]
+    elif strategy == 'WUR':
+        scores = []
+        for r in all_results:
+            mean_conf = float(r.get('mean_conf', r.get('conf', 0.0)))
+            min_conf = float(r.get('min_conf', r.get('conf', 0.0)))
+            drop = float(r.get('drop', 0.0))
+            q = 0.5 * (1.0 - mean_conf) + 0.3 * (1.0 - min_conf) + 0.2 * drop
+            if min_conf < 0.35:
+                q += 0.10
+            if drop > 0.20:
+                q += 0.10
+            scores.append(float(q))
+    elif strategy == 'DWUR':
+        scores = []
+        eta = float(getattr(router.config.rule_scorer, 'eta', 0.5))
+        for r in all_results:
+            mean_conf = float(r.get('mean_conf', r.get('conf', 0.0)))
+            min_conf = float(r.get('min_conf', r.get('conf', 0.0)))
+            drop = float(r.get('drop', 0.0))
+            q = 0.5 * (1.0 - mean_conf) + 0.3 * (1.0 - min_conf) + 0.2 * drop
+            if min_conf < 0.35:
+                q += 0.10
+            if drop > 0.20:
+                q += 0.10
+            q += eta * float(r.get('r_d', 0.0))
+            scores.append(float(q))
+    elif strategy == 'BAUR':
+        # Budget-Aware Uncertainty Router：轻量不确定性，不含领域项
+        scores = []
+        for r in all_results:
+            dec = router.route(
+                boundary_stats=r['boundary_stats'],
+                top2_info=r['top2_info'],
+                r_d=0.0,
+                agent_a_text=r['T_A'],
+            )
+            scores.append(max(dec.s_b, dec.s_a))
+    elif strategy == 'DAR':
+        # Domain-Augmented Router：在 BAUR 基础上显式加入领域项
+        scores = []
+        for r in all_results:
+            dec = router.route(
+                boundary_stats=r['boundary_stats'],
+                top2_info=r['top2_info'],
+                r_d=r['r_d'],
+                agent_a_text=r['T_A'],
+            )
+            scores.append(dec.q)
+    else:  # Router-only or SH-DA++
+        # 系统对照默认使用 WUR 作为当前固定规则主路由
+        scores = []
+        for r in all_results:
+            mean_conf = float(r.get('mean_conf', r.get('conf', 0.0)))
+            min_conf = float(r.get('min_conf', r.get('conf', 0.0)))
+            drop = float(r.get('drop', 0.0))
+            q = 0.5 * (1.0 - mean_conf) + 0.3 * (1.0 - min_conf) + 0.2 * drop
+            if min_conf < 0.35:
+                q += 0.10
+            if drop > 0.20:
+                q += 0.10
+            scores.append(float(q))
 
     upgrade_set = set(
         sorted(range(N), key=lambda i: scores[i], reverse=True)[:n_call_target]
