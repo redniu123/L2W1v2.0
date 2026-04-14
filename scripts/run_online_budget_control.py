@@ -80,7 +80,7 @@ def build_scores(strategy, all_results, router):
     return score_entries
 
 
-def run_online_pipeline(strategy, target_budget, all_results, router, backfill_controller, prompter, agent_b_callable, budget_cfg, circuit_breaker, run_id='', prompt_version='prompt_v1.0', agent_b_label='configured_agent_b'):
+def run_online_pipeline(strategy, target_budget, all_results, router, backfill_controller, prompter, agent_b_callable, budget_cfg, circuit_breaker, run_id='', prompt_version='prompt_v1.0', agent_b_label='configured_agent_b', skip_backfill=False, domain_prompt=False):
     from modules.router.backfill import RouteType
     ctrl = OnlineBudgetController(budget_cfg)
     score_entries = build_scores(strategy, all_results, router)
@@ -105,7 +105,7 @@ def run_online_pipeline(strategy, target_budget, all_results, router, backfill_c
         cb_stats = circuit_breaker.step_without_call()
         if upgrade:
             n_upgraded += 1
-            domain_label = {'geology': '地质勘探', 'finance': '金融财会', 'medicine': '医学'}.get(r.get('domain', 'geology')) if strategy == 'SH-DA++' else None
+            domain_label = {'geology': '地质勘探', 'finance': '金融财会', 'medicine': '医学'}.get(r.get('domain', 'geology')) if (strategy == 'SH-DA++' or domain_prompt) else None
             prompt = prompter.generate_targeted_correction_prompt(T_A=T_A, min_conf_idx=r['min_conf_idx'], domain=domain_label, image_path=r['img_path'])
             prompt['T_A'], prompt['min_conf_idx'], prompt['image_path'] = T_A, r['min_conf_idx'], r['img_path']
             agent_b_result = agent_b_callable(prompt)
@@ -114,9 +114,11 @@ def run_online_pipeline(strategy, target_budget, all_results, router, backfill_c
             latency_ms = agent_b_result.get('latency_ms')
             token_usage = agent_b_result.get('token_usage')
             error_type = agent_b_result.get('error_type', 'none')
-            if strategy == 'BAUR-only':
+            if strategy == 'BAUR-only' or skip_backfill:
                 T_final = T_cand if isinstance(T_cand, str) and T_cand else T_A
-                final_text_if_upgraded, backfill_status, backfill_reason = T_final, 'skipped', 'baur_only_no_backfill'
+                final_text_if_upgraded = T_final
+                backfill_status = 'skipped'
+                backfill_reason = 'skip_backfill' if skip_backfill else 'baur_only_no_backfill'
                 cb_stats = circuit_breaker.observe(rejected=False)
                 if T_final != T_A: n_accepted += 1
             else:
@@ -201,6 +203,8 @@ def main():
     p.add_argument('--budget_lambda_min', type=float, default=None, help='Override budget controller lambda_min for debug/validation')
     p.add_argument('--budget_lambda_max', type=float, default=None, help='Override budget controller lambda_max for debug/validation')
     p.add_argument('--use_gpu', action='store_true', default=False); p.add_argument('--use_cache', action='store_true', default=False); p.add_argument('--rebuild_cache', action='store_true', default=False)
+    p.add_argument('--skip_backfill', action='store_true', default=False, help='Accept Agent B output directly for upgraded samples')
+    p.add_argument('--disable_circuit_breaker', action='store_true', default=False, help='Force disable circuit breaker for this run')
     p.add_argument('--prompt_version', default=None, help='Override frozen prompt version')
     args = p.parse_args(); random.seed(args.seed); np.random.seed(args.seed)
     with open(args.config, 'r', encoding='utf-8') as f: config = yaml.safe_load(f)
@@ -241,8 +245,8 @@ def main():
         target_budget=args.target_budget,
     )
     cb_cfg = (config or {}).get('sh_da_v4', {}).get('circuit_breaker', {})
-    circuit_breaker = CircuitBreaker(CircuitBreakerConfig(enabled=cb_cfg.get('enabled', True), min_samples=cb_cfg.get('min_samples', 20), rejection_rate_threshold=cb_cfg.get('rejection_rate_threshold', 0.60), cooldown_steps=cb_cfg.get('cooldown_steps', 50)))
-    result = run_online_pipeline(args.strategy, args.target_budget, all_results, router, backfill_controller, prompter, agent_b_callable, budget_cfg, circuit_breaker, run_id=run_id, prompt_version=prompt_version, agent_b_label=mainline_agent_b)
+    circuit_breaker = CircuitBreaker(CircuitBreakerConfig(enabled=False if args.disable_circuit_breaker else cb_cfg.get('enabled', True), min_samples=cb_cfg.get('min_samples', 20), rejection_rate_threshold=cb_cfg.get('rejection_rate_threshold', 0.60), cooldown_steps=cb_cfg.get('cooldown_steps', 50)))
+    result = run_online_pipeline(args.strategy, args.target_budget, all_results, router, backfill_controller, prompter, agent_b_callable, budget_cfg, circuit_breaker, run_id=run_id, prompt_version=prompt_version, agent_b_label=mainline_agent_b, skip_backfill=args.skip_backfill)
     with open(run_dir / 'summary.csv', 'w', newline='', encoding='utf-8') as f:
         w = csv.DictWriter(f, fieldnames=['Strategy','Target_Budget','Actual_Call_Rate','Overall_CER','Boundary_Deletion_Recall@B','Substitution_CER','P95_Latency_MS','Avg_Token_Usage','Total_Token_Usage','N_Latency_Valid','N_Token_Valid','AER','CVR','N_valid']); w.writeheader(); w.writerow(result['summary'])
     (run_dir / 'metrics_summary.json').write_text(json.dumps([result['summary']], ensure_ascii=False, indent=2), encoding='utf-8')

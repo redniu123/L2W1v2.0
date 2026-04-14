@@ -1,0 +1,6 @@
+router_name: GCR
+router_version: router_v5.1
+score_definition: "q = 1 - conf"
+threshold_mode: online_control
+budget_points: [0.10, 0.20, 0.30]
+source: expA_formal_run_20260413_run115631

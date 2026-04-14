@@ -1,0 +1,25 @@
+# 主实验 B 协议冻结说明
+
+- 实验名称：主实验 B（系统级方法）
+- 实验目标：在固定 BestRouter 的前提下，比较 `M5 = BestRouter-only` 与 `M6 = SH-DA++`。
+- 设计依据：`实验设计书.md` + `docs/expB_output_spec.md`
+- 当前冻结 BestRouter：`GCR`
+- 选择依据：主实验 A 正式结果中 `GCR` 取得全局最佳 CER（`0.078858 @ 0.30`），且更适合作为后续扩展到 `0.50 / 0.80` 预算时的统一固定 Router
+- 正式预算点：`0.10 / 0.20 / 0.30`
+- 预算模式：`online_control`
+- M5 定义：BestRouter + Agent A + Agent B，不启用领域软提示词、不启用 strict backfill、不启用 circuit breaker
+- M6 定义：BestRouter + 领域软提示词 + strict backfill + circuit breaker
+- 固定变量：
+  - 数据：`data/l2w1data/test.jsonl`
+  - 图像目录：`data/l2w1data/images`
+  - Agent A：`PP-OCRv5_server_rec_infer`
+  - Agent B：`Gemini Flash Preview 1x`
+  - API 模型：`gemini-3-flash-preview`
+  - Prompt：`prompt_v1.1`
+  - 统一评测脚本：主线正式脚本
+- 结果有效性：
+  - 必须有 `run_id`
+  - 必须有 `config_snapshot.yaml`
+  - 必须有 `summary.csv` / `metrics_summary.json`
+  - 必须有 M5/M6 各预算点 JSONL
+  - 必须有预算合法性记录
