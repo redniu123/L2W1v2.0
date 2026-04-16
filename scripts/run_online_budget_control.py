@@ -114,22 +114,37 @@ def run_online_pipeline(strategy, target_budget, all_results, router, backfill_c
             latency_ms = agent_b_result.get('latency_ms')
             token_usage = agent_b_result.get('token_usage')
             error_type = agent_b_result.get('error_type', 'none')
+            cached_final_text = agent_b_result.get('cached_final_text')
+            cached_final_text_if_upgraded = agent_b_result.get('cached_final_text_if_upgraded')
+            cached_backfill_status = agent_b_result.get('cached_backfill_status')
+            cached_backfill_reason = agent_b_result.get('cached_backfill_reason')
             if strategy == 'BAUR-only' or skip_backfill:
-                T_final = T_cand if isinstance(T_cand, str) and T_cand else T_A
-                final_text_if_upgraded = T_final
-                backfill_status = 'skipped'
-                backfill_reason = 'skip_backfill' if skip_backfill else 'baur_only_no_backfill'
+                T_final = cached_final_text if cached_final_text is not None else (T_cand if isinstance(T_cand, str) and T_cand else T_A)
+                final_text_if_upgraded = cached_final_text_if_upgraded if cached_final_text_if_upgraded is not None else T_final
+                backfill_status = cached_backfill_status or 'skipped'
+                backfill_reason = cached_backfill_reason or ('skip_backfill' if skip_backfill else 'baur_only_no_backfill')
                 cb_stats = circuit_breaker.observe(rejected=False)
                 if T_final != T_A: n_accepted += 1
             else:
-                bf = backfill_controller.apply_backfill(T_A=T_A, T_cand=T_cand, route_type=RouteType.BOUNDARY)
-                T_final = bf.T_final
-                final_text_if_upgraded = T_final
-                if bf.is_rejected:
-                    n_rejected += 1; backfill_status, backfill_reason = 'rejected', bf.rejection_reason.value; cb_stats = circuit_breaker.observe(rejected=True)
+                if cached_final_text is not None and cached_backfill_status is not None:
+                    T_final = cached_final_text
+                    final_text_if_upgraded = cached_final_text_if_upgraded if cached_final_text_if_upgraded is not None else T_final
+                    backfill_status = cached_backfill_status
+                    backfill_reason = cached_backfill_reason or ''
+                    if backfill_status == 'rejected':
+                        n_rejected += 1; cb_stats = circuit_breaker.observe(rejected=True)
+                    else:
+                        cb_stats = circuit_breaker.observe(rejected=False)
+                        if T_final != T_A: n_accepted += 1
                 else:
-                    backfill_status, backfill_reason = 'accepted', bf.rejection_reason.value; cb_stats = circuit_breaker.observe(rejected=False)
-                    if T_final != T_A: n_accepted += 1
+                    bf = backfill_controller.apply_backfill(T_A=T_A, T_cand=T_cand, route_type=RouteType.BOUNDARY)
+                    T_final = bf.T_final
+                    final_text_if_upgraded = T_final
+                    if bf.is_rejected:
+                        n_rejected += 1; backfill_status, backfill_reason = 'rejected', bf.rejection_reason.value; cb_stats = circuit_breaker.observe(rejected=True)
+                    else:
+                        backfill_status, backfill_reason = 'accepted', bf.rejection_reason.value; cb_stats = circuit_breaker.observe(rejected=False)
+                        if T_final != T_A: n_accepted += 1
         else:
             T_final = T_A
         cer_num += Levenshtein.distance(T_final, T_GT); gt_len += len(T_GT)
