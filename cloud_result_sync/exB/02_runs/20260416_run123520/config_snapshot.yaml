@@ -1,0 +1,8 @@
+{
+  "run_id": "20260416_run123520",
+  "mode": "prepare_dual_cache_only",
+  "m5_cache_path": "cloud_result_sync/exB/02_runs/m5_full_call_cache.jsonl",
+  "m6_cache_path": "cloud_result_sync/exB/02_runs/m6_full_call_cache.jsonl",
+  "prompt_version": "prompt_v1.1",
+  "cache_semantics": "vlm_only_cache_pool"
+}
