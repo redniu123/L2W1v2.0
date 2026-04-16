@@ -208,6 +208,7 @@ class GeminiAgentB:
         suspicious_index = manifest.get("suspicious_index", -1)
         suspicious_char = manifest.get("suspicious_char", "")
         risk_level = manifest.get("risk_level", "medium")
+        domain = (manifest.get("domain") or "").strip()
 
         # 构建 Targeted Correction 提示词
         hint_lines = []
@@ -215,7 +216,8 @@ class GeminiAgentB:
             hint_lines.append(
                 f"其中第 {suspicious_index + 1} 个字符 '{suspicious_char}' 的机器置信度极低，请重点关注。"
             )
-        hint_lines.append("本文本属于【地质勘探】领域，请留意专业术语的准确性。")
+        if domain:
+            hint_lines.append(f"本文本属于【{domain}】领域，请留意专业术语的准确性。")
 
         hint_block = (
             "系统检测到该文本可能存在识别错误。\n" + "\n".join(hint_lines) + "\n\n"

@@ -259,6 +259,7 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
             "suspicious_index": min_conf_idx,
             "suspicious_char": suspicious_char,
             "risk_level": "medium",
+            "domain": prompt.get("domain"),
         }
         t0 = time.perf_counter()
         last_error_type = "none"
