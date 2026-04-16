@@ -107,7 +107,7 @@ def run_online_pipeline(strategy, target_budget, all_results, router, backfill_c
             n_upgraded += 1
             domain_label = {'geology': '地质勘探', 'finance': '金融财会', 'medicine': '医学'}.get(r.get('domain', 'geology')) if (strategy == 'SH-DA++' or domain_prompt) else None
             prompt = prompter.generate_targeted_correction_prompt(T_A=T_A, min_conf_idx=r['min_conf_idx'], domain=domain_label, image_path=r['img_path'])
-            prompt['T_A'], prompt['min_conf_idx'], prompt['image_path'] = T_A, r['min_conf_idx'], r['img_path']
+            prompt['T_A'], prompt['min_conf_idx'], prompt['image_path'], prompt['sample_id'] = T_A, r['min_conf_idx'], r['img_path'], r.get('sample_id','')
             agent_b_result = agent_b_callable(prompt)
             T_cand = agent_b_result.get('corrected_text', T_A)
             vlm_raw_output = T_cand

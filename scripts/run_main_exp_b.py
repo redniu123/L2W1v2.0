@@ -46,10 +46,10 @@ def cache(rows,cfg,bf,rd,pv,shda,path,rebuild):
     ag=build_agent_b_callable(cfg);strategy='SH-DA++' if shda else 'Router-only';o=run_pipeline(strategy,1.0,rows,None,bf,P(shda),ag,run_id=rd.name,prompt_version=pv,agent_b_label=getattr(ag,'_model_label','configured_agent_b'))
     rs=[{'sample_id':x.get('sample_id',''),'image_path':x.get('image_path',''),'ocr_text':x.get('ocr_text',''),'vlm_raw_output':x.get('vlm_raw_output',''),'latency_ms':x.get('latency_ms'),'token_usage':x.get('token_usage'),'error_type':x.get('error_type','none'),'vlm_model':x.get('vlm_model',''),'prompt_version':x.get('prompt_version',pv),'cache_variant':'M6' if shda else 'M5'} for x in o['per_sample']];JL(p,rs);return p,rs
 def A(rows,label):
-    bp={};bi={};ml=label
-    for r in rows:bp.setdefault((r.get('image_path',''),r.get('ocr_text','')),r);bi.setdefault(r.get('image_path',''),r);ml=r.get('vlm_model') or ml
+    bs={};bp={};bi={};ml=label
+    for r in rows:bs.setdefault(r.get('sample_id',''),r);bp.setdefault((r.get('image_path',''),r.get('ocr_text','')),r);bi.setdefault(r.get('image_path',''),r);ml=r.get('vlm_model') or ml
     def call(prompt):
-        h=bp.get((prompt.get('image_path',''),prompt.get('T_A',''))) or bi.get(prompt.get('image_path',''))
+        h=bs.get(prompt.get('sample_id','')) or bp.get((prompt.get('image_path',''),prompt.get('T_A',''))) or bi.get(prompt.get('image_path',''))
         return {'corrected_text':(h or {}).get('vlm_raw_output',prompt.get('T_A','')) or prompt.get('T_A',''),'latency_ms':0.0,'token_usage':(h or {}).get('token_usage'),'error_type':(h or {}).get('error_type','cache_miss' if h is None else 'none')}
     call._model_label=ml;call._supports_parallel=False;call._max_concurrency=1;return call
 if __name__=='__main__':
