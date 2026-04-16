@@ -200,7 +200,7 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
             agent = GeminiAgentB(config=gemini_cfg)
             print(f"[Agent B] Gemini backend: {agent.config.model_name} @ {agent.config.base_url}")
             agent_model_label = f"gemini:{agent.config.model_name}"
-            max_concurrency = int(agent_b_cfg.get("max_concurrency", 4) or 4)
+            max_concurrency = int(agent_b_cfg.get("max_concurrency", 100) or 100)
         except Exception as e:
             print(f"[Agent B] Gemini load failed: {e}, fallback to mock")
             def mock_fn(prompt: dict) -> dict:
