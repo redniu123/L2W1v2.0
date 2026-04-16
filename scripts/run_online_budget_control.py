@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """正式在线预算实验：逐样本使用 OnlineBudgetController.step(q)。"""
 
-import argparse, csv, json, random, sys
+import argparse, csv, json, random, sys, hashlib
 from datetime import datetime
 from pathlib import Path
 
@@ -80,7 +80,7 @@ def build_scores(strategy, all_results, router):
     return score_entries
 
 
-def run_online_pipeline(strategy, target_budget, all_results, router, backfill_controller, prompter, agent_b_callable, budget_cfg, circuit_breaker, run_id='', prompt_version='prompt_v1.0', agent_b_label='configured_agent_b', skip_backfill=False, domain_prompt=False):
+def run_online_pipeline(strategy, target_budget, all_results, router, backfill_controller, prompter, agent_b_callable, budget_cfg, circuit_breaker, run_id='', prompt_version='prompt_v1.0', agent_b_label='configured_agent_b', skip_backfill=False, domain_prompt=False, cache_variant=None, cache_signature_builder=None):
     from modules.router.backfill import RouteType
     ctrl = OnlineBudgetController(budget_cfg)
     score_entries = build_scores(strategy, all_results, router)
@@ -101,6 +101,8 @@ def run_online_pipeline(strategy, target_budget, all_results, router, backfill_c
         latency_ms = None
         token_usage = None
         error_type = 'not_upgraded'
+        cache_status = 'not_used'
+        cache_signature_hash = None
         backfill_status = backfill_reason = 'not_upgraded'
         cb_stats = circuit_breaker.step_without_call()
         if upgrade:
@@ -108,43 +110,34 @@ def run_online_pipeline(strategy, target_budget, all_results, router, backfill_c
             domain_label = {'geology': '地质勘探', 'finance': '金融财会', 'medicine': '医学'}.get(r.get('domain', 'geology')) if (strategy == 'SH-DA++' or domain_prompt) else None
             prompt = prompter.generate_targeted_correction_prompt(T_A=T_A, min_conf_idx=r['min_conf_idx'], domain=domain_label, image_path=r['img_path'])
             prompt['T_A'], prompt['min_conf_idx'], prompt['image_path'], prompt['sample_id'] = T_A, r['min_conf_idx'], r['img_path'], r.get('sample_id','')
+            if cache_signature_builder is not None:
+                cache_signature = cache_signature_builder(r)
+                prompt['cache_signature'] = cache_signature
+                prompt['cache_variant'] = cache_variant
             agent_b_result = agent_b_callable(prompt)
             T_cand = agent_b_result.get('corrected_text', T_A)
             vlm_raw_output = T_cand
             latency_ms = agent_b_result.get('latency_ms')
             token_usage = agent_b_result.get('token_usage')
             error_type = agent_b_result.get('error_type', 'none')
-            cached_final_text = agent_b_result.get('cached_final_text')
-            cached_final_text_if_upgraded = agent_b_result.get('cached_final_text_if_upgraded')
-            cached_backfill_status = agent_b_result.get('cached_backfill_status')
-            cached_backfill_reason = agent_b_result.get('cached_backfill_reason')
+            cache_status = agent_b_result.get('cache_status', 'api_call')
+            cache_signature_hash = agent_b_result.get('signature_hash')
             if strategy == 'BAUR-only' or skip_backfill:
-                T_final = cached_final_text if cached_final_text is not None else (T_cand if isinstance(T_cand, str) and T_cand else T_A)
-                final_text_if_upgraded = cached_final_text_if_upgraded if cached_final_text_if_upgraded is not None else T_final
-                backfill_status = cached_backfill_status or 'skipped'
-                backfill_reason = cached_backfill_reason or ('skip_backfill' if skip_backfill else 'baur_only_no_backfill')
+                T_final = T_cand if isinstance(T_cand, str) and T_cand else T_A
+                final_text_if_upgraded = T_final
+                backfill_status = 'skipped'
+                backfill_reason = 'skip_backfill' if skip_backfill else 'baur_only_no_backfill'
                 cb_stats = circuit_breaker.observe(rejected=False)
                 if T_final != T_A: n_accepted += 1
             else:
-                if cached_final_text is not None and cached_backfill_status is not None:
-                    T_final = cached_final_text
-                    final_text_if_upgraded = cached_final_text_if_upgraded if cached_final_text_if_upgraded is not None else T_final
-                    backfill_status = cached_backfill_status
-                    backfill_reason = cached_backfill_reason or ''
-                    if backfill_status == 'rejected':
-                        n_rejected += 1; cb_stats = circuit_breaker.observe(rejected=True)
-                    else:
-                        cb_stats = circuit_breaker.observe(rejected=False)
-                        if T_final != T_A: n_accepted += 1
+                bf = backfill_controller.apply_backfill(T_A=T_A, T_cand=T_cand, route_type=RouteType.BOUNDARY)
+                T_final = bf.T_final
+                final_text_if_upgraded = T_final
+                if bf.is_rejected:
+                    n_rejected += 1; backfill_status, backfill_reason = 'rejected', bf.rejection_reason.value; cb_stats = circuit_breaker.observe(rejected=True)
                 else:
-                    bf = backfill_controller.apply_backfill(T_A=T_A, T_cand=T_cand, route_type=RouteType.BOUNDARY)
-                    T_final = bf.T_final
-                    final_text_if_upgraded = T_final
-                    if bf.is_rejected:
-                        n_rejected += 1; backfill_status, backfill_reason = 'rejected', bf.rejection_reason.value; cb_stats = circuit_breaker.observe(rejected=True)
-                    else:
-                        backfill_status, backfill_reason = 'accepted', bf.rejection_reason.value; cb_stats = circuit_breaker.observe(rejected=False)
-                        if T_final != T_A: n_accepted += 1
+                    backfill_status, backfill_reason = 'accepted', bf.rejection_reason.value; cb_stats = circuit_breaker.observe(rejected=False)
+                    if T_final != T_A: n_accepted += 1
         else:
             T_final = T_A
         cer_num += Levenshtein.distance(T_final, T_GT); gt_len += len(T_GT)
@@ -180,6 +173,9 @@ def run_online_pipeline(strategy, target_budget, all_results, router, backfill_c
             'latency_ms': latency_ms,
             'token_usage': token_usage,
             'error_type': error_type,
+            'cache_status': cache_status if upgrade else 'not_used',
+            'cache_variant': cache_variant if upgrade else '',
+            'cache_signature_hash': cache_signature_hash if upgrade else None,
             'has_professional_terms': r.get('has_professional_terms', False),
             'professional_terms': r.get('professional_terms', []),
             'domain_risk_score': round(float(r.get('r_d', 0.0)), 6),
