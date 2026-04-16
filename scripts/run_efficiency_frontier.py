@@ -158,11 +158,12 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
     """构建 Agent B 调用函数（含重试）"""
     import re
 
-    def attach_callable_meta(fn: Callable, backend_name: str, model_label: str, supports_parallel: bool, max_concurrency: int = 1) -> Callable:
+    def attach_callable_meta(fn: Callable, backend_name: str, model_label: str, supports_parallel: bool, max_concurrency: int = 1, key_count: int = 1) -> Callable:
         fn._backend = backend_name
         fn._model_label = model_label
         fn._supports_parallel = supports_parallel
         fn._max_concurrency = max_concurrency
+        fn._key_count = key_count
         return fn
 
     agent_b_cfg = config.get("agent_b", {})
@@ -201,6 +202,7 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
             print(f"[Agent B] Gemini backend: {agent.config.model_name} @ {agent.config.base_url}")
             agent_model_label = f"gemini:{agent.config.model_name}"
             max_concurrency = int(agent_b_cfg.get("max_concurrency", 100) or 100)
+            key_count = agent.config.key_manager.get_key_count()
         except Exception as e:
             print(f"[Agent B] Gemini load failed: {e}, fallback to mock")
             def mock_fn(prompt: dict) -> dict:
@@ -288,6 +290,7 @@ def build_agent_b_callable(config: dict, max_retries: int = 3) -> Callable:
         model_label=locals().get("agent_model_label", backend),
         supports_parallel=(backend == "gemini"),
         max_concurrency=locals().get("max_concurrency", 1),
+        key_count=locals().get("key_count", 1),
     )
     return real_fn
 
@@ -520,10 +523,7 @@ def run_pipeline(
         supports_parallel = bool(getattr(agent_b_callable, '_supports_parallel', False))
         backend_name = getattr(agent_b_callable, '_backend', 'unknown')
         if supports_parallel:
-            try:
-                key_count = agent_b_callable.__self__.config.key_manager.get_key_count()
-            except Exception:
-                key_count = 10
+            key_count = int(getattr(agent_b_callable, '_key_count', 10) or 10)
             max_concurrency = int(getattr(agent_b_callable, '_max_concurrency', 4) or 4)
             n_workers = max(1, min(key_count, max_concurrency))
         else:
