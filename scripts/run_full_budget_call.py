@@ -66,13 +66,7 @@ def gain_rows(ocr_cer, metrics_rows):
         delta_cer_vs_prev = prev_cer - cer
         extra_budget = b - prev_budget
         gain_per_extra = (delta_cer_vs_prev / extra_budget) if extra_budget > 0 else 0.0
-        cur = {
-            **row,
-            'cer_gain_vs_ocr': round(cer_gain_vs_ocr, 6),
-            'delta_cer_vs_prev_budget': round(delta_cer_vs_prev, 6),
-            'gain_per_extra_budget': round(gain_per_extra, 6),
-            'is_best_gain_point': False,
-        }
+        cur = {**row, 'cer_gain_vs_ocr': round(cer_gain_vs_ocr, 6), 'delta_cer_vs_prev_budget': round(delta_cer_vs_prev, 6), 'gain_per_extra_budget': round(gain_per_extra, 6), 'is_best_gain_point': False}
         out.append(cur)
         if gain_per_extra > best_gain:
             best_gain, best_idx = gain_per_extra, len(out) - 1
@@ -80,6 +74,17 @@ def gain_rows(ocr_cer, metrics_rows):
     if best_idx >= 0:
         out[best_idx]['is_best_gain_point'] = True
     return out
+
+
+def load_or_make_full_call_cache(cache_path, rebuild, strategy, rows, router, backfill, prompter, agent_b, run_id, prompt_version, agent_b_label):
+    path = Path(cache_path) if cache_path else None
+    if path and path.exists() and not rebuild:
+        return path, [json.loads(line) for line in path.read_text(encoding='utf-8').splitlines() if line.strip()]
+    full = run_pipeline(strategy, 1.0, rows, router, backfill, prompter, agent_b, run_id=run_id, prompt_version=prompt_version, agent_b_label=agent_b_label)
+    if path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        jlines(path, full['per_sample'])
+    return path, full['per_sample']
 
 
 def main():
@@ -101,8 +106,13 @@ def main():
     p.add_argument('--use_gpu', action='store_true', default=False)
     p.add_argument('--use_cache', action='store_true', default=True)
     p.add_argument('--rebuild_cache', action='store_true', default=False)
+    p.add_argument('--full_call_cache_path', default=None)
+    p.add_argument('--reuse_full_call_cache', action='store_true', default=False)
+    p.add_argument('--prepare_full_call_cache_only', action='store_true', default=False)
+    p.add_argument('--rebuild_full_call_cache', action='store_true', default=False)
     args = p.parse_args()
-    random.seed(args.seed); np.random.seed(args.seed)
+    random.seed(args.seed)
+    np.random.seed(args.seed)
 
     config = yaml.safe_load(Path(args.config).read_text(encoding='utf-8'))
     prompt_version = config.get('prompt_version') or config.get('mainline', {}).get('prompt_version', 'prompt_v1.1')
@@ -117,35 +127,35 @@ def main():
     run_id = datetime.now().strftime('%Y%m%d_run%H%M%S')
     run_dir = Path(args.output_dir) / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
-    (run_dir / 'config_snapshot.yaml').write_text(yaml.safe_dump({'run_id': run_id, 'strategy': args.strategy, 'replay_budgets': args.replay_budgets, 'prompt_version': prompt_version}, allow_unicode=True, sort_keys=False), encoding='utf-8')
+    (run_dir / 'config_snapshot.yaml').write_text(yaml.safe_dump({'run_id': run_id, 'strategy': args.strategy, 'replay_budgets': args.replay_budgets, 'prompt_version': prompt_version, 'reuse_full_call_cache': args.reuse_full_call_cache, 'full_call_cache_path': args.full_call_cache_path or ''}, allow_unicode=True, sort_keys=False), encoding='utf-8')
 
     base = run_pipeline('AgentA_Only', 0.0, rows, router, backfill, prompter, agent_b, run_id=run_id, prompt_version=prompt_version)
     ocr_cer = float(base['summary']['Overall_CER'])
-    full = run_pipeline(args.strategy, 1.0, rows, router, backfill, prompter, agent_b, run_id=run_id, prompt_version=prompt_version, agent_b_label=config.get('mainline_agent_b', 'configured_agent_b'))
-    jlines(run_dir / f'full_budget_results_{args.strategy}.jsonl', full['per_sample'])
 
+    if args.prepare_full_call_cache_only or args.reuse_full_call_cache:
+        cache_path, full_items = load_or_make_full_call_cache(args.full_call_cache_path, args.rebuild_full_call_cache, args.strategy, rows, router, backfill, prompter, agent_b, run_id, prompt_version, config.get('mainline_agent_b', 'configured_agent_b'))
+    else:
+        cache_path = None
+        full = run_pipeline(args.strategy, 1.0, rows, router, backfill, prompter, agent_b, run_id=run_id, prompt_version=prompt_version, agent_b_label=config.get('mainline_agent_b', 'configured_agent_b'))
+        full_items = full['per_sample']
+
+    if args.prepare_full_call_cache_only:
+        print(f'Full-call cache ready: {cache_path}')
+        print(run_dir)
+        return
+
+    jlines(run_dir / f'full_budget_results_{args.strategy}.jsonl', full_items)
     metrics = []
     for budget in args.replay_budgets:
-        replay = replay_from_full_budget(args.strategy, budget, full['per_sample'], run_id=run_id, prompt_version=prompt_version)
-        row = {
-            'run_id': run_id,
-            'strategy': args.strategy,
-            'budget': budget,
-            'actual_call_rate': replay['summary']['Actual_Call_Rate'],
-            'overall_cer': replay['summary']['Overall_CER'],
-            'boundary_deletion_recall_at_b': replay['summary']['Boundary_Deletion_Recall@B'],
-            'substitution_cer': replay['summary']['Substitution_CER'],
-            'aer': replay['summary']['AER'],
-            'cvr': replay['summary']['CVR'],
-            'num_samples': replay['summary']['N_valid'],
-        }
+        replay = replay_from_full_budget(args.strategy, budget, full_items, run_id=run_id, prompt_version=prompt_version)
+        row = {'run_id': run_id, 'strategy': args.strategy, 'budget': budget, 'actual_call_rate': replay['summary']['Actual_Call_Rate'], 'overall_cer': replay['summary']['Overall_CER'], 'boundary_deletion_recall_at_b': replay['summary']['Boundary_Deletion_Recall@B'], 'substitution_cer': replay['summary']['Substitution_CER'], 'aer': replay['summary']['AER'], 'cvr': replay['summary']['CVR'], 'num_samples': replay['summary']['N_valid']}
         metrics.append(row)
         jlines(run_dir / f"offline_budget_{int(round(budget * 100)):02d}_{args.strategy}.jsonl", replay['per_sample'])
 
     gain_analysis = gain_rows(ocr_cer, metrics)
     wcsv(run_dir / 'budget_gain_analysis.csv', list(gain_analysis[0].keys()) if gain_analysis else ['run_id'], gain_analysis)
     wcsv(run_dir / 'summary.csv', ['run_id', 'strategy', 'budget', 'actual_call_rate', 'overall_cer', 'boundary_deletion_recall_at_b', 'substitution_cer', 'aer', 'cvr', 'num_samples'], metrics)
-    jdump(run_dir / 'metrics_summary.json', {'run_id': run_id, 'strategy': args.strategy, 'ocr_cer': ocr_cer, 'results': metrics, 'gain_analysis': gain_analysis})
+    jdump(run_dir / 'metrics_summary.json', {'run_id': run_id, 'strategy': args.strategy, 'ocr_cer': ocr_cer, 'reuse_full_call_cache': args.reuse_full_call_cache, 'full_call_cache_path': str(cache_path) if cache_path else '', 'results': metrics, 'gain_analysis': gain_analysis})
     print(run_dir)
 
 
