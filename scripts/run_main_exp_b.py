@@ -8,7 +8,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
 from modules.router.backfill import BackfillConfig,StrictBackfillController
 from modules.router.circuit_breaker import CircuitBreaker,CircuitBreakerConfig
 from modules.router.uncertainty_router import BudgetControllerConfig
-from scripts.run_efficiency_frontier import build_agent_b_callable,ensure_agent_a_result_schema,infer_all_samples
+from scripts.run_efficiency_frontier import build_agent_b_callable,ensure_agent_a_result_schema,infer_all_samples,run_pipeline
 from scripts.run_online_budget_control import run_online_pipeline
 BR='GCR';SPV='dsp_v1.0';BV='backfill_v1_strict';CKV='breaker_v1';TOL=0.005
 J=lambda p,o:p.write_text(json.dumps(o,ensure_ascii=False,indent=2),encoding='utf-8')
@@ -43,7 +43,7 @@ def L(a):
 def cache(rows,cfg,bf,rd,pv,shda,path,rebuild):
     p=Path(path) if path else (rd/('m6_full_call_cache.jsonl' if shda else 'm5_full_call_cache.jsonl'));p.parent.mkdir(parents=True,exist_ok=True)
     if p.exists() and not rebuild:return p,[json.loads(x) for x in p.read_text(encoding='utf-8').splitlines() if x.strip()]
-    ag=build_agent_b_callable(cfg);o=run_online_pipeline('GCR',1.0,rows,None,bf,P(shda),ag,BudgetControllerConfig(target_budget=1.0),CircuitBreaker(CircuitBreakerConfig(enabled=False,min_samples=20,rejection_rate_threshold=0.60,cooldown_steps=50)),run_id=rd.name,prompt_version=pv,agent_b_label=getattr(ag,'_model_label','configured_agent_b'),skip_backfill=(not shda),domain_prompt=shda)
+    ag=build_agent_b_callable(cfg);strategy='SH-DA++' if shda else 'Router-only';o=run_pipeline(strategy,1.0,rows,None,bf,P(shda),ag,run_id=rd.name,prompt_version=pv,agent_b_label=getattr(ag,'_model_label','configured_agent_b'))
     rs=[{'sample_id':x.get('sample_id',''),'image_path':x.get('image_path',''),'ocr_text':x.get('ocr_text',''),'vlm_raw_output':x.get('vlm_raw_output',''),'latency_ms':x.get('latency_ms'),'token_usage':x.get('token_usage'),'error_type':x.get('error_type','none'),'vlm_model':x.get('vlm_model',''),'prompt_version':x.get('prompt_version',pv),'cache_variant':'M6' if shda else 'M5'} for x in o['per_sample']];JL(p,rs);return p,rs
 def A(rows,label):
     bp={};bi={};ml=label
@@ -51,7 +51,7 @@ def A(rows,label):
     def call(prompt):
         h=bp.get((prompt.get('image_path',''),prompt.get('T_A',''))) or bi.get(prompt.get('image_path',''))
         return {'corrected_text':(h or {}).get('vlm_raw_output',prompt.get('T_A','')) or prompt.get('T_A',''),'latency_ms':0.0,'token_usage':(h or {}).get('token_usage'),'error_type':(h or {}).get('error_type','cache_miss' if h is None else 'none')}
-    call._model_label=ml;return call
+    call._model_label=ml;call._supports_parallel=False;call._max_concurrency=1;return call
 if __name__=='__main__':
     p=argparse.ArgumentParser(description='Main Experiment B dual-cache');p.add_argument('--config',default='configs/router_config.yaml');p.add_argument('--test_jsonl',default='data/l2w1data/test.jsonl');p.add_argument('--image_root',default='data/l2w1data/images');p.add_argument('--rec_model_dir',default='./models/agent_a_ppocr/PP-OCRv5_server_rec_infer');p.add_argument('--rec_char_dict_path',default='ppocr/utils/ppocrv5_dict.txt');p.add_argument('--geo_dict',default='data/dicts/Geology.txt');p.add_argument('--finance_dict',default='data/dicts/Finance.txt');p.add_argument('--medicine_dict',default='data/dicts/Medicine.txt');p.add_argument('--output_dir',default='results/expriments/exB/02_runs');p.add_argument('--cache_path',default='results/expriments/exB/02_runs/agent_a_cache.json');p.add_argument('--m5_cache_path',default=None);p.add_argument('--m6_cache_path',default=None);p.add_argument('--reuse_cached_vlm',action='store_true');p.add_argument('--prepare_dual_cache_only',action='store_true');p.add_argument('--rebuild_m5_cache',action='store_true');p.add_argument('--rebuild_m6_cache',action='store_true');p.add_argument('--budgets',nargs='+',type=float,default=[0.10,0.20,0.30]);p.add_argument('--seed',type=int,default=42);p.add_argument('--n_samples',type=int);p.add_argument('--use_gpu',action='store_true');p.add_argument('--use_cache',action='store_true',default=True);p.add_argument('--rebuild_cache',action='store_true');p.add_argument('--prompt_version',default=None);p.add_argument('--smoke_test',action='store_true');a=p.parse_args();random.seed(a.seed);np.random.seed(a.seed)
     root=Path(__file__).resolve().parent.parent;cfg=yaml.safe_load(Path(a.config).read_text(encoding='utf-8'));pv=a.prompt_version or cfg.get('prompt_version') or cfg.get('mainline',{}).get('prompt_version','prompt_v1.1');cfg2=json.loads(json.dumps(cfg));
