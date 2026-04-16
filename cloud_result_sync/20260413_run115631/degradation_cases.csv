@@ -1,0 +1,602 @@
+sample_id,router_name,budget,domain,ocr_text,vlm_raw_output,final_text,gt,backfill_status,backfill_reason,edit_distance_ocr,edit_distance_final,delta_edit_distance,vlm_model
+GeoP0199_L074,GCR,0.1,geology,(4个)顺层~,(24)顺层~,(24)顺层~,(4个)顺层~,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0199_L091,GCR,0.1,geology,限制(被限制的映),限制 (被限制的映),限制 (被限制的映),限制(被限制的晚),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0199_L095,GCR,0.1,geology,覆构造),覆褶皱),覆褶皱),覆构造),accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0199_L098,GCR,0.1,geology,追踪利用、改造(被的早),追踪利用、改造(补写的),追踪利用、改造(补写的),{追踪，利用，改造（被..的早）,accepted,accepted,5,7,2,gemini:gemini-3-flash-preview
+GeoP0200_L024,GCR,0.1,geology,形态及其与,形态、及其与,形态、及其与,形态及其与,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0212_L012,GCR,0.1,geology,(3)结论,3)结论,3)结论,(3)结论,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0217_L034,GCR,0.1,geology,利余AbO3,利余Al2O3,利余Al2O3,利余AbO₃,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+GeoP0218_L003,GCR,0.1,geology,钾K石>,钾K长>,钾K长>,钾长石>,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0218_L012,GCR,0.1,geology,泥于水,泥浆水,泥浆水,溶于水，,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0219_L009,GCR,0.1,geology,中性市,中生界,中生界,中性岩,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0221_L014,GCR,0.1,geology,同生矿床：矿体与围岩在同一地质作用。,同生矿床：矿体与围岩在同一地质作用中。,同生矿床：矿体与围岩在同一地质作用中。,(同生矿床：矿体与围岩在同一地质作用.,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0241_L038,GCR,0.1,geology,二.八面体择位能对过渡金属元素控制.,二.八面体择位能对过渡金属元素的控制.,二.八面体择位能对过渡金属元素的控制.,二.八面体择位能对过渡金属元素控制.,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0243_L008,GCR,0.1,geology,之间的角义，,之间的夹角，,之间的夹角，,之间的角α，,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+FinP0195_L001,GCR,0.1,finance,②货币互换,②深井互换,②深井互换,②货币互换,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+FinP0204_L057,GCR,0.1,finance,信券空向,倾向走向,倾向走向,债券票面,accepted,accepted,3,4,1,gemini:gemini-3-flash-preview
+MedP0201_L025,GCR,0.1,medicine,无肾买质改变,无明显改变,无明显改变,无肾实质政变,accepted,accepted,2,4,2,gemini:gemini-3-flash-preview
+MedP0204_L019,GCR,0.1,medicine,腔骨长轴线,胚界长轴线,胚界长轴线,胫骨长轴线,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0222_L039,GCR,0.1,medicine,美胆素(颜色,基组素(颜色),基组素(颜色),粪胆素(颜色,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+MedP0225_L031,GCR,0.1,medicine,则使NADPH氧化生成了水，即一分子氧发了两种功能，故又称混合功能氧,则使NADPH氧化生成了水，即一分子氧发挥了两种功能，故又称混合功能氧化酶,则使NADPH氧化生成了水，即一分子氧发挥了两种功能，故又称混合功能氧化酶,则使NADPH氧化生成了水，即一分子氧发挥了两种功能，故又称混合功能氧,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0234_L029,GCR,0.1,medicine,狼疮抗凝物。(相毒）,狼疮抗凝物。(筛查),狼疮抗凝物。(筛查),狼疮抗凝物.(梅毒),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0234_L037,GCR,0.1,medicine,(所有血爆都),(所有钻塔都到),(所有钻塔都到),(所有血糖都可),accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+MedP0234_L052,GCR,0.1,medicine,(不蚀性关节员),(不连续关节面),(不连续关节面),(不侵蚀性关节炎),accepted,accepted,2,4,2,gemini:gemini-3-flash-preview
+GeoP0199_L074,WUR,0.1,geology,(4个)顺层~,(24)顺层~,(24)顺层~,(4个)顺层~,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0199_L091,WUR,0.1,geology,限制(被限制的映),限制 (被限制的层),限制 (被限制的层),限制(被限制的晚),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0199_L095,WUR,0.1,geology,覆构造),覆褶皱),覆褶皱),覆构造),accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0199_L098,WUR,0.1,geology,追踪利用、改造(被的早),追踪利用、改造(补写的),追踪利用、改造(补写的),{追踪，利用，改造（被..的早）,accepted,accepted,5,7,2,gemini:gemini-3-flash-preview
+GeoP0208_L009,WUR,0.1,geology,的水分,全水分,全水分,的水分,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0212_L012,WUR,0.1,geology,(3)结论,3)结论,3)结论,(3)结论,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0217_L034,WUR,0.1,geology,利余AbO3,利余Al2O3,利余Al2O3,利余AbO₃,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+GeoP0219_L009,WUR,0.1,geology,中性市,中生界,中生界,中性岩,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0219_L035,WUR,0.1,geology,具有板理.片理、薄层理石,具有板理、片理、薄层理的,具有板理、片理、薄层理的,具有板理·片理、薄层理岩石,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0221_L014,WUR,0.1,geology,同生矿床：矿体与围岩在同一地质作用。,同生矿床：矿体与围岩在同一地质作用中。,同生矿床：矿体与围岩在同一地质作用中。,(同生矿床：矿体与围岩在同一地质作用.,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0243_L008,WUR,0.1,geology,之间的角义，,之间的夹角，,之间的夹角，,之间的角α，,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+FinP0177_L003,WUR,0.1,finance,(2)票面利率,12) 层面利率,12) 层面利率,（2）票面利率,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+FinP0201_L051,WUR,0.1,finance,4.货币乘数,4.质量参数,4.质量参数,4.货币乘数,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+FinP0204_L057,WUR,0.1,finance,信券空向,信号定向,信号定向,债券票面,accepted,accepted,3,4,1,gemini:gemini-3-flash-preview
+FinP0204_L073,WUR,0.1,finance,(P{1:卖出价n:持有年限),(P1: 卖出价 n:持有年限),(P1: 卖出价 n:持有年限),(P₁:卖出价n:持有年限),accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+FinP0204_L075,WUR,0.1,finance,=)持有期收益率=105=,二)持有期收益率=10.5%,二)持有期收益率=10.5%,=>持有期收益率:105:,accepted,accepted,3,5,2,gemini:gemini-3-flash-preview
+MedP0201_L025,WUR,0.1,medicine,无肾买质改变,无明显基质改变,无明显基质改变,无肾实质政变,accepted,accepted,2,4,2,gemini:gemini-3-flash-preview
+MedP0204_L019,WUR,0.1,medicine,腔骨长轴线,胚界长轴线,胚界长轴线,胫骨长轴线,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0218_L032,WUR,0.1,medicine,肝一木（子),肝一木(2),肝一木(2),肝—木(子),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0222_L039,WUR,0.1,medicine,美胆素(颜色,基质素(颜色),基质素(颜色),粪胆素(颜色,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+MedP0224_L004,WUR,0.1,medicine,1、域电位水平.,八阈电位水平.,八阈电位水平.,1、阈电位水平，,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+MedP0234_L029,WUR,0.1,medicine,狼疮抗凝物。(相毒）,狼疮抗凝物。(筛选）,狼疮抗凝物。(筛选）,狼疮抗凝物.(梅毒),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0234_L052,WUR,0.1,medicine,(不蚀性关节员),(不连续性关节面),(不连续性关节面),(不侵蚀性关节炎),accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+MedP0235_L020,WUR,0.1,medicine,(酸性结合OH-带负电)两个-COOH,(碱性结合OH-带负电)两个-COOH,(碱性结合OH-带负电)两个-COOH,(酸性结合OH⁻带负电)两个-COOH,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0199_L002,DGCR,0.1,geology,层与层之间发生滑动,层与层之间发生层动,层与层之间发生层动,层与层之间发生滑动,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0199_L091,DGCR,0.1,geology,限制(被限制的映),限制 (被限制的层),限制 (被限制的层),限制(被限制的晚),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0200_L044,DGCR,0.1,geology,羽状节理与主断层所交,羽状节理与主断层斜交,羽状节理与主断层斜交,羽状节理与主断层所交,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0207_L037,DGCR,0.1,geology,弹性给水度,弹性释水度,弹性释水度,3弹性给水度,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0217_L010,DGCR,0.1,geology,物理风化作用：只发生机械破碎而化学成分未改变的风化作用只暗碎,物理风化作用：只发生机械破碎而化学成分未改变的风化作用。只崩碎。,物理风化作用：只发生机械破碎而化学成分未改变的风化作用。只崩碎。,物理风化作用：只发生机械破碎而化学成分未改变的风化作用只嚼碎了,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0217_L012,DGCR,0.1,geology,结果：各种碎屑物质形成形成各种法子,结果：各种碎屑物质形成形成各种结构,结果：各种碎屑物质形成形成各种结构,结果：各种碎屑物质形成形成各种渣子,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0218_L031,DGCR,0.1,geology,一般情况下.只发生机械破碎，而无化学分解.,一般情况下，只发生机械破碎，而无化学分解。,一般情况下，只发生机械破碎，而无化学分解。,"一般情况下.只发生机械破碎,而无化学分解.",accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0219_L035,DGCR,0.1,geology,具有板理.片理、薄层理石,具有板理、片理、薄层理的,具有板理、片理、薄层理的,具有板理·片理、薄层理岩石,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0221_L014,DGCR,0.1,geology,同生矿床：矿体与围岩在同一地质作用。,同生矿床：矿体与围岩在同一地质作用中。,同生矿床：矿体与围岩在同一地质作用中。,(同生矿床：矿体与围岩在同一地质作用.,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0222_L013,DGCR,0.1,geology,二、易需保成矿因素,二、显著的成矿因素,二、显著的成矿因素,二、易聚体成矿因素,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0227_L020,DGCR,0.1,geology,②、A矿物交代B矿物，B早于A⑦、梳状、晶洞、环带、条带构造等.,②、A矿物交代B矿物，B早于A ③、梳状、晶洞、环带、条带构造等.,②、A矿物交代B矿物，B早于A ③、梳状、晶洞、环带、条带构造等.,②、A矿物交代B矿物，B早于A⑦、梳状、晶洞、环带、条带构造等。,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0235_L030,DGCR,0.1,geology,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛等挥发分,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛及挥发分,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛及挥发分,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛等挥发分，,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0238_L007,DGCR,0.1,geology,①、元素种类多样②、矿物成分多达300种以上,①、元素种类多样②、矿物成分多达300余种以上,①、元素种类多样②、矿物成分多达300余种以上,①、元素种类多样②、矿物成分多达300种以上,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0240_L008,DGCR,0.1,geology,交换，而主要由于物理化学条件改变，引起沉淀物质直接淀沉于所在的构造,交换，而主要由于物理化学条件改变，引起沉淀物质便直接淀沉于所在的构造,交换，而主要由于物理化学条件改变，引起沉淀物质便直接淀沉于所在的构造,交换，而主要由于物理化学条件改变，引起沉淀物质直接淀沉于所在的构造,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0240_L012,DGCR,0.1,geology,·云英岩化、花岗岩类岩石中，高温蚀变产生玉主要由白云母、石英组合的岩石。,",云英岩化:花岗岩类岩石中，高温蚀变产生的主要由白云母、石英组合的岩石。",",云英岩化:花岗岩类岩石中，高温蚀变产生的主要由白云母、石英组合的岩石。","·云英岩化、花岗岩类岩石中,高温蚀变产生主要由白云母、石英组合的岩石.",accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+GeoP0241_L036,DGCR,0.1,geology,实际发生区别的反电子数4~7时.,实际发生区别的原子数4~7时.,实际发生区别的原子数4~7时.,实际发生区别的仅d电子数4~7时.,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+MedP0201_L018,DGCR,0.1,medicine,肝硬化+腹水,矽化+脱水,矽化+脱水,肝硬化+腹水,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+MedP0222_L064,DGCR,0.1,medicine,生态：生长抑系，奥曲肽(收缩内脏血管),止血：生长抑素，奥曲肽(收缩内脏血管),止血：生长抑素，奥曲肽(收缩内脏血管),生态：生长抑素，奥曲肽(收缩内脏血管),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0225_L036,DGCR,0.1,medicine,即胆汁酸盐，可胆汁酸盐，简称胆盐。,即胆汁酸盐，或胆汁酸盐。简称胆盐。,即胆汁酸盐，或胆汁酸盐。简称胆盐。,即胆汁酸盐，即胆汁酸盐，简称胆盐。,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0228_L012,DGCR,0.1,medicine,洋地黄特别适用于,该地质特别适用于,该地质特别适用于,洋地黄特别适用于,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0199_L091,DWUR,0.1,geology,限制(被限制的映),限制 (被限制的层),限制 (被限制的层),限制(被限制的晚),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0199_L098,DWUR,0.1,geology,追踪利用、改造(被的早),追踪利用、改造(旧的早),追踪利用、改造(旧的早),{追踪，利用，改造（被..的早）,accepted,accepted,5,6,1,gemini:gemini-3-flash-preview
+GeoP0199_L111,DWUR,0.1,geology,如地层关系的变化,"如,地层关系的变化","如,地层关系的变化",如地层关系的变化,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0199_L115,DWUR,0.1,geology,(1)正断层(从地表的切面来观测),1) 正断层 (从地表的切面来观测),1) 正断层 (从地表的切面来观测),1)正断层(以地表的切面来观测),accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0200_L044,DWUR,0.1,geology,羽状节理与主断层所交,羽状节理与主断层斜交,羽状节理与主断层斜交,羽状节理与主断层所交,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0207_L014,DWUR,0.1,geology,含水层入渗系数,含水层渗透系数下,含水层渗透系数下,含水层入渗系数,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+GeoP0208_L011,DWUR,0.1,geology,(1)含水层空隙中水由于水压力降低而膨胀释放出来的重力水共同作用,(1)含水层空隙中水由于水压力降低而膨胀释放出来的弹性水}共同作用,(1)含水层空隙中水由于水压力降低而膨胀释放出来的弹性水}共同作用,(1)含水层空隙中水由于水压力降低而膨胀释放出来的重力水}共同作用,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0208_L027,DWUR,0.1,geology,(3)其地下水的补给主要来源是大气降水，河水和两岸的基石裂陈水,(3)其地下水的补给主要来源是大气降水、河水和两岸的基岩裂隙水,(3)其地下水的补给主要来源是大气降水、河水和两岸的基岩裂隙水,(3)其地下水的补给主要来源是大气降水，河水和两岸的基石裂隙水,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0212_L004,DWUR,0.1,geology,2.Cs越大，频率曲线中部上端越陡，中段曲率变大，下端变平缓,2.Cs越大，频率曲线上端越陡，中段曲率变大，下端变平缓,2.Cs越大，频率曲线上端越陡，中段曲率变大，下端变平缓,2.Cs越大，频率曲线中部上端越陡，中段曲率变大，下端变平缓,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0219_L019,DWUR,0.1,geology,气候湿热地区可分阔,气候湿热地区亦分纲,气候湿热地区亦分纲,气候湿热地区也可分解,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0219_L035,DWUR,0.1,geology,具有板理.片理、薄层理石,具有板理、片理、薄层理的,具有板理、片理、薄层理的,具有板理·片理、薄层理岩石,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0220_L006,DWUR,0.1,geology,松驰：应力不变，应变随时间增加而减小。,松弛：应变不变，应力随时间增加而减小。,松弛：应变不变，应力随时间增加而减小。,松驰：应力不变，应变随时间增加而减小。,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+GeoP0221_L014,DWUR,0.1,geology,同生矿床：矿体与围岩在同一地质作用。,同生矿床：矿体与围岩在同一地质作用中。,同生矿床：矿体与围岩在同一地质作用中。,(同生矿床：矿体与围岩在同一地质作用.,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0222_L013,DWUR,0.1,geology,二、易需保成矿因素,二、影响成矿因素,二、影响成矿因素,二、易聚体成矿因素,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+MedP0201_L018,DWUR,0.1,medicine,肝硬化+腹水,矽化+脱水,矽化+脱水,肝硬化+腹水,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+MedP0219_L026,DWUR,0.1,medicine,补液量估算①每丧失体重的1%，补液量400-500m1.,补液量估算 ①每丧失体重的1%，补液量 400-500ml.,补液量估算 ①每丧失体重的1%，补液量 400-500ml.,补液量估算①每丧失体重的1%，补液量400-500ml.,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0222_L018,DWUR,0.1,medicine,CB(结合胆红素,CB(结合胆红素),CB(结合胆红素),CB(结合胆红素,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0228_L012,DWUR,0.1,medicine,洋地黄特别适用于,洋地质特别适用于,洋地质特别适用于,洋地黄特别适用于,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0235_L014,DWUR,0.1,medicine,2、氨基酸的分类,乙、氨基酸的分类,乙、氨基酸的分类,2、氨基酸的分类,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0199_L002,GCR,0.2,geology,层与层之间发生滑动,层与层之间发生层动,层与层之间发生层动,层与层之间发生滑动,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0199_L074,GCR,0.2,geology,(4个)顺层~,(24)顺层~,(24)顺层~,(4个)顺层~,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0199_L095,GCR,0.2,geology,覆构造),覆褶皱),覆褶皱),覆构造),accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0199_L098,GCR,0.2,geology,追踪利用、改造(被的早),追踪利用、改造(旧的早),追踪利用、改造(旧的早),{追踪，利用，改造（被..的早）,accepted,accepted,5,6,1,gemini:gemini-3-flash-preview
+GeoP0205_L015,GCR,0.2,geology,A或B,P或B,P或B,A成B,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0208_L009,GCR,0.2,geology,的水分,全水分,全水分,的水分,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0212_L012,GCR,0.2,geology,(3)结论,3)结论,3)结论,(3)结论,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0217_L034,GCR,0.2,geology,利余AbO3,利余Al2O3,利余Al2O3,利余AbO₃,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+GeoP0218_L012,GCR,0.2,geology,泥于水,泥浆水,泥浆水,溶于水，,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0219_L027,GCR,0.2,geology,以溶解为主,以溶蚀为主,以溶蚀为主,以溶解为主,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0219_L035,GCR,0.2,geology,具有板理.片理、薄层理石,具有板理、片理、薄层理的,具有板理、片理、薄层理的,具有板理·片理、薄层理岩石,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0221_L004,GCR,0.2,geology,自形自形/半自形/他形,自形 自形/半自形/他形,自形 自形/半自形/他形,'自形自形/半自形/他形,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0221_L014,GCR,0.2,geology,同生矿床：矿体与围岩在同一地质作用。,同生矿床：矿体与围岩在同一地质作用中形成。,同生矿床：矿体与围岩在同一地质作用中形成。,(同生矿床：矿体与围岩在同一地质作用.,accepted,accepted,1,4,3,gemini:gemini-3-flash-preview
+GeoP0228_L023,GCR,0.2,geology,②.围岩主要为碳酸盐岩类，部分火成岩，控制矿物组合有层控性。,②.围岩主要为碳酸盐岩类，部分火成岩，矿物组合有层控性。,②.围岩主要为碳酸盐岩类，部分火成岩，矿物组合有层控性。,②，围岩主要为碳酸盐岩类，部分火成岩，控制矿物组合，有层控性.,accepted,accepted,2,4,2,gemini:gemini-3-flash-preview
+GeoP0235_L030,GCR,0.2,geology,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛等挥发分,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛及挥发分,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛及挥发分,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛等挥发分，,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0240_L012,GCR,0.2,geology,·云英岩化、花岗岩类岩石中，高温蚀变产生玉主要由白云母、石英组合的岩石。,",云英岩化、花岗岩类岩石中，高温蚀变产生的主要由白云母、石英组合的岩石。",",云英岩化、花岗岩类岩石中，高温蚀变产生的主要由白云母、石英组合的岩石。","·云英岩化、花岗岩类岩石中,高温蚀变产生主要由白云母、石英组合的岩石.",accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0241_L033,GCR,0.2,geology,穷人急着占.,层内急着点.,层内急着点.,穷人急着占.,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+GeoP0241_L036,GCR,0.2,geology,实际发生区别的反电子数4~7时.,实际发生区别时的附近电子数4~7时.,实际发生区别时的附近电子数4~7时.,实际发生区别的仅d电子数4~7时.,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+FinP0176_L027,GCR,0.2,finance,二、联系生活，理解本金，存期，利率、利息等根念,二、联系生活，理解本金、存期、利率、利息等概念,二、联系生活，理解本金、存期、利率、利息等概念,二、联系生活理解本金，存期，利率，利息等概念,accepted,accepted,3,4,1,gemini:gemini-3-flash-preview
+FinP0179_L040,GCR,0.2,finance,发行）③中间发行,发射）③中间激发,发射）③中间激发,发行)③中间发行:,accepted,accepted,1,4,3,gemini:gemini-3-flash-preview
+FinP0179_L041,GCR,0.2,finance,介于面客和市价之间、,介于面容质和市阶之间、,介于面容质和市阶之间、,：介于面额和市价之间、,accepted,accepted,2,4,2,gemini:gemini-3-flash-preview
+FinP0189_L017,GCR,0.2,finance,现货：当场/天内买方付款.卖,现货：当场10天内买方付款，卖,现货：当场10天内买方付款，卖,现货：当场|n天内买方付款.卖方,accepted,accepted,3,4,1,gemini:gemini-3-flash-preview
+FinP0195_L001,GCR,0.2,finance,②货币互换,②深井互换,②深井互换,②货币互换,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+FinP0200_L020,GCR,0.2,finance,·在全融领域的应用场景,·在金属矿领域的应用场景,·在金属矿领域的应用场景,·在金融领域的应用场景,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+FinP0201_L051,GCR,0.2,finance,4.货币乘数,4.质量参数,4.质量参数,4.货币乘数,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+FinP0201_L057,GCR,0.2,finance,活期存款总额.,活期存蓄总额.,活期存蓄总额.,活期存款总额.,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+FinP0204_L057,GCR,0.2,finance,信券空向,信号定向,信号定向,债券票面,accepted,accepted,3,4,1,gemini:gemini-3-flash-preview
+FinP0204_L075,GCR,0.2,finance,=)持有期收益率=105=,二)持有期收益率=10.5%,二)持有期收益率=10.5%,=>持有期收益率:105:,accepted,accepted,3,5,2,gemini:gemini-3-flash-preview
+MedP0201_L018,GCR,0.2,medicine,肝硬化+腹水,矽化+脱水,矽化+脱水,肝硬化+腹水,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+MedP0201_L025,GCR,0.2,medicine,无肾买质改变,无明显质改变,无明显质改变,无肾实质政变,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+MedP0201_L039,GCR,0.2,medicine,血性腹水,延性脆性,延性脆性,血性腹水,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+MedP0204_L019,GCR,0.2,medicine,腔骨长轴线,胚界长轴线,胚界长轴线,胫骨长轴线,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0225_L031,GCR,0.2,medicine,则使NADPH氧化生成了水，即一分子氧发了两种功能，故又称混合功能氧,则使NADPH氧化生成了水，即一分子氧发挥了两种功能，故又称混合功能氧化酶,则使NADPH氧化生成了水，即一分子氧发挥了两种功能，故又称混合功能氧化酶,则使NADPH氧化生成了水，即一分子氧发挥了两种功能，故又称混合功能氧,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0225_L036,GCR,0.2,medicine,即胆汁酸盐，可胆汁酸盐，简称胆盐。,即胆汁酸盐，或胆汁酸盐。简称胆盐。,即胆汁酸盐，或胆汁酸盐。简称胆盐。,即胆汁酸盐，即胆汁酸盐，简称胆盐。,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0234_L029,GCR,0.2,medicine,狼疮抗凝物。(相毒）,狼疮抗凝物。(筛选）,狼疮抗凝物。(筛选）,狼疮抗凝物.(梅毒),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0234_L052,GCR,0.2,medicine,(不蚀性关节员),(不连续性关节面),(不连续性关节面),(不侵蚀性关节炎),accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+MedP0235_L025,GCR,0.2,medicine,含-OHAA：苏(酪)丝苏老师,含-OHAA=苏(酪)丝 苏老师,含-OHAA=苏(酪)丝 苏老师,含-OHAA：苏(酪)丝苏老师,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+MedP0249_L017,GCR,0.2,medicine,2、第2颈椎：C2对应身体部区：双耳视神经,2、第2颈椎：C2对应身体部位区：双耳视神经,2、第2颈椎：C2对应身体部位区：双耳视神经,"2、第2颈椎：C₂对应身体部区：双耳,视神经",accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+MedP0249_L028,GCR,0.2,medicine,4、第4颈椎：(4对应身体部位区：鼻、唇.嘴,4、第4颈椎：(C4对应身体部位区：鼻、唇、嘴,4、第4颈椎：(C4对应身体部位区：鼻、唇、嘴,4、第4颈椎：C4对应身体部险区：鼻.唇.嘴,accepted,accepted,3,4,1,gemini:gemini-3-flash-preview
+MedP0249_L045,GCR,0.2,medicine,还有膀脱等、,还有膨胀等、,还有膨胀等、,还有膀胱等.,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0199_L074,WUR,0.2,geology,(4个)顺层~,(24)顺层~,(24)顺层~,(4个)顺层~,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0199_L095,WUR,0.2,geology,覆构造),覆褶皱),覆褶皱),覆构造),accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0199_L098,WUR,0.2,geology,追踪利用、改造(被的早),追踪利用、改造(补写的),追踪利用、改造(补写的),{追踪，利用，改造（被..的早）,accepted,accepted,5,7,2,gemini:gemini-3-flash-preview
+GeoP0199_L111,WUR,0.2,geology,如地层关系的变化,如，地层关系的变化,如，地层关系的变化,如地层关系的变化,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0200_L044,WUR,0.2,geology,羽状节理与主断层所交,羽状节理与主断层斜交,羽状节理与主断层斜交,羽状节理与主断层所交,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0201_L020,WUR,0.2,geology,正断：拉开形成,正断层：拉开形成,正断层：拉开形成,正断：拉开形成,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0208_L009,WUR,0.2,geology,的水分,全水分,全水分,的水分,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0211_L028,WUR,0.2,geology,(3)负偏分布，(s<0，系列出现小于均值的机会比大于均值的机会少,(3)负偏分布，Cs < 0，系列出现小于均值的机会比大于均值的机会少,(3)负偏分布，Cs < 0，系列出现小于均值的机会比大于均值的机会少,(3)负偏分布，Cs<0，系列出现小于均值的机会比大于均值的机会少,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0212_L012,WUR,0.2,geology,(3)结论,3)结论,3)结论,(3)结论,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0216_L002,WUR,0.2,geology,(3)暴雨强度(认)相对均匀，点雨量与面雨量接近,(3)暴雨强度(分布)相对均匀，点雨量与面雨量接近,(3)暴雨强度(分布)相对均匀，点雨量与面雨量接近,(3)暴雨强度(i)相对均匀，点雨量与面雨量接近,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0217_L024,WUR,0.2,geology,1.长石类(k.Na.Ca的铝硅酸盐),"1.长石类(K,Na,Ca的铝硅酸盐)","1.长石类(K,Na,Ca的铝硅酸盐)",1.长石类(k.Na.Ca的铝硅酸盐),accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+GeoP0217_L034,WUR,0.2,geology,利余AbO3,利余Al2O3,利余Al2O3,利余AbO₃,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+GeoP0218_L003,WUR,0.2,geology,钾K石>,钾K长石,钾K长石,钾长石>,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0219_L009,WUR,0.2,geology,中性市,中生界,中生界,中性岩,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0219_L027,WUR,0.2,geology,以溶解为主,以溶蚀为主,以溶蚀为主,以溶解为主,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0219_L035,WUR,0.2,geology,具有板理.片理、薄层理石,具有板理、片理、薄层理者,具有板理、片理、薄层理者,具有板理·片理、薄层理岩石,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0221_L004,WUR,0.2,geology,自形自形/半自形/他形,自形 自形/半自形/他形,自形 自形/半自形/他形,'自形自形/半自形/他形,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0221_L014,WUR,0.2,geology,同生矿床：矿体与围岩在同一地质作用。,同生矿床：矿体与围岩在同一地质作用中。,同生矿床：矿体与围岩在同一地质作用中。,(同生矿床：矿体与围岩在同一地质作用.,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0222_L013,WUR,0.2,geology,二、易需保成矿因素,二、影响成矿因素,二、影响成矿因素,二、易聚体成矿因素,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0232_L001,WUR,0.2,geology,矿床学复习草稿第二章,矿床学复习提纲第二章,矿床学复习提纲第二章,矿床学复习草稿第二章,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0236_L020,WUR,0.2,geology,成方式。,成元式-,成元式-,成立式.,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0241_L015,WUR,0.2,geology,四个仿锤型轨道,四个纺锤型轨迹,四个纺锤型轨迹,四个仿锤型轨道,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0243_L004,WUR,0.2,geology,厚：：1.3-3.5m,层厚：1.3~3.5m,层厚：1.3~3.5m,"中厚：：1.3～3.5m
+",accepted,accepted,3,4,1,gemini:gemini-3-flash-preview
+GeoP0243_L006,WUR,0.2,geology,投影所的,受影响的,受影响的,投影下F的方向,accepted,accepted,4,5,1,gemini:gemini-3-flash-preview
+GeoP0243_L015,WUR,0.2,geology,通常层乘,逆断层厚,逆断层厚,通常层状,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+FinP0172_L034,WUR,0.2,finance,币，货币天然，是,金，银天然，是,金，银天然，是,币，货币天然是,accepted,accepted,1,4,3,gemini:gemini-3-flash-preview
+FinP0177_L003,WUR,0.2,finance,(2)票面利率,12)层面斜率,12)层面斜率,（2）票面利率,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+FinP0177_L004,WUR,0.2,finance,(3)债券期限,(3)使用期限,(3)使用期限,(３)债券期限,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+FinP0179_L040,WUR,0.2,finance,发行）③中间发行,发射）③中间发射,发射）③中间发射,发行)③中间发行:,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+FinP0184_L007,WUR,0.2,finance,人民币个就是升值,人民币升值就是升值,人民币升值就是升值,人民币↑就是升值,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+FinP0189_L017,WUR,0.2,finance,现货：当场/天内买方付款.卖,现货：当场10天内买方付款，卖,现货：当场10天内买方付款，卖,现货：当场|n天内买方付款.卖方,accepted,accepted,3,4,1,gemini:gemini-3-flash-preview
+FinP0195_L001,WUR,0.2,finance,②货币互换,②深井互换,②深井互换,②货币互换,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+FinP0200_L011,WUR,0.2,finance,在金融领域的应用场景,在金属领域的应用场景,在金属领域的应用场景,在金融领域的应用场景,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+FinP0201_L002,WUR,0.2,finance,“特殊的金融企业”,“特殊的金属矿床”,“特殊的金属矿床”,“特殊的金融企业”,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+FinP0201_L051,WUR,0.2,finance,4.货币乘数,4.质量系数,4.质量系数,4.货币乘数,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+FinP0201_L057,WUR,0.2,finance,活期存款总额.,活期存蓄量总额.,活期存蓄量总额.,活期存款总额.,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+FinP0204_L028,WUR,0.2,finance,[费雪效应],[馈电效应],[馈电效应],[费雪效应],accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+FinP0204_L057,WUR,0.2,finance,信券空向,信号定向,信号定向,债券票面,accepted,accepted,3,4,1,gemini:gemini-3-flash-preview
+FinP0204_L075,WUR,0.2,finance,=)持有期收益率=105=,二)持有期收益率=105=,二)持有期收益率=105=,=>持有期收益率:105:,accepted,accepted,3,4,1,gemini:gemini-3-flash-preview
+FinP0205_L002,WUR,0.2,finance,1:要素：①期限,1要素：①期限,1要素：①期限,1：要素：①期限,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+FinP0205_L025,WUR,0.2,finance,(1)：不付现金红利，一年后价格变为22，20，18.时，投资收益率为？,(1)：不付现金红利，一年后价格变为22，20，18时，投资收益率为？,(1)：不付现金红利，一年后价格变为22，20，18时，投资收益率为？,(1):不付现金红利，一年后价格变为22，20，18.时，投资收益率为？,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+FinP0206_L006,WUR,0.2,finance,(3)流动性陷阱,(3)岩性陷阱,(3)岩性陷阱,(3)流动性陷阱,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+FinP0208_L009,WUR,0.2,finance,借款期限和风险期限长，风险大，利率高,勘探期限和风险期限长，风险大，利率高,勘探期限和风险期限长，风险大，利率高,借款期限和风险期限长，风险大，利率高，,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+MedP0201_L025,WUR,0.2,medicine,无肾买质改变,无明显质改变,无明显质改变,无肾实质政变,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+MedP0201_L039,WUR,0.2,medicine,血性腹水,岩性脆性,岩性脆性,血性腹水,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+MedP0201_L041,WUR,0.2,medicine,SABG>因为是高,SAGD>因为是高丘,SAGD>因为是高丘,SADG>11.因为是高压,accepted,accepted,5,6,1,gemini:gemini-3-flash-preview
+MedP0204_L017,WUR,0.2,medicine,股滑体长轴,般滑体长轴,般滑体长轴,股骨体长轴,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0206_L031,WUR,0.2,medicine,顺钟向转房,顺钟向转层,顺钟向转层,顺钟向转房,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0206_L032,WUR,0.2,medicine,可段可压低,可锻可延,可锻可延,ST锻可压低,accepted,accepted,3,4,1,gemini:gemini-3-flash-preview
+MedP0210_L105,WUR,0.2,medicine,7.高血压急症三联征：,7.高压急症三联征：,7.高压急症三联征：,7.高血压急症三联征：,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0218_L032,WUR,0.2,medicine,肝一木（子),附一本（子),附一本（子),肝—木(子),accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+MedP0222_L018,WUR,0.2,medicine,CB(结合胆红素,CB(结合胆红素),CB(结合胆红素),CB(结合胆红素,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0222_L039,WUR,0.2,medicine,美胆素(颜色,基质素(颜色),基质素(颜色),粪胆素(颜色,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+MedP0224_L006,WUR,0.2,medicine,2.静息电位水平.,2.静自电位水平.,2.静自电位水平.,2.静息电位水平.,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0225_L033,WUR,0.2,medicine,3、胆汁酸,3、胆甾酸,3、胆甾酸,36、胆汁酸：,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+MedP0228_L012,WUR,0.2,medicine,洋地黄特别适用于,详地质特别适用于,详地质特别适用于,洋地黄特别适用于,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+MedP0234_L029,WUR,0.2,medicine,狼疮抗凝物。(相毒）,狼疮抗凝物。(筛选）,狼疮抗凝物。(筛选）,狼疮抗凝物.(梅毒),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0235_L020,WUR,0.2,medicine,(酸性结合OH-带负电)两个-COOH,(碱性结合OH-带负电)两个-COOH,(碱性结合OH-带负电)两个-COOH,(酸性结合OH⁻带负电)两个-COOH,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0238_L025,WUR,0.2,medicine,脾、肝均有.,膨、胀均有.,膨、胀均有.,脾、肝均有.,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+MedP0240_L044,WUR,0.2,medicine,①中枢神经系统知病,①中枢神经系统诊断,①中枢神经系统诊断,①中枢神经系统疾病,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0242_L004,WUR,0.2,medicine,(一) 生理特性,(一) 物理特性,(一) 物理特性,(一)生理特性,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0247_L025,WUR,0.2,medicine,1、一般形态：(1)椎体,一、一般形态：(1)椎体,一、一般形态：(1)椎体,1、一般形态：(1)椎体,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0249_L046,WUR,0.2,medicine,肩关节、肘关节.,肩关节、肘关节、,肩关节、肘关节、,肩关节.肘关节.,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0199_L011,DGCR,0.2,geology,{深部 韧性剪切带,{深部 韧性剪切带},{深部 韧性剪切带},{深部韧性剪切带,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0199_L111,DGCR,0.2,geology,如地层关系的变化,如，地层关系的变化,如，地层关系的变化,如地层关系的变化,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0200_L006,DGCR,0.2,geology,①根据地层的新老关系.(适用于走向断层),① 根据地层的新老关系，(适用于走向断层),① 根据地层的新老关系，(适用于走向断层),①根据地层的新老关系.(适用于走向断层),accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0200_L044,DGCR,0.2,geology,羽状节理与主断层所交,羽状节理与主断层斜交,羽状节理与主断层斜交,羽状节理与主断层所交,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0202_L024,DGCR,0.2,geology,(3)给水性：给水度M,(B)给水性；给水度μ,(B)给水性；给水度μ,(3)给水性：给水度μ,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0207_L014,DGCR,0.2,geology,含水层入渗系数,含水层渗透系数,含水层渗透系数,含水层入渗系数,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0207_L037,DGCR,0.2,geology,弹性给水度,弹性释水度,弹性释水度,3弹性给水度,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0208_L012,DGCR,0.2,geology,(2)含水层由于骨架变形空隙变小而被挤出来的重力水,(2)含水层由于骨架变形孔隙变小而被挤出来的重力水,(2)含水层由于骨架变形孔隙变小而被挤出来的重力水,(2)含水层由于骨架变形空隙变小而被挤出来的重力水,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0212_L004,DGCR,0.2,geology,2.Cs越大，频率曲线中部上端越陡，中段曲率变大，下端变平缓,2. Cs越大，频率曲线中部上端越陡，中段曲率变大，下端变平缓,2. Cs越大，频率曲线中部上端越陡，中段曲率变大，下端变平缓,2.Cs越大，频率曲线中部上端越陡，中段曲率变大，下端变平缓,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0217_L024,DGCR,0.2,geology,1.长石类(k.Na.Ca的铝硅酸盐),1.长石类(K.Na.Ca的铝硅酸盐),1.长石类(K.Na.Ca的铝硅酸盐),1.长石类(k.Na.Ca的铝硅酸盐),accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0218_L031,DGCR,0.2,geology,一般情况下.只发生机械破碎，而无化学分解.,一般情况下，只发生机械破碎，而无化学分解。,一般情况下，只发生机械破碎，而无化学分解。,"一般情况下.只发生机械破碎,而无化学分解.",accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0218_L032,DGCR,0.2,geology,酸性质—高岭石,介质—高岭石`,介质—高岭石`,酸性介质—高岭石,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+GeoP0219_L035,DGCR,0.2,geology,具有板理.片理、薄层理石,具有板理、片理、薄层理的,具有板理、片理、薄层理的,具有板理·片理、薄层理岩石,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0221_L014,DGCR,0.2,geology,同生矿床：矿体与围岩在同一地质作用。,同生矿床：矿体与围岩在同一地质作用中。,同生矿床：矿体与围岩在同一地质作用中。,(同生矿床：矿体与围岩在同一地质作用.,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0222_L013,DGCR,0.2,geology,二、易需保成矿因素,二、显著的成矿因素,二、显著的成矿因素,二、易聚体成矿因素,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0228_L027,DGCR,0.2,geology,① Fe：山东金岭镇铁矿床、湖北大冶铁矿床,① Fe：山东金岭铁矿床、湖北大冶铁矿床,① Fe：山东金岭铁矿床、湖北大冶铁矿床,①Fe: 山东金岭镇铁矿床、湖北大冶铁矿床,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0229_L013,DGCR,0.2,geology,③、浅度深，距原生岩石或矿体近，作为原生矿床的直接而有效的找矿标志。,③、埋藏浅，距原生岩石或矿体近，作为原生矿床的直接而有效的找矿标志。,③、埋藏浅，距原生岩石或矿体近，作为原生矿床的直接而有效的找矿标志。,"③、浅度深,距原生岩石或矿体近,作为原生矿床的直接而有效的找矿标志，",accepted,accepted,1,4,3,gemini:gemini-3-flash-preview
+GeoP0231_L015,DGCR,0.2,geology,P：江苏海州磷矿床,P₂江苏海州磷矿床,P₂江苏海州磷矿床,P：江苏海州磷矿床,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0232_L012,DGCR,0.2,geology,相互的结合关系等所反映的形态特征.主要决定于矿粒形成条件，研究矿,相互的结合关系等所反映的形态、特征.主要决定于矿粒形成条件，研究矿,相互的结合关系等所反映的形态、特征.主要决定于矿粒形成条件，研究矿,相互的结合关系等所反映的形态特征.主要决定于矿粒形成条件，研究矿,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0232_L020,DGCR,0.2,geology,·矿体：组成矿床的基本单位，是矿石在三维空间的堆积体，占有一定空间,.矿体：组成矿床的基本单位，是矿石在三维空间的堆积体，占有一定空间,.矿体：组成矿床的基本单位，是矿石在三维空间的堆积体，占有一定空间,·矿体：组成矿床的基本单位，是矿石在三维空间的堆积体，占有一定空间，,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0233_L008,DGCR,0.2,geology,·浓度克拉克值：某一元素在特定地质体中的含量与其克拉克值的比值、,",浓度克拉克值：某一元素在特定地质体中的含量与其克拉克值的比值.",",浓度克拉克值：某一元素在特定地质体中的含量与其克拉克值的比值.",·浓度克拉克值：某一元素在特定地质体中的含量与其克拉克值的比值、,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0233_L026,DGCR,0.2,geology,4.元素分布规律对影响矿床形成的意义：,4.元素分布规律对研究矿床形成的意义：,4.元素分布规律对研究矿床形成的意义：,4、元素分布规律对影响矿床形成的意义：,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+GeoP0235_L030,DGCR,0.2,geology,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛等挥发分,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛及挥发分,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛及挥发分,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛等挥发分，,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0236_L004,DGCR,0.2,geology,岩矿庭床。此阶段成岩与成矿同步发生。,岩矿同生。此阶段成岩与成矿同步发生。,岩矿同生。此阶段成岩与成矿同步发生。,岩矿床。此阶段成岩与成矿同步发生.,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0236_L011,DGCR,0.2,geology,③、矿体形态：a、上悬矿体底部层状矿体，脉状矿体b.岩矿同体矿体，纯硫化物,③、矿体形态：a、上悬矿体、底部层状矿体、脉状矿体 b.岩矿同体矿体，纯硫化物,③、矿体形态：a、上悬矿体、底部层状矿体、脉状矿体 b.岩矿同体矿体，纯硫化物,"③、矿体形态、a.上悬矿体、底部层状矿体,脉状矿体b.岩矿同体矿体,纯硫化物",accepted,accepted,3,4,1,gemini:gemini-3-flash-preview
+GeoP0238_L007,DGCR,0.2,geology,①、元素种类多样②、矿物成分多达300种以上,①、元素种类多样 ②、矿物成分多达300种以上,①、元素种类多样 ②、矿物成分多达300种以上,①、元素种类多样②、矿物成分多达300种以上,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0240_L008,DGCR,0.2,geology,交换，而主要由于物理化学条件改变，引起沉淀物质直接淀沉于所在的构造,交换，而主要由于物理化学条件改变，引起沉淀物质便直接淀沉于所在的构造,交换，而主要由于物理化学条件改变，引起沉淀物质便直接淀沉于所在的构造,交换，而主要由于物理化学条件改变，引起沉淀物质直接淀沉于所在的构造,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0240_L012,DGCR,0.2,geology,·云英岩化、花岗岩类岩石中，高温蚀变产生玉主要由白云母、石英组合的岩石。,",云英岩化:花岗岩类岩石中，高温蚀变产生的主要由白云母、石英组合的岩石。",",云英岩化:花岗岩类岩石中，高温蚀变产生的主要由白云母、石英组合的岩石。","·云英岩化、花岗岩类岩石中,高温蚀变产生主要由白云母、石英组合的岩石.",accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+GeoP0240_L020,DGCR,0.2,geology,②、构造是成矿热液运移通道和成矿物质沉淀富集场所，受构造的间些性,②、构造是成矿热液运移通道和成矿物质沉淀富集场所，受构造的间歇性,②、构造是成矿热液运移通道和成矿物质沉淀富集场所，受构造的间歇性,③、构造是成矿热液运移通道和成矿物质沉淀富集场所，受构造的间些性,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0200_L031,DGCR,0.2,medicine,新亚甲蓝WHO推荐使用,新亚甲蓝 WHO推荐使用,新亚甲蓝 WHO推荐使用,新亚甲蓝WHO推荐使用,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0218_L001,DGCR,0.2,medicine,脑：△元神之府.主宰生命、精神.感觉运动,脑：△元神之府.主宰生命、精神.感觉运动 },脑：△元神之府.主宰生命、精神.感觉运动 },脑：△元神之府．主宰生命、精神、感觉运动）,accepted,accepted,3,4,1,gemini:gemini-3-flash-preview
+MedP0222_L018,DGCR,0.2,medicine,CB(结合胆红素,CB(结合胆红素),CB(结合胆红素),CB(结合胆红素,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0222_L064,DGCR,0.2,medicine,生态：生长抑系，奥曲肽(收缩内脏血管),止血：生长抑素，奥曲肽(收缩内脏血管),止血：生长抑素，奥曲肽(收缩内脏血管),生态：生长抑素，奥曲肽(收缩内脏血管),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0225_L036,DGCR,0.2,medicine,即胆汁酸盐，可胆汁酸盐，简称胆盐。,即胆汁酸盐，或胆汁酸盐。简称胆盐。,即胆汁酸盐，或胆汁酸盐。简称胆盐。,即胆汁酸盐，即胆汁酸盐，简称胆盐。,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0225_L049,DGCR,0.2,medicine,催化下，与葡萄酸基结合，变生成结合胆红素,催化下，与葡萄糖醛酸基结合，转变生成结合胆红素,催化下，与葡萄糖醛酸基结合，转变生成结合胆红素,催化下，与葡萄酸基结合，转变生成结合胆红素,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0228_L012,DGCR,0.2,medicine,洋地黄特别适用于,详地质特别适用于,详地质特别适用于,洋地黄特别适用于,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+MedP0229_L002,DGCR,0.2,medicine,(一)人体细胞的形态,(一)人体细胞的研究,(一)人体细胞的研究,(一)人体细胞的形态,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+MedP0234_L029,DGCR,0.2,medicine,狼疮抗凝物。(相毒）,狼疮抗凝物。(筛查）,狼疮抗凝物。(筛查）,狼疮抗凝物.(梅毒),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0238_L001,DGCR,0.2,medicine,运化水谷：脾为“后天之本，气血生化之源”：食物消化吸收,/运化水谷：脾为“后天之本，气血生化之源”；食物消化吸收,/运化水谷：脾为“后天之本，气血生化之源”；食物消化吸收,运化水谷：脾为“后天之本，气血生化之源”：食物消化吸收,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+MedP0243_L012,DGCR,0.2,medicine,1.骨迷路：耳蜗、前庭.骨半规管,1.骨迷路：耳蜗、前庭、骨半规管,1.骨迷路：耳蜗、前庭、骨半规管,1.骨迷路:耳蜗.前庭.骨半规管.,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0199_L095,DWUR,0.2,geology,覆构造),覆褶皱),覆褶皱),覆构造),accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0200_L042,DWUR,0.2,geology,个是流动阶段,一个是流动阶段,一个是流动阶段,个是流动阶段,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0200_L044,DWUR,0.2,geology,羽状节理与主断层所交,羽状节理与主断层斜交,羽状节理与主断层斜交,羽状节理与主断层所交,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0200_L070,DWUR,0.2,geology,滑劈理(褶劈理),滑劈理(褶皱劈理),滑劈理(褶皱劈理),{滑劈理(褶劈理),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0200_L075,DWUR,0.2,geology,依据劈理域,依据层劈理域,依据层劈理域,依据劈理域,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0202_L024,DWUR,0.2,geology,(3)给水性：给水度M,(B)给水性；给水度μ,(B)给水性；给水度μ,(3)给水性：给水度μ,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0203_L010,DWUR,0.2,geology,(4)当隔水层分布较广时可作为小型生活水源,(4)当含水层分布较广时可作为小型生活水源。,(4)当含水层分布较广时可作为小型生活水源。,(4)当隔水层分布较广时可作为小型生活水源,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0206_L026,DWUR,0.2,geology,时间配线法.,时间剖面法.,时间剖面法.,时间配线法.,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0206_L029,DWUR,0.2,geology,时间距离配线法,时间距离曲线法,时间距离曲线法,时间距离配线法,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0207_L014,DWUR,0.2,geology,含水层入渗系数,含水层渗透系数,含水层渗透系数,含水层入渗系数,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0207_L037,DWUR,0.2,geology,弹性给水度,弹性释水度,弹性释水度,3弹性给水度,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0208_L009,DWUR,0.2,geology,的水分,全水分,全水分,的水分,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0212_L004,DWUR,0.2,geology,2.Cs越大，频率曲线中部上端越陡，中段曲率变大，下端变平缓,2. Cs越大，频率曲线上端越陡，中段曲率变大，下端变平缓,2. Cs越大，频率曲线上端越陡，中段曲率变大，下端变平缓,2.Cs越大，频率曲线中部上端越陡，中段曲率变大，下端变平缓,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+GeoP0215_L014,DWUR,0.2,geology,(1)同频率放大法：要求放大后的设计洪水过程线的峰和不同时段的,(1)同频率放大法：要求放大后的设计洪水过程线的洪峰和不同时段的,(1)同频率放大法：要求放大后的设计洪水过程线的洪峰和不同时段的,(1)同频率放大法：要求放大后的设计洪水过程线的峰和不同时段的,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0217_L010,DWUR,0.2,geology,物理风化作用：只发生机械破碎而化学成分未改变的风化作用只暗碎,物理风化作用：只发生机械破碎而化学成分未改变的风化作用 只崩碎。,物理风化作用：只发生机械破碎而化学成分未改变的风化作用 只崩碎。,物理风化作用：只发生机械破碎而化学成分未改变的风化作用只嚼碎了,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0218_L003,DWUR,0.2,geology,钾K石>,钾K长石,钾K长石,钾长石>,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0218_L031,DWUR,0.2,geology,一般情况下.只发生机械破碎，而无化学分解.,一般情况下，只发生机械破碎，而无化学分解。,一般情况下，只发生机械破碎，而无化学分解。,"一般情况下.只发生机械破碎,而无化学分解.",accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0219_L035,DWUR,0.2,geology,具有板理.片理、薄层理石,具有板理、片理、薄层理的,具有板理、片理、薄层理的,具有板理·片理、薄层理岩石,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0220_L006,DWUR,0.2,geology,松驰：应力不变，应变随时间增加而减小。,松弛：应变不变，应力随时间增加而减小。,松弛：应变不变，应力随时间增加而减小。,松驰：应力不变，应变随时间增加而减小。,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+GeoP0221_L014,DWUR,0.2,geology,同生矿床：矿体与围岩在同一地质作用。,同生矿床：矿体与围岩在同一地质作用中。,同生矿床：矿体与围岩在同一地质作用中。,(同生矿床：矿体与围岩在同一地质作用.,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0221_L040,DWUR,0.2,geology,划分依据：①矿体构造②矿石构造③矿物共组合标志,划分依据：①矿体构造 ②矿石构造 ③矿物共生组合标志,划分依据：①矿体构造 ②矿石构造 ③矿物共生组合标志,划分依据: ①矿体构造②矿石构造③矿物共生组合标志,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0222_L013,DWUR,0.2,geology,二、易需保成矿因素,二、显著的成矿因素,二、显著的成矿因素,二、易聚体成矿因素,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0227_L020,DWUR,0.2,geology,②、A矿物交代B矿物，B早于A⑦、梳状、晶洞、环带、条带构造等.,②、A矿物交代B矿物，B早于A  ⑦、梳状、晶洞、环带、条带构造等.,②、A矿物交代B矿物，B早于A  ⑦、梳状、晶洞、环带、条带构造等.,②、A矿物交代B矿物，B早于A⑦、梳状、晶洞、环带、条带构造等。,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0232_L003,DWUR,0.2,geology,单元，是人类开采，利用的对象.,矿体，是人类开采，利用的对象.,矿体，是人类开采，利用的对象.,"单元,是人类开采,利用的对象.",accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0233_L008,DWUR,0.2,geology,·浓度克拉克值：某一元素在特定地质体中的含量与其克拉克值的比值、,",浓度克拉克值：某一元素在特定地质体中的含量与其克拉克值的比值。",",浓度克拉克值：某一元素在特定地质体中的含量与其克拉克值的比值。",·浓度克拉克值：某一元素在特定地质体中的含量与其克拉克值的比值、,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0235_L030,DWUR,0.2,geology,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛等挥发分,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛及挥发分,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛及挥发分,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛等挥发分，,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0238_L007,DWUR,0.2,geology,①、元素种类多样②、矿物成分多达300种以上,①、元素种类多样 ②、矿物成分多达300余种以上,①、元素种类多样 ②、矿物成分多达300余种以上,①、元素种类多样②、矿物成分多达300种以上,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0238_L023,DWUR,0.2,geology,5.伟晶岩矿床成矿作用：,5.伟晶岩矿床成矿作用;,5.伟晶岩矿床成矿作用;,5.伟晶岩矿床成矿作用：,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0240_L008,DWUR,0.2,geology,交换，而主要由于物理化学条件改变，引起沉淀物质直接淀沉于所在的构造,交换，而主要由于物理化学条件改变，引起沉淀物质便直接淀沉于所在的构造,交换，而主要由于物理化学条件改变，引起沉淀物质便直接淀沉于所在的构造,交换，而主要由于物理化学条件改变，引起沉淀物质直接淀沉于所在的构造,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0240_L012,DWUR,0.2,geology,·云英岩化、花岗岩类岩石中，高温蚀变产生玉主要由白云母、石英组合的岩石。,",云英岩化:花岗岩类岩石中，高温蚀变产生的主要由白云母、石英组合的岩石。",",云英岩化:花岗岩类岩石中，高温蚀变产生的主要由白云母、石英组合的岩石。","·云英岩化、花岗岩类岩石中,高温蚀变产生主要由白云母、石英组合的岩石.",accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+GeoP0241_L036,DWUR,0.2,geology,实际发生区别的反电子数4~7时.,实际发生区别时的价电子数 4~7时.,实际发生区别时的价电子数 4~7时.,实际发生区别的仅d电子数4~7时.,accepted,accepted,2,4,2,gemini:gemini-3-flash-preview
+MedP0201_L039,DWUR,0.2,medicine,血性腹水,延性脆性,延性脆性,血性腹水,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+MedP0210_L065,DWUR,0.2,medicine,5.心肌炎三联征：,5.心肌酶三联征：,5.心肌酶三联征：,5.心肌炎三联征：,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0222_L018,DWUR,0.2,medicine,CB(结合胆红素,CB(结合胆红素),CB(结合胆红素),CB(结合胆红素,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0222_L064,DWUR,0.2,medicine,生态：生长抑系，奥曲肽(收缩内脏血管),止血：生长抑素，奥曲肽(收缩内脏血管),止血：生长抑素，奥曲肽(收缩内脏血管),生态：生长抑素，奥曲肽(收缩内脏血管),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0224_L013,DWUR,0.2,medicine,(一)工作细胞的跨膜电位,(一) 工作细胞的跨膜电位,(一) 工作细胞的跨膜电位,(一)工作细胞的跨膜电位,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0225_L036,DWUR,0.2,medicine,即胆汁酸盐，可胆汁酸盐，简称胆盐。,即胆汁酸盐，或胆汁酸盐。简称胆盐。,即胆汁酸盐，或胆汁酸盐。简称胆盐。,即胆汁酸盐，即胆汁酸盐，简称胆盐。,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0228_L012,DWUR,0.2,medicine,洋地黄特别适用于,该地质特别适用于,该地质特别适用于,洋地黄特别适用于,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+MedP0229_L018,DWUR,0.2,medicine,2.减数分裂,2.减数分层,2.减数分层,2.减数分裂,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0234_L029,DWUR,0.2,medicine,狼疮抗凝物。(相毒）,狼疮抗凝物。(筛选）,狼疮抗凝物。(筛选）,狼疮抗凝物.(梅毒),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0240_L044,DWUR,0.2,medicine,①中枢神经系统知病,①中枢神经系统诊断,①中枢神经系统诊断,①中枢神经系统疾病,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0199_L002,GCR,0.3,geology,层与层之间发生滑动,层与层之间发生层动,层与层之间发生层动,层与层之间发生滑动,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0199_L016,GCR,0.3,geology,中性面向内侧移动.,中性面向内侧偏移。,中性面向内侧偏移。,中性面向内侧移动.,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0199_L055,GCR,0.3,geology,(枢纽断层(旋转),(枢纽断层(旋转)),(枢纽断层(旋转)),(枢纽断层(旋转),accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0199_L074,GCR,0.3,geology,(4个)顺层~,(24)顺层~,(24)顺层~,(4个)顺层~,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0199_L095,GCR,0.3,geology,覆构造),复褶皱),复褶皱),覆构造),accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+GeoP0199_L098,GCR,0.3,geology,追踪利用、改造(被的早),追踪利用、改造(补的早),追踪利用、改造(补的早),{追踪，利用，改造（被..的早）,accepted,accepted,5,6,1,gemini:gemini-3-flash-preview
+GeoP0200_L044,GCR,0.3,geology,羽状节理与主断层所交,羽状节理与主断层斜交,羽状节理与主断层斜交,羽状节理与主断层所交,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0207_L037,GCR,0.3,geology,弹性给水度,弹性释水度,弹性释水度,3弹性给水度,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0208_L009,GCR,0.3,geology,的水分,全水分,全水分,的水分,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0208_L011,GCR,0.3,geology,(1)含水层空隙中水由于水压力降低而膨胀释放出来的重力水共同作用,(1)含水层空隙中水由于水压力降低而膨胀释放出来的弹性水共同作用,(1)含水层空隙中水由于水压力降低而膨胀释放出来的弹性水共同作用,(1)含水层空隙中水由于水压力降低而膨胀释放出来的重力水}共同作用,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+GeoP0211_L028,GCR,0.3,geology,(3)负偏分布，(s<0，系列出现小于均值的机会比大于均值的机会少,(3)负偏分布，Cs < 0，系列出现小于均值的机会比大于均值的机会少,(3)负偏分布，Cs < 0，系列出现小于均值的机会比大于均值的机会少,(3)负偏分布，Cs<0，系列出现小于均值的机会比大于均值的机会少,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0212_L012,GCR,0.3,geology,(3)结论,3)结论,3)结论,(3)结论,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0217_L010,GCR,0.3,geology,物理风化作用：只发生机械破碎而化学成分未改变的风化作用只暗碎,物理风化作用：只发生机械破碎而化学成分未改变的风化作用。只崩碎。,物理风化作用：只发生机械破碎而化学成分未改变的风化作用。只崩碎。,物理风化作用：只发生机械破碎而化学成分未改变的风化作用只嚼碎了,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0217_L024,GCR,0.3,geology,1.长石类(k.Na.Ca的铝硅酸盐),1.长石类(K.Na.Ca的铝硅酸盐),1.长石类(K.Na.Ca的铝硅酸盐),1.长石类(k.Na.Ca的铝硅酸盐),accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0217_L034,GCR,0.3,geology,利余AbO3,利余Al2O3,利余Al2O3,利余AbO₃,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+GeoP0218_L003,GCR,0.3,geology,钾K石>,钾K长>,钾K长>,钾长石>,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0218_L012,GCR,0.3,geology,泥于水,泥浆水,泥浆水,溶于水，,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0218_L031,GCR,0.3,geology,一般情况下.只发生机械破碎，而无化学分解.,一般情况下，只发生机械破碎，而无化学分解.,一般情况下，只发生机械破碎，而无化学分解.,"一般情况下.只发生机械破碎,而无化学分解.",accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0219_L009,GCR,0.3,geology,中性市,中生界,中生界,中性岩,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0219_L013,GCR,0.3,geology,抗风能力较强.,抗风化能力较强.,抗风化能力较强.,抗风能力较强.,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0219_L027,GCR,0.3,geology,以溶解为主,以溶蚀为主,以溶蚀为主,以溶解为主,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0219_L035,GCR,0.3,geology,具有板理.片理、薄层理石,具有板理、片理、薄层理的,具有板理、片理、薄层理的,具有板理·片理、薄层理岩石,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0221_L014,GCR,0.3,geology,同生矿床：矿体与围岩在同一地质作用。,同生矿床：矿体与围岩在同一地质作用中。,同生矿床：矿体与围岩在同一地质作用中。,(同生矿床：矿体与围岩在同一地质作用.,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0222_L013,GCR,0.3,geology,二、易需保成矿因素,二、显著的成矿因素,二、显著的成矿因素,二、易聚体成矿因素,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0222_L014,GCR,0.3,geology,1)高克拉克值2)聚集亲和能力强.(Au),1)高克拉克值2)富集亲和能力强.(Au),1)高克拉克值2)富集亲和能力强.(Au),1)高克拉克值.2)聚集亲和能力强.(Au),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0227_L020,GCR,0.3,geology,②、A矿物交代B矿物，B早于A⑦、梳状、晶洞、环带、条带构造等.,②、A矿物交代B矿物，B早于A  ⑦、梳状、晶洞、环带、条带构造等.,②、A矿物交代B矿物，B早于A  ⑦、梳状、晶洞、环带、条带构造等.,②、A矿物交代B矿物，B早于A⑦、梳状、晶洞、环带、条带构造等。,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0227_L022,GCR,0.3,geology,④、先生间隙被后生填充胶结,④、原生间隙被后生填充胶结,④、原生间隙被后生填充胶结,④、先生间隙被后生填充胶结,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0233_L008,GCR,0.3,geology,·浓度克拉克值：某一元素在特定地质体中的含量与其克拉克值的比值、,",浓度克拉克值：某一元素在特定地质体中的含量与其克拉克值的比值。",",浓度克拉克值：某一元素在特定地质体中的含量与其克拉克值的比值。",·浓度克拉克值：某一元素在特定地质体中的含量与其克拉克值的比值、,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0235_L030,GCR,0.3,geology,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛等挥发分,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛及挥发分,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛及挥发分,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛等挥发分，,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0238_L007,GCR,0.3,geology,①、元素种类多样②、矿物成分多达300种以上,①、元素种类多样②、矿物成分多达300余种以上,①、元素种类多样②、矿物成分多达300余种以上,①、元素种类多样②、矿物成分多达300种以上,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0240_L008,GCR,0.3,geology,交换，而主要由于物理化学条件改变，引起沉淀物质直接淀沉于所在的构造,交换，而主要由于物理化学条件改变，引起沉淀物质便直接淀沉于所在的构造,交换，而主要由于物理化学条件改变，引起沉淀物质便直接淀沉于所在的构造,交换，而主要由于物理化学条件改变，引起沉淀物质直接淀沉于所在的构造,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0240_L012,GCR,0.3,geology,·云英岩化、花岗岩类岩石中，高温蚀变产生玉主要由白云母、石英组合的岩石。,，云英岩化：花岗岩类岩石中，高温蚀变产生的主要由白云母、石英组合的岩石。,，云英岩化：花岗岩类岩石中，高温蚀变产生的主要由白云母、石英组合的岩石。,"·云英岩化、花岗岩类岩石中,高温蚀变产生主要由白云母、石英组合的岩石.",accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+GeoP0240_L019,GCR,0.3,geology,②、矿质，成矿介质有多元性,②、矿源，成矿介质有多元性,②、矿源，成矿介质有多元性,②、矿质、成矿介质有多元性,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0241_L015,GCR,0.3,geology,四个仿锤型轨道,四个纺锤型轨迹,四个纺锤型轨迹,四个仿锤型轨道,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0241_L036,GCR,0.3,geology,实际发生区别的反电子数4~7时.,实际发生区别时的电子数4~7时.,实际发生区别时的电子数4~7时.,实际发生区别的仅d电子数4~7时.,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0241_L038,GCR,0.3,geology,二.八面体择位能对过渡金属元素控制.,二.八面体择位能对过渡金属元素的控制.,二.八面体择位能对过渡金属元素的控制.,二.八面体择位能对过渡金属元素控制.,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0243_L004,GCR,0.3,geology,厚：：1.3-3.5m,厚：1.3~3.5m,厚：1.3~3.5m,"中厚：：1.3～3.5m
+",accepted,accepted,3,4,1,gemini:gemini-3-flash-preview
+GeoP0243_L008,GCR,0.3,geology,之间的角义，,之间的夹角，,之间的夹角，,之间的角α，,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0243_L014,GCR,0.3,geology,越大不用设备,磁法所用设备,磁法所用设备,越大不用设备,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+FinP0173_L015,GCR,0.3,finance,狭M1=MO+企业活期存款,狭义M1=M0+企业活期存款,狭义M1=M0+企业活期存款,狭M₁=M₀+企业活期存款,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+FinP0176_L025,GCR,0.3,finance,2.揭示课题,2.揭示深度,2.揭示深度,２、揭示课题,accepted,accepted,2,4,2,gemini:gemini-3-flash-preview
+FinP0177_L016,GCR,0.3,finance,发行，也叫无息债券、最后偿还的时候按面值偿还，利率是隐,发行，也叫无息债券，最后偿还的时候按面值偿还，利率是隐,发行，也叫无息债券，最后偿还的时候按面值偿还，利率是隐,发行，也叫无息债券、最后偿还的时候按面值偿还，利率是隐,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+FinP0177_L021,GCR,0.3,finance,(1)定义：是把当前收益率(日收益率，月收益率)换成年收,(1)定义：是把当前收益率(日收益率，月收益率)换成年收益率,(1)定义：是把当前收益率(日收益率，月收益率)换成年收益率,(1)定义：是把当前收益率(日收益率、月收益率)换成年收,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+FinP0179_L040,GCR,0.3,finance,发行）③中间发行,发射）③中间发射,发射）③中间发射,发行)③中间发行:,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+FinP0189_L012,GCR,0.3,finance,1、金融市场：资金筹集的场所,1、钢铁市场：资金筹集的场所（,1、钢铁市场：资金筹集的场所（,1、金融市场：资金筹集的场所＜,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+FinP0189_L017,GCR,0.3,finance,现货：当场/天内买方付款.卖,现货：当场10天内买方付款，卖,现货：当场10天内买方付款，卖,现货：当场|n天内买方付款.卖方,accepted,accepted,3,4,1,gemini:gemini-3-flash-preview
+FinP0191_L026,GCR,0.3,finance,债券供给变动,储量供给变动,储量供给变动,债券供给变动,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+FinP0195_L001,GCR,0.3,finance,②货币互换,②深部互换,②深部互换,②货币互换,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+FinP0196_L007,GCR,0.3,finance,二：回购市场工质押贷款，质押品为证券】,二：回购市场（质押贷款，质押品为证券）],二：回购市场（质押贷款，质押品为证券）],二：回购市场[质押贷款，质押品为证券],accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+FinP0199_L011,GCR,0.3,finance,狭义货币：M_0=流通中现金，M_{1}=M_{}+商业银行活期存款,狭义货币：M_0=流通中现金，M_{1}=M_{0}+商业银行活期存款,狭义货币：M_0=流通中现金，M_{1}=M_{0}+商业银行活期存款,狭义货币:M₀=流通中现金，M₁=M₀+商业银行活期存款,accepted,accepted,9,10,1,gemini:gemini-3-flash-preview
+FinP0200_L006,GCR,0.3,finance,推动金确发展提质增效。,推动地勘发展提质增效。,推动地勘发展提质增效。,推动金融发展提质增效。,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+FinP0200_L011,GCR,0.3,finance,在金融领域的应用场景,在金属领域的应用场景,在金属领域的应用场景,在金融领域的应用场景,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+FinP0200_L020,GCR,0.3,finance,·在全融领域的应用场景,·在金属矿领域的应用场景,·在金属矿领域的应用场景,·在金融领域的应用场景,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+FinP0201_L002,GCR,0.3,finance,“特殊的金融企业”,“特殊的金属矿业”,“特殊的金属矿业”,“特殊的金融企业”,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+FinP0201_L007,GCR,0.3,finance,2.来外业务,2.野外作业,2.野外作业,2.表外业务,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+FinP0201_L051,GCR,0.3,finance,4.货币乘数,4.质量参数,4.质量参数,4.货币乘数,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+FinP0201_L057,GCR,0.3,finance,活期存款总额.,活期存蓄入总额.,活期存蓄入总额.,活期存款总额.,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+FinP0204_L019,GCR,0.3,finance,·一般利率(参与基准r而定)如企业、个人存贷款利率,·一般利率(随基准r而定)如企业、个人存贷款利率,·一般利率(随基准r而定)如企业、个人存贷款利率,·一般利率（参考基准r而定）如企业、个人存贷款利率,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+FinP0204_L057,GCR,0.3,finance,信券空向,信号走向,信号走向,债券票面,accepted,accepted,3,4,1,gemini:gemini-3-flash-preview
+FinP0204_L075,GCR,0.3,finance,=)持有期收益率=105=,二)持有期收益率=10.5%,二)持有期收益率=10.5%,=>持有期收益率:105:,accepted,accepted,3,5,2,gemini:gemini-3-flash-preview
+FinP0208_L009,GCR,0.3,finance,借款期限和风险期限长，风险大，利率高,勘探期限和风险期限长，风险大，利率高,勘探期限和风险期限长，风险大，利率高,借款期限和风险期限长，风险大，利率高，,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+MedP0201_L018,GCR,0.3,medicine,肝硬化+腹水,硅化+脱水,硅化+脱水,肝硬化+腹水,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+MedP0201_L025,GCR,0.3,medicine,无肾买质改变,无明显性质改变,无明显性质改变,无肾实质政变,accepted,accepted,2,4,2,gemini:gemini-3-flash-preview
+MedP0201_L039,GCR,0.3,medicine,血性腹水,延性脆性,延性脆性,血性腹水,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+MedP0204_L019,GCR,0.3,medicine,腔骨长轴线,胚界长轴线,胚界长轴线,胫骨长轴线,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0206_L031,GCR,0.3,medicine,顺钟向转房,顺钟向转层,顺钟向转层,顺钟向转房,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0222_L039,GCR,0.3,medicine,美胆素(颜色,基胆素(颜色),基胆素(颜色),粪胆素(颜色,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0222_L064,GCR,0.3,medicine,生态：生长抑系，奥曲肽(收缩内脏血管),止血：生长抑素，奥曲肽(收缩内脏血管),止血：生长抑素，奥曲肽(收缩内脏血管),生态：生长抑素，奥曲肽(收缩内脏血管),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0225_L031,GCR,0.3,medicine,则使NADPH氧化生成了水，即一分子氧发了两种功能，故又称混合功能氧,则使NADPH氧化生成了水，即一分子氧发挥了两种功能，故又称混合功能氧化酶,则使NADPH氧化生成了水，即一分子氧发挥了两种功能，故又称混合功能氧化酶,则使NADPH氧化生成了水，即一分子氧发挥了两种功能，故又称混合功能氧,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0228_L012,GCR,0.3,medicine,洋地黄特别适用于,详地质特别适用于,详地质特别适用于,洋地黄特别适用于,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+MedP0234_L029,GCR,0.3,medicine,狼疮抗凝物。(相毒）,狼疮抗凝物。(筛查）,狼疮抗凝物。(筛查）,狼疮抗凝物.(梅毒),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0234_L052,GCR,0.3,medicine,(不蚀性关节员),(不连续性关节面),(不连续性关节面),(不侵蚀性关节炎),accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+MedP0235_L025,GCR,0.3,medicine,含-OHAA：苏(酪)丝苏老师,含-OHAA：苏(酪)丝 苏丝缬,含-OHAA：苏(酪)丝 苏丝缬,含-OHAA：苏(酪)丝苏老师,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+MedP0242_L018,GCR,0.3,medicine,脏腑位置之高低,脱脂位置之高低,脱脂位置之高低,脏腑位置之高低,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+MedP0249_L017,GCR,0.3,medicine,2、第2颈椎：C2对应身体部区：双耳视神经,2、第2颈椎：C2对应身体部位区：双耳视神经,2、第2颈椎：C2对应身体部位区：双耳视神经,"2、第2颈椎：C₂对应身体部区：双耳,视神经",accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+MedP0249_L026,GCR,0.3,medicine,6、第6胸椎=T6对应的身体部区：脾.胃.,6、第6胸椎=T6对应的身体部位：脾.胃.,6、第6胸椎=T6对应的身体部位：脾.胃.,6、第6胞椎：T₆对应的自体部区：脾.胃、,accepted,accepted,5,6,1,gemini:gemini-3-flash-preview
+MedP0249_L028,GCR,0.3,medicine,4、第4颈椎：(4对应身体部位区：鼻、唇.嘴,4、第4颈椎：(C4对应身体部位区：鼻、唇、嘴,4、第4颈椎：(C4对应身体部位区：鼻、唇、嘴,4、第4颈椎：C4对应身体部险区：鼻.唇.嘴,accepted,accepted,3,4,1,gemini:gemini-3-flash-preview
+MedP0249_L032,GCR,0.3,medicine,8、第8胸椎：T8对应的身体部区：脾脏.,8、第8胸椎：T8对应的身体部位：脾脏.,8、第8胸椎：T8对应的身体部位：脾脏.,8、第8胸椎：T₈对应的身体部区：脾脏.,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0199_L003,WUR,0.3,geology,外侧易环裂,外侧显环裂,外侧显环裂,外侧易张裂,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0199_L066,WUR,0.3,geology,(伸展构造),(伸展构造)),(伸展构造)),(伸展构造),accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0199_L067,WUR,0.3,geology,延同一方向],[沿同一方向],[沿同一方向],延同一方向],accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0199_L074,WUR,0.3,geology,(4个)顺层~,(24)顺层~,(24)顺层~,(4个)顺层~,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0199_L095,WUR,0.3,geology,覆构造),覆褶皱),覆褶皱),覆构造),accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0199_L098,WUR,0.3,geology,追踪利用、改造(被的早),追踪利用、改造(补写的早),追踪利用、改造(补写的早),{追踪，利用，改造（被..的早）,accepted,accepted,5,6,1,gemini:gemini-3-flash-preview
+GeoP0199_L111,WUR,0.3,geology,如地层关系的变化,"如,地层关系的变化","如,地层关系的变化",如地层关系的变化,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0200_L024,WUR,0.3,geology,形态及其与,形态、及其与,形态、及其与,形态及其与,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0200_L044,WUR,0.3,geology,羽状节理与主断层所交,羽状节理与主断层斜交,羽状节理与主断层斜交,羽状节理与主断层所交,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0200_L067,WUR,0.3,geology,破劈理→是岩石中的一组密集的剪切破裂面.,破劈理 → 是岩石中的一组密集的剪切破裂面.,破劈理 → 是岩石中的一组密集的剪切破裂面.,破劈理->是岩石中的一组密集的剪切破裂面.,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0201_L020,WUR,0.3,geology,正断：拉开形成,正断层：拉开形成,正断层：拉开形成,正断：拉开形成,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0203_L020,WUR,0.3,geology,(1)有上下两个隔水板(不易被污染),(1)有上下两个隔水层 (不易被污染),(1)有上下两个隔水层 (不易被污染),(1)有上下两个隔水板(不易被污染),accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0203_L027,WUR,0.3,geology,(7)受污染时难治理,(7)受污染后难治理,(7)受污染后难治理,(7)受污染时难治理,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0205_L007,WUR,0.3,geology,流速度永远小于实际流速,渗流速度永远小于实际流速,渗流速度永远小于实际流速,流速度永远小于实际流速,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0207_L014,WUR,0.3,geology,含水层入渗系数,含水层渗透系数,含水层渗透系数,含水层入渗系数,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0208_L011,WUR,0.3,geology,(1)含水层空隙中水由于水压力降低而膨胀释放出来的重力水共同作用,(1)含水层空隙中水由于水压力降低而膨胀释放出来的弹性水}共同作用,(1)含水层空隙中水由于水压力降低而膨胀释放出来的弹性水}共同作用,(1)含水层空隙中水由于水压力降低而膨胀释放出来的重力水}共同作用,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0208_L027,WUR,0.3,geology,(3)其地下水的补给主要来源是大气降水，河水和两岸的基石裂陈水,(3)其地下水的补给主要来源是大气降水、河水和两岸的基岩裂隙水,(3)其地下水的补给主要来源是大气降水、河水和两岸的基岩裂隙水,(3)其地下水的补给主要来源是大气降水，河水和两岸的基石裂隙水,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0209_L014,WUR,0.3,geology,④横向环流：河流横断面上存在水面的横比降，使水流向下游运动。,④横向环流：河流横断面上存在水面的横比降，使水流不只向下游运动。,④横向环流：河流横断面上存在水面的横比降，使水流不只向下游运动。,⑭横向环流：河流横断面上存在水面的横比降，使水流向下游运动，,accepted,accepted,2,4,2,gemini:gemini-3-flash-preview
+GeoP0211_L028,WUR,0.3,geology,(3)负偏分布，(s<0，系列出现小于均值的机会比大于均值的机会少,(3)负偏分布，Cs < 0，系列出现小于均值的机会比大于均值的机会少,(3)负偏分布，Cs < 0，系列出现小于均值的机会比大于均值的机会少,(3)负偏分布，Cs<0，系列出现小于均值的机会比大于均值的机会少,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0212_L004,WUR,0.3,geology,2.Cs越大，频率曲线中部上端越陡，中段曲率变大，下端变平缓,2. Cs越大，频率曲线中部上端越陡，中段曲率变大，下端变平缓,2. Cs越大，频率曲线中部上端越陡，中段曲率变大，下端变平缓,2.Cs越大，频率曲线中部上端越陡，中段曲率变大，下端变平缓,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0212_L012,WUR,0.3,geology,(3)结论,3)结论,3)结论,(3)结论,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0212_L025,WUR,0.3,geology,③相关分析的分类：完全相关(函数关系)；零相关(不相关，没有关系)；统计相关(直线关系),③相关分析的分类：完全相关(函数关系)；零相关(不相关，没有关系)；统计相关(相关关系),③相关分析的分类：完全相关(函数关系)；零相关(不相关，没有关系)；统计相关(相关关系),"③相关分析的分类：完全相关(函数关系);零相关(不相关,没有关系);统计相关(直线关系)",accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0213_L023,WUR,0.3,geology,(倚奇y),(偏奇η),(偏奇η),(x倚y),accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0213_L045,WUR,0.3,geology,(1)长期观测资料(大于30年)：目估适线法,1)长期观测资料(大于30年)：目估适线法,1)长期观测资料(大于30年)：目估适线法,(1)长期观测资料(大于30年)：目估适线法,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0217_L024,WUR,0.3,geology,1.长石类(k.Na.Ca的铝硅酸盐),"1.长石类(K,Na,Ca的铝硅酸盐)","1.长石类(K,Na,Ca的铝硅酸盐)",1.长石类(k.Na.Ca的铝硅酸盐),accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+GeoP0217_L034,WUR,0.3,geology,利余AbO3,利余Al2O3,利余Al2O3,利余AbO₃,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+GeoP0219_L009,WUR,0.3,geology,中性市,中生界,中生界,中性岩,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0219_L027,WUR,0.3,geology,以溶解为主,以溶蚀为主,以溶蚀为主,以溶解为主,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0219_L035,WUR,0.3,geology,具有板理.片理、薄层理石,具有板理、片理、薄层理的,具有板理、片理、薄层理的,具有板理·片理、薄层理岩石,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0220_L006,WUR,0.3,geology,松驰：应力不变，应变随时间增加而减小。,松弛：应变不变，应力随时间增加而减小。,松弛：应变不变，应力随时间增加而减小。,松驰：应力不变，应变随时间增加而减小。,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+GeoP0220_L022,WUR,0.3,geology,加速蠕变阶段,加速蠕变度阶段,加速蠕变度阶段,加速蠕变阶段,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0221_L004,WUR,0.3,geology,自形自形/半自形/他形,自形 自形/半自形/他形,自形 自形/半自形/他形,'自形自形/半自形/他形,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0221_L014,WUR,0.3,geology,同生矿床：矿体与围岩在同一地质作用。,同生矿床：矿体与围岩在同一地质作用中形成。,同生矿床：矿体与围岩在同一地质作用中形成。,(同生矿床：矿体与围岩在同一地质作用.,accepted,accepted,1,4,3,gemini:gemini-3-flash-preview
+GeoP0222_L013,WUR,0.3,geology,二、易需保成矿因素,二、显著的成矿因素,二、显著的成矿因素,二、易聚体成矿因素,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0232_L003,WUR,0.3,geology,单元，是人类开采，利用的对象.,矿体，是人类开采，利用的对象.,矿体，是人类开采，利用的对象.,"单元,是人类开采,利用的对象.",accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0241_L015,WUR,0.3,geology,四个仿锤型轨道,四个纺锤型轨迹,四个纺锤型轨迹,四个仿锤型轨道,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0241_L023,WUR,0.3,geology,eg、八面体配位,eg. 八面体配位,eg. 八面体配位,"eg,八面体配位",accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0243_L004,WUR,0.3,geology,厚：：1.3-3.5m,层厚：1.3~3.5m,层厚：1.3~3.5m,"中厚：：1.3～3.5m
+",accepted,accepted,3,4,1,gemini:gemini-3-flash-preview
+GeoP0243_L008,WUR,0.3,geology,之间的角义，,之间的夹角，,之间的夹角，,之间的角α，,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0243_L013,WUR,0.3,geology,急斜2：45~90°,急斜：45~90°,急斜：45~90°,急斜2 : 45 ~ 90°,accepted,accepted,4,5,1,gemini:gemini-3-flash-preview
+GeoP0243_L014,WUR,0.3,geology,越大不用设备,磁法所用设备,磁法所用设备,越大不用设备,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+GeoP0243_L015,WUR,0.3,geology,通常层乘,逆断层位,逆断层位,通常层状,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+FinP0172_L034,WUR,0.3,finance,币，货币天然，是,金，货币天然，是,金，货币天然，是,币，货币天然是,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+FinP0177_L003,WUR,0.3,finance,(2)票面利率,12)层面利率,12)层面利率,（2）票面利率,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+FinP0177_L004,WUR,0.3,finance,(3)债券期限,(2)使用期限,(2)使用期限,(３)债券期限,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+FinP0179_L009,WUR,0.3,finance,券和基金市场,贵和基金属,贵和基金属,券和基金市场,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+FinP0179_L040,WUR,0.3,finance,发行）③中间发行,发射）③中间发射,发射）③中间发射,发行)③中间发行:,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+FinP0180_L019,WUR,0.3,finance,三复式记账.,三复试记账.,三复试记账.,三、复式记账.,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+FinP0180_L030,WUR,0.3,finance,账户结构.,赋存结构.,赋存结构.,账户结构.,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+FinP0183_L022,WUR,0.3,finance,明存货过多。,矿物质过多。,矿物质过多。,明存货过多。,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+FinP0189_L017,WUR,0.3,finance,现货：当场/天内买方付款.卖,现货：当场10天内买方付款，卖,现货：当场10天内买方付款，卖,现货：当场|n天内买方付款.卖方,accepted,accepted,3,4,1,gemini:gemini-3-flash-preview
+FinP0189_L021,WUR,0.3,finance,S一级市场,S一级重场,S一级重场,{一级市场,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+FinP0195_L001,WUR,0.3,finance,②货币互换,②深部互换,②深部互换,②货币互换,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+FinP0196_L017,WUR,0.3,finance,RR：回则利率,RR：回收率,RR：回收率,RR:回则利率,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+FinP0200_L011,WUR,0.3,finance,在金融领域的应用场景,在金属矿领域的应用场景,在金属矿领域的应用场景,在金融领域的应用场景,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+FinP0201_L002,WUR,0.3,finance,“特殊的金融企业”,“特殊的金属矿床”,“特殊的金属矿床”,“特殊的金融企业”,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+FinP0201_L024,WUR,0.3,finance,非盈利性.流动性、主动性、公开性,非盈利性、流动性、主动性、公开性,非盈利性、流动性、主动性、公开性,非盈利性.流动性、主动性、公开性,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+FinP0201_L037,WUR,0.3,finance,第十章、货币理论,第十章、地质理论,第十章、地质理论,第十章.货币理论,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+FinP0201_L051,WUR,0.3,finance,4.货币乘数,4.质量参数,4.质量参数,4.货币乘数,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+FinP0203_L014,WUR,0.3,finance,第三章 金融市场,第三章 钻探磁场,第三章 钻探磁场,第三章金融市场,accepted,accepted,1,4,3,gemini:gemini-3-flash-preview
+FinP0204_L023,WUR,0.3,finance,<=刷除价格变动,<=剔除阶梯变动,<=剔除阶梯变动,⇐剔除价格变动,accepted,accepted,3,4,1,gemini:gemini-3-flash-preview
+FinP0204_L028,WUR,0.3,finance,[费雪效应],[馈电效应],[馈电效应],[费雪效应],accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+FinP0204_L057,WUR,0.3,finance,信券空向,信号定向,信号定向,债券票面,accepted,accepted,3,4,1,gemini:gemini-3-flash-preview
+FinP0204_L061,WUR,0.3,finance,资本利得：每年,设备利用：每年,设备利用：每年,资本利得：每年,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+FinP0204_L073,WUR,0.3,finance,(P{1:卖出价n:持有年限),(P1: 卖出价 n:持有年限),(P1: 卖出价 n:持有年限),(P₁:卖出价n:持有年限),accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+FinP0204_L075,WUR,0.3,finance,=)持有期收益率=105=,二)持有期收益率=105%,二)持有期收益率=105%,=>持有期收益率:105:,accepted,accepted,3,4,1,gemini:gemini-3-flash-preview
+FinP0205_L025,WUR,0.3,finance,(1)：不付现金红利，一年后价格变为22，20，18.时，投资收益率为？,(1)：不付现金红利，一年后价格变为22，20，18时，投资收益率为？,(1)：不付现金红利，一年后价格变为22，20，18时，投资收益率为？,(1):不付现金红利，一年后价格变为22，20，18.时，投资收益率为？,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+FinP0206_L006,WUR,0.3,finance,(3)流动性陷阱,(3)岩性陷阱,(3)岩性陷阱,(3)流动性陷阱,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+FinP0206_L018,WUR,0.3,finance,宽松货币政策,宽松低昂政策,宽松低昂政策,宽松货币政策,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+FinP0208_L006,WUR,0.3,finance,给减少;刺激借款意愿和投资，资金需求增加，利率上升。,供给减少；刺激借款意愿和投资，资金需求增加，利率上升。,供给减少；刺激借款意愿和投资，资金需求增加，利率上升。,给减少;刺激借款意愿和投资，资金需求增加，利率上升。,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+FinP0208_L009,WUR,0.3,finance,借款期限和风险期限长，风险大，利率高,勘探期限和风险期限长，风险大，利率高,勘探期限和风险期限长，风险大，利率高,借款期限和风险期限长，风险大，利率高，,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+FinP0210_L015,WUR,0.3,finance,2.古典学派,2.克典学派,2.克典学派,2.古典学派,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0201_L018,WUR,0.3,medicine,肝硬化+腹水,矽化+脱水,矽化+脱水,肝硬化+腹水,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+MedP0201_L025,WUR,0.3,medicine,无肾买质改变,无性质改变,无性质改变,无肾实质政变,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+MedP0201_L039,WUR,0.3,medicine,血性腹水,延性脆性,延性脆性,血性腹水,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+MedP0202_L004,WUR,0.3,medicine,分区：臀区,分层区：臂区,分层区：臂区,分区:臀区,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+MedP0203_L026,WUR,0.3,medicine,(3)体位改变：卧位变为立位时，回心血量减,(3)体位改变：卧位变为立位时，回心血量减少,(3)体位改变：卧位变为立位时，回心血量减少,(3)体位改变：卧位变为立位时，回心血量减,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0206_L031,WUR,0.3,medicine,顺钟向转房,顺钟向转层,顺钟向转层,顺钟向转房,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0210_L003,WUR,0.3,medicine,循环系统常见三联征：,循环系统常见三联症：,循环系统常见三联症：,循环系统常见三联征：,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0210_L039,WUR,0.3,medicine,PTE需结合影像,PTE需结合录像,PTE需结合录像,PTE需结合影像,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0210_L105,WUR,0.3,medicine,7.高血压急症三联征：,7.高压急症三联征：,7.高压急症三联征：,7.高血压急症三联征：,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0218_L032,WUR,0.3,medicine,肝一木（子),肝一木(2),肝一木(2),肝—木(子),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0222_L018,WUR,0.3,medicine,CB(结合胆红素,CB(结合胆红素),CB(结合胆红素),CB(结合胆红素,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0224_L004,WUR,0.3,medicine,1、域电位水平.,八阈电位水平.,八阈电位水平.,1、阈电位水平，,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+MedP0228_L012,WUR,0.3,medicine,洋地黄特别适用于,详地质特别适用于,详地质特别适用于,洋地黄特别适用于,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+MedP0231_L020,WUR,0.3,medicine,(小量多见),(少量多见),(少量多见),(小量多见),accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0231_L021,WUR,0.3,medicine,3.临床表现,3.矿床表现,3.矿床表现,3.临床表现,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0232_L010,WUR,0.3,medicine,局部水肿.,局部水冲.,局部水冲.,局部水肿.,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0234_L029,WUR,0.3,medicine,狼疮抗凝物。(相毒）,狼疮抗凝物。(筛查）,狼疮抗凝物。(筛查）,狼疮抗凝物.(梅毒),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0234_L052,WUR,0.3,medicine,(不蚀性关节员),(不连续性关节面),(不连续性关节面),(不侵蚀性关节炎),accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+MedP0235_L019,WUR,0.3,medicine,(4)酸性：酸性天冬浴,(4)酸性：酸性天然熔,(4)酸性：酸性天然熔,(4)酸性：酸性天冬谷,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0235_L020,WUR,0.3,medicine,(酸性结合OH-带负电)两个-COOH,(碱性结合OH-带负电)两个-COOH,(碱性结合OH-带负电)两个-COOH,(酸性结合OH⁻带负电)两个-COOH,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0235_L027,WUR,0.3,medicine,含酰氨基团：天冬谷酸性AA),含酰胺基团：天冬、谷(酸性AA),含酰胺基团：天冬、谷(酸性AA),含酰氨基团：天冬谷(酸性AA),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0240_L044,WUR,0.3,medicine,①中枢神经系统知病,①中枢神经系统诊断,①中枢神经系统诊断,①中枢神经系统疾病,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0242_L017,WUR,0.3,medicine,肺(阳中之少阴),肺(阳中之太阴),肺(阳中之太阴),肺(阳中之少阴),accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0242_L032,WUR,0.3,medicine,(二)生理功能,(二) 生理功能,(二) 生理功能,(二)生理功能,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0245_L008,WUR,0.3,medicine,2.泵血过程,2.泵吸过程,2.泵吸过程,2.泵血过程,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0247_L025,WUR,0.3,medicine,1、一般形态：(1)椎体,一、一般形态：(1)椎体,一、一般形态：(1)椎体,1、一般形态：(1)椎体,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0247_L039,WUR,0.3,medicine,(二)胸骨：1.分为胸骨柄.胸骨体和剑突三部分,(二)胸骨：1.分为胸骨柄、胸骨体和剑突三部分,(二)胸骨：1.分为胸骨柄、胸骨体和剑突三部分,(二)胸骨:1.分为胸骨柄.胸骨体和剑突三部分,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0249_L046,WUR,0.3,medicine,肩关节、肘关节.,肩关节、肘关节、,肩关节、肘关节、,肩关节.肘关节.,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0199_L011,DGCR,0.3,geology,{深部 韧性剪切带,{深部 韧性剪切带},{深部 韧性剪切带},{深部韧性剪切带,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0199_L055,DGCR,0.3,geology,(枢纽断层(旋转),(枢纽断层(旋转)),(枢纽断层(旋转)),(枢纽断层(旋转),accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0199_L091,DGCR,0.3,geology,限制(被限制的映),限制 (被限制的层),限制 (被限制的层),限制(被限制的晚),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0199_L111,DGCR,0.3,geology,如地层关系的变化,如，地层关系的变化,如，地层关系的变化,如地层关系的变化,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0200_L044,DGCR,0.3,geology,羽状节理与主断层所交,羽状节理与主断层斜交,羽状节理与主断层斜交,羽状节理与主断层所交,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0200_L067,DGCR,0.3,geology,破劈理→是岩石中的一组密集的剪切破裂面.,破劈理 → 是岩石中的一组密集的剪切破裂面.,破劈理 → 是岩石中的一组密集的剪切破裂面.,破劈理->是岩石中的一组密集的剪切破裂面.,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0201_L005,DGCR,0.3,geology,五、水文地质概述、地下水循环及物化性质,五、水文地质概况、地下水循环及物化性质,五、水文地质概况、地下水循环及物化性质,五、水文地质概述、地下水循环及物化性质,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0201_L023,DGCR,0.3,geology,(2)分类：成岩裂隙(原生)；构造裂隙(由应力产生)；风化裂隙(风化).,(2)分类：成岩裂隙(原生)；构造裂隙(由应力产生)；风化裂隙(次生).,(2)分类：成岩裂隙(原生)；构造裂隙(由应力产生)；风化裂隙(次生).,(2)分类：成岩裂隙(原生)；构造裂隙(由应力产生)；风化裂隙(风化).,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0201_L032,DGCR,0.3,geology,的主要因素：排列方式、分选程度、胶结程度、颗粒形状,的影响因素：排列方式、分选程度、胶结程度、颗粒形状、,的影响因素：排列方式、分选程度、胶结程度、颗粒形状、,的主要因素：排列方式、分选程度、胶结程度、颗粒形状、,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0202_L014,DGCR,0.3,geology,(2)毛细水：在毛细力作用下，保持在细小孔隙构成的毛细管道中的水，存在,(2)毛细水：在毛细力作用下，保持在细小孔隙构成的毛细管道中的水，存在，,(2)毛细水：在毛细力作用下，保持在细小孔隙构成的毛细管道中的水，存在，,(2)毛细水：在毛细力作用下，保持在细小孔隙构成的毛细管道中的水，存在,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0202_L029,DGCR,0.3,geology,强、给水度低、透水性差,强、给水度低、透水性差。,强、给水度低、透水性差。,强、给水度低、透水性差,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0203_L010,DGCR,0.3,geology,(4)当隔水层分布较广时可作为小型生活水源,(4)当含水层分布较广时可作为小型生活水源。,(4)当含水层分布较广时可作为小型生活水源。,(4)当隔水层分布较广时可作为小型生活水源,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0203_L023,DGCR,0.3,geology,过上下部的含水层进行越流排泄,通过上下部的含水层进行越流排泄,通过上下部的含水层进行越流排泄,过上下部的含水层进行越流排泄,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0207_L014,DGCR,0.3,geology,含水层入渗系数,含水层渗透系数,含水层渗透系数,含水层入渗系数,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0207_L035,DGCR,0.3,geology,含水层变幅内平均给水度,7)含水层变幅内平均给水度,7)含水层变幅内平均给水度,>含水层变幅内平均给水度,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0207_L037,DGCR,0.3,geology,弹性给水度,弹性释水度,弹性释水度,3弹性给水度,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0208_L011,DGCR,0.3,geology,(1)含水层空隙中水由于水压力降低而膨胀释放出来的重力水共同作用,(1)含水层空隙中水由于水压力降低而膨胀释放出来的弹性水共同作用,(1)含水层空隙中水由于水压力降低而膨胀释放出来的弹性水共同作用,(1)含水层空隙中水由于水压力降低而膨胀释放出来的重力水}共同作用,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+GeoP0212_L004,DGCR,0.3,geology,2.Cs越大，频率曲线中部上端越陡，中段曲率变大，下端变平缓,2. Cs越大，频率曲线上端越陡，中段曲率变大，下端变平缓,2. Cs越大，频率曲线上端越陡，中段曲率变大，下端变平缓,2.Cs越大，频率曲线中部上端越陡，中段曲率变大，下端变平缓,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+GeoP0215_L014,DGCR,0.3,geology,(1)同频率放大法：要求放大后的设计洪水过程线的峰和不同时段的,(1)同频率放大法：要求放大后的设计洪水过程线的洪峰和不同时段的,(1)同频率放大法：要求放大后的设计洪水过程线的洪峰和不同时段的,(1)同频率放大法：要求放大后的设计洪水过程线的峰和不同时段的,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0216_L031,DGCR,0.3,geology,(水科院水文所公式)，适用于：一般条,(水科院水文所公式)，适用于：一般条件,(水科院水文所公式)，适用于：一般条件,(水科院水文所公式)，适用于：一般条,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0217_L010,DGCR,0.3,geology,物理风化作用：只发生机械破碎而化学成分未改变的风化作用只暗碎,物理风化作用：只发生机械破碎而化学成分未改变的风化作用。只崩碎。,物理风化作用：只发生机械破碎而化学成分未改变的风化作用。只崩碎。,物理风化作用：只发生机械破碎而化学成分未改变的风化作用只嚼碎了,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0218_L004,DGCR,0.3,geology,酸性斜长石>基性斜长石.,酸性斜长石>中性斜长石.,酸性斜长石>中性斜长石.,酸性斜长石>基性斜长石.,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0218_L031,DGCR,0.3,geology,一般情况下.只发生机械破碎，而无化学分解.,一般情况下，只发生机械破碎，而无化学分解.,一般情况下，只发生机械破碎，而无化学分解.,"一般情况下.只发生机械破碎,而无化学分解.",accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0220_L006,DGCR,0.3,geology,松驰：应力不变，应变随时间增加而减小。,松弛：应变不变，应力随时间增加而减小。,松弛：应变不变，应力随时间增加而减小。,松驰：应力不变，应变随时间增加而减小。,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+GeoP0221_L014,DGCR,0.3,geology,同生矿床：矿体与围岩在同一地质作用。,同生矿床：矿体与围岩在同一地质作用中。,同生矿床：矿体与围岩在同一地质作用中。,(同生矿床：矿体与围岩在同一地质作用.,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0222_L013,DGCR,0.3,geology,二、易需保成矿因素,二、显著的成矿因素,二、显著的成矿因素,二、易聚体成矿因素,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0224_L004,DGCR,0.3,geology,①米氏符号为截距系数的倒数比，为互质数,①米氏符号为截距系数的倒数比，为互质整数,①米氏符号为截距系数的倒数比，为互质整数,①米氏符号为截距系数的倒数比，为互质数,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0224_L010,DGCR,0.3,geology,注、面网密度越大，晶面在晶轴上的截距系数越简单(单位面(111)面网密度最大),注：面网密度越大，晶面在晶轴上的截距系数越简单(单位面(111)面网密度最大),注：面网密度越大，晶面在晶轴上的截距系数越简单(单位面(111)面网密度最大),注、面网密度越大，晶面在晶轴上的截距系数越简单(单位面(111)面网密度最大),accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0225_L007,DGCR,0.3,geology,结晶学：研究矿物晶体的化学组成和内部结构，生成和变化，外部形态，物理性质以及相关关系的科学。,结晶学：研究矿物晶体的化学组成和内部结构，生成和变化，外部形态，物理性质以及相互关系的科学。,结晶学：研究矿物晶体的化学组成和内部结构，生成和变化，外部形态，物理性质以及相互关系的科学。,结晶学：研究矿物晶体的化学组成和内部结构，生成和变化，外部形态，物理性质以及相关关系的科学。,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0225_L008,DGCR,0.3,geology,晶体光学：研究可见光透明晶体所产生的一系列光学形象及规律的科学,晶体光学：研究可见光透明晶体所产生的一系列光学现象及规律的科学,晶体光学：研究可见光透明晶体所产生的一系列光学现象及规律的科学,晶体光学:研究可见光透明晶体所产生的一系列光学形象及规律的科学,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0225_L054,DGCR,0.3,geology,晶面(晶体最外层面网)是平行向外推移面生长的。,晶面(晶体最外层面网)是平行向外推移而生长的.,晶面(晶体最外层面网)是平行向外推移而生长的.,晶面(晶体最外层面网)是平行向外推移面生长的。,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0226_L002,DGCR,0.3,geology,在晶体生长过程中，面网密度小的晶面将逐渐缩小以至消失，面网密度大的晶面则相对增大而成为实际,在晶体生长过程中，面网密度小的晶面将逐渐缩小，以至消失，面网密度大的晶面则相对增大而成为实际晶面,在晶体生长过程中，面网密度小的晶面将逐渐缩小，以至消失，面网密度大的晶面则相对增大而成为实际晶面,"在晶体生长过程中,面网密度小的晶面将逐渐缩小以至消失,面网密度大的晶面则相对增大而成为实际",accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+GeoP0226_L005,DGCR,0.3,geology,成分与构造相同的晶体，其对应晶面间的夹角恒等。,成分与结构相同的晶体，其对应晶面间的夹角恒等。,成分与结构相同的晶体，其对应晶面间的夹角恒等。,成分与构造相同的晶体，其对应晶面间的夹角恒等。,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0226_L015,DGCR,0.3,geology,缺：受测量精度和环境条件的限制,缺点：受测量精度和环境条件的限制,缺点：受测量精度和环境条件的限制,缺：受测量精度和环境条件的限制,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0227_L020,DGCR,0.3,geology,②、A矿物交代B矿物，B早于A⑦、梳状、晶洞、环带、条带构造等.,②、A矿物交代B矿物，B早于A ③、梳状、晶洞、环带、条带构造等.,②、A矿物交代B矿物，B早于A ③、梳状、晶洞、环带、条带构造等.,②、A矿物交代B矿物，B早于A⑦、梳状、晶洞、环带、条带构造等。,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0228_L019,DGCR,0.3,geology,金属硫化物过渡，高温热液阶段,金属硫化物过渡 高温热液阶段,金属硫化物过渡 高温热液阶段,金属硫化物过渡，高温热液阶段,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0229_L010,DGCR,0.3,geology,1、风化岩床的地质特征及工业意义,八、风化壳的地质特征及工业意义,八、风化壳的地质特征及工业意义,1、风化岩床的地质特征及工业意义,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+GeoP0229_L013,DGCR,0.3,geology,③、浅度深，距原生岩石或矿体近，作为原生矿床的直接而有效的找矿标志。,③、埋藏浅，距原生岩石或矿体近，作为原生矿床的直接而有效的找矿标志。,③、埋藏浅，距原生岩石或矿体近，作为原生矿床的直接而有效的找矿标志。,"③、浅度深,距原生岩石或矿体近,作为原生矿床的直接而有效的找矿标志，",accepted,accepted,1,4,3,gemini:gemini-3-flash-preview
+GeoP0229_L014,DGCR,0.3,geology,④、按出露形态矿体可分三类、A面型，B线型，C岩溶形,④、按出露形态、矿体可分三类：A面型，B线型，C岩溶型,④、按出露形态、矿体可分三类：A面型，B线型，C岩溶型,④、按出露形态矿体可分三类，A面型，B线型，C岩溶形,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+GeoP0229_L017,DGCR,0.3,geology,2、风化矿床的形成条件，,2、风化矿床的形成条件：,2、风化矿床的形成条件：,2、风化矿床的形成条件，,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0229_L025,DGCR,0.3,geology,3、风化矿床主要类型及特点.,3、风化矿床主要类型及特点、,3、风化矿床主要类型及特点、,3、风化矿床主要类型及特点.,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0231_L016,DGCR,0.3,geology,石墨：山东南墅石黑矿床,石墨：山东南墅石墨矿床,石墨：山东南墅石墨矿床,石墨：山东南墅石黑矿床,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0232_L003,DGCR,0.3,geology,单元，是人类开采，利用的对象.,矿体，是人类开采，利用的对象.,矿体，是人类开采，利用的对象.,"单元,是人类开采,利用的对象.",accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0232_L012,DGCR,0.3,geology,相互的结合关系等所反映的形态特征.主要决定于矿粒形成条件，研究矿,相互的结合关系等所反映的形态、特征.主要决定于矿粒形成条件，研究矿,相互的结合关系等所反映的形态、特征.主要决定于矿粒形成条件，研究矿,相互的结合关系等所反映的形态特征.主要决定于矿粒形成条件，研究矿,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0232_L020,DGCR,0.3,geology,·矿体：组成矿床的基本单位，是矿石在三维空间的堆积体，占有一定空间,.矿体：组成矿床的基本单位，是矿石在三维空间的堆积体，占有一定空间,.矿体：组成矿床的基本单位，是矿石在三维空间的堆积体，占有一定空间,·矿体：组成矿床的基本单位，是矿石在三维空间的堆积体，占有一定空间，,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0233_L008,DGCR,0.3,geology,·浓度克拉克值：某一元素在特定地质体中的含量与其克拉克值的比值、,",浓度克拉克值：某一元素在特定地质体中的含量与其克拉克值的比值.",",浓度克拉克值：某一元素在特定地质体中的含量与其克拉克值的比值.",·浓度克拉克值：某一元素在特定地质体中的含量与其克拉克值的比值、,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0233_L026,DGCR,0.3,geology,4.元素分布规律对影响矿床形成的意义：,4.元素分布规律对研究矿床形成的意义：,4.元素分布规律对研究矿床形成的意义：,4、元素分布规律对影响矿床形成的意义：,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+GeoP0234_L020,DGCR,0.3,geology,①野外观察：收集地质与矿化现象的实际资源,①、野外观察：收集地质与矿化现象的实际资料、,①、野外观察：收集地质与矿化现象的实际资料、,①、野外观察：收集地质与矿化现象的实际资源,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0235_L002,DGCR,0.3,geology,岩浆矿床.在地壳深处，各类岩浆通过结晶与分异作用使分散在岩浆中的有用组分发生,· 岩浆矿床：在地壳深处，各类岩浆通过结晶与分异作用使分散在岩浆中的有用组分发生,· 岩浆矿床：在地壳深处，各类岩浆通过结晶与分异作用使分散在岩浆中的有用组分发生,"·岩浆矿床.在地壳深处,各类岩浆通过结晶与分异作用使分散在岩浆中的有用组分发生",accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0235_L005,DGCR,0.3,geology,·岩浆熔离作用：高温下一种均匀的岩浆熔融体，随着温度、压力的下降分离成两,·岩浆熔离作用：高温下一种均匀的岩浆熔离体，随着温度、压力的下降分离成两,·岩浆熔离作用：高温下一种均匀的岩浆熔离体，随着温度、压力的下降分离成两,·岩浆熔离作用：高温下一种均匀的岩浆熔融体，随着温度、压力的下降分离成两,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0235_L030,DGCR,0.3,geology,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛等挥发分,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛及挥发分,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛及挥发分,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛等挥发分，,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0236_L017,DGCR,0.3,geology,力作用下向下集中结晶高集形成的矿床,力作用下向下沉降结晶离集形成的矿床,力作用下向下沉降结晶离集形成的矿床,力作用下向下集中，结晶富集形成的矿床,accepted,accepted,2,4,2,gemini:gemini-3-flash-preview
+GeoP0238_L007,DGCR,0.3,geology,①、元素种类多样②、矿物成分多达300种以上,①、元素种类多样②、矿物成分多达300余种以上,①、元素种类多样②、矿物成分多达300余种以上,①、元素种类多样②、矿物成分多达300种以上,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0238_L023,DGCR,0.3,geology,5.伟晶岩矿床成矿作用：,5.伟晶岩矿床成矿作用;,5.伟晶岩矿床成矿作用;,5.伟晶岩矿床成矿作用：,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0240_L008,DGCR,0.3,geology,交换，而主要由于物理化学条件改变，引起沉淀物质直接淀沉于所在的构造,交换，而主要由于物理化学条件改变，引起沉淀物质便直接淀沉于所在的构造,交换，而主要由于物理化学条件改变，引起沉淀物质便直接淀沉于所在的构造,交换，而主要由于物理化学条件改变，引起沉淀物质直接淀沉于所在的构造,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0240_L012,DGCR,0.3,geology,·云英岩化、花岗岩类岩石中，高温蚀变产生玉主要由白云母、石英组合的岩石。,，云英岩化：花岗岩类岩石中，高温蚀变产生的主要由白云母、石英组合的岩石。,，云英岩化：花岗岩类岩石中，高温蚀变产生的主要由白云母、石英组合的岩石。,"·云英岩化、花岗岩类岩石中,高温蚀变产生主要由白云母、石英组合的岩石.",accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+GeoP0240_L020,DGCR,0.3,geology,②、构造是成矿热液运移通道和成矿物质沉淀富集场所，受构造的间些性,②、构造是成矿热液运移通道和成矿物质沉淀富集场所，受构造的间歇性,②、构造是成矿热液运移通道和成矿物质沉淀富集场所，受构造的间歇性,③、构造是成矿热液运移通道和成矿物质沉淀富集场所，受构造的间些性,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0241_L036,DGCR,0.3,geology,实际发生区别的反电子数4~7时.,实际发生区别的价电子数 4~7 时.,实际发生区别的价电子数 4~7 时.,实际发生区别的仅d电子数4~7时.,accepted,accepted,2,4,2,gemini:gemini-3-flash-preview
+MedP0200_L031,DGCR,0.3,medicine,新亚甲蓝WHO推荐使用,新亚甲蓝 WHO推荐使用,新亚甲蓝 WHO推荐使用,新亚甲蓝WHO推荐使用,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0222_L018,DGCR,0.3,medicine,CB(结合胆红素,CB(结合胆红素),CB(结合胆红素),CB(结合胆红素,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0222_L064,DGCR,0.3,medicine,生态：生长抑系，奥曲肽(收缩内脏血管),止血：生长抑素，奥曲肽(收缩内脏血管),止血：生长抑素，奥曲肽(收缩内脏血管),生态：生长抑素，奥曲肽(收缩内脏血管),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0225_L036,DGCR,0.3,medicine,即胆汁酸盐，可胆汁酸盐，简称胆盐。,即胆汁酸盐，或胆汁酸盐。简称胆盐。,即胆汁酸盐，或胆汁酸盐。简称胆盐。,即胆汁酸盐，即胆汁酸盐，简称胆盐。,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0228_L012,DGCR,0.3,medicine,洋地黄特别适用于,洋地质特别适用于,洋地质特别适用于,洋地黄特别适用于,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0229_L002,DGCR,0.3,medicine,(一)人体细胞的形态,(一)人体细胞的研究,(一)人体细胞的研究,(一)人体细胞的形态,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+MedP0229_L018,DGCR,0.3,medicine,2.减数分裂,2.减数分层,2.减数分层,2.减数分裂,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0229_L019,DGCR,0.3,medicine,3.有丝分裂—人体,3.有丝分裂—岩体,3.有丝分裂—岩体,3.有丝分裂——人体,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0233_L019,DGCR,0.3,medicine,15、一氧化碳中毒临床表现：口唇樱桃红色,15.一氧化碳中毒临床表现=口唇樱桃红色,15.一氧化碳中毒临床表现=口唇樱桃红色,15、一氧化碳中毒临床表现:口唇樱桃红色,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+MedP0234_L029,DGCR,0.3,medicine,狼疮抗凝物。(相毒）,狼疮抗凝物。(筛选）,狼疮抗凝物。(筛选）,狼疮抗凝物.(梅毒),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0236_L012,DGCR,0.3,medicine,组织换气：组织细胞与组织血管间气体交换,组织换气：组织细胞与组织毛细血管间气体交换,组织换气：组织细胞与组织毛细血管间气体交换,组织换气：组织细胞与组织血管间气体交换,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+MedP0238_L001,DGCR,0.3,medicine,运化水谷：脾为“后天之本，气血生化之源”：食物消化吸收,运化水谷：脾为“后天之本，气血生化之源”；食物消化吸收,运化水谷：脾为“后天之本，气血生化之源”；食物消化吸收,运化水谷：脾为“后天之本，气血生化之源”：食物消化吸收,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0241_L019,DGCR,0.3,medicine,碎屑.更为彻底的特殊类型的凝固性坏死,干酪.更为彻底的特殊类型的凝固性坏死,干酪.更为彻底的特殊类型的凝固性坏死,碎屑.更为彻底的特殊类型的凝固性坏死,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+MedP0244_L046,DGCR,0.3,medicine,分类：①宫颈裂伤②阴道裂伤③会阴裂伤,分类：①宫颈裂伤 ②阴道裂伤 ③会阴裂伤,分类：①宫颈裂伤 ②阴道裂伤 ③会阴裂伤,分类：①宫颈裂伤②阴道裂伤③会阴裂伤,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+MedP0246_L026,DGCR,0.3,medicine,正常血小板2~15f1正偏态分布,正常血小板 2~15fl 正偏态分布,正常血小板 2~15fl 正偏态分布,正常血小板2～15fl正偏态分布,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0199_L002,DWUR,0.3,geology,层与层之间发生滑动,层与层之间发生层动,层与层之间发生层动,层与层之间发生滑动,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0199_L064,DWUR,0.3,geology,阶梯状构造及笑状构造.,阶梯状构造 及 箕状构造.,阶梯状构造 及 箕状构造.,阶梯状构造及箕状构造.,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0199_L095,DWUR,0.3,geology,覆构造),覆褶皱),覆褶皱),覆构造),accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0199_L098,DWUR,0.3,geology,追踪利用、改造(被的早),追踪利用、改造(补写的),追踪利用、改造(补写的),{追踪，利用，改造（被..的早）,accepted,accepted,5,7,2,gemini:gemini-3-flash-preview
+GeoP0199_L102,DWUR,0.3,geology,平移断层：,平移断层；,平移断层；,平移断层:,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0199_L111,DWUR,0.3,geology,如地层关系的变化,"如,地层关系的变化","如,地层关系的变化",如地层关系的变化,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0200_L038,DWUR,0.3,geology,⑤派生构造(羽状节理和派生小褶皱),⑤派生构造(羽状节理和派生小褶曲),⑤派生构造(羽状节理和派生小褶曲),⑤派生构造(羽状节理和派生小褶皱).,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0200_L042,DWUR,0.3,geology,个是流动阶段,一个是流动阶段,一个是流动阶段,个是流动阶段,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0200_L044,DWUR,0.3,geology,羽状节理与主断层所交,羽状节理与主断层斜交,羽状节理与主断层斜交,羽状节理与主断层所交,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0201_L032,DWUR,0.3,geology,的主要因素：排列方式、分选程度、胶结程度、颗粒形状,的影响因素：排列方式、分选程度、胶结程度、颗粒形状、,的影响因素：排列方式、分选程度、胶结程度、颗粒形状、,的主要因素：排列方式、分选程度、胶结程度、颗粒形状、,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0202_L014,DWUR,0.3,geology,(2)毛细水：在毛细力作用下，保持在细小孔隙构成的毛细管道中的水，存在,(2)毛细水：在毛细力作用下，保持在细小孔隙构成的毛细管道中的水，存在，,(2)毛细水：在毛细力作用下，保持在细小孔隙构成的毛细管道中的水，存在，,(2)毛细水：在毛细力作用下，保持在细小孔隙构成的毛细管道中的水，存在,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0203_L010,DWUR,0.3,geology,(4)当隔水层分布较广时可作为小型生活水源,(4)当含水层分布较广时可作为小型生活水源。,(4)当含水层分布较广时可作为小型生活水源。,(4)当隔水层分布较广时可作为小型生活水源,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0204_L008,DWUR,0.3,geology,6地下水透明度分级,26地下水透明度分级,26地下水透明度分级,㉖地下水透明度分级,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0206_L029,DWUR,0.3,geology,时间距离配线法,时间距离曲线法,时间距离曲线法,时间距离配线法,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0207_L014,DWUR,0.3,geology,含水层入渗系数,含水层渗透系数,含水层渗透系数,含水层入渗系数,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0207_L037,DWUR,0.3,geology,弹性给水度,弹性释水度,弹性释水度,3弹性给水度,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0208_L009,DWUR,0.3,geology,的水分,全水分,全水分,的水分,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0211_L028,DWUR,0.3,geology,(3)负偏分布，(s<0，系列出现小于均值的机会比大于均值的机会少,(3)负偏分布，Cs < 0，系列出现小于均值的机会比大于均值的机会少,(3)负偏分布，Cs < 0，系列出现小于均值的机会比大于均值的机会少,(3)负偏分布，Cs<0，系列出现小于均值的机会比大于均值的机会少,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0212_L004,DWUR,0.3,geology,2.Cs越大，频率曲线中部上端越陡，中段曲率变大，下端变平缓,2. Cs越大，频率曲线上端越陡，中段曲率变大，下端变平缓,2. Cs越大，频率曲线上端越陡，中段曲率变大，下端变平缓,2.Cs越大，频率曲线中部上端越陡，中段曲率变大，下端变平缓,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+GeoP0212_L025,DWUR,0.3,geology,③相关分析的分类：完全相关(函数关系)；零相关(不相关，没有关系)；统计相关(直线关系),③相关分析的分类：完全相关(函数关系)；零相关(不相关，没有关系)；统计相关(相关关系),③相关分析的分类：完全相关(函数关系)；零相关(不相关，没有关系)；统计相关(相关关系),"③相关分析的分类：完全相关(函数关系);零相关(不相关,没有关系);统计相关(直线关系)",accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0213_L045,DWUR,0.3,geology,(1)长期观测资料(大于30年)：目估适线法,1)长期观测资料(大于30年)：目估适线法,1)长期观测资料(大于30年)：目估适线法,(1)长期观测资料(大于30年)：目估适线法,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0214_L029,DWUR,0.3,geology,(3)分类资料内特大洪水：发生在实测流量期间的n年内.(连续),(3)分类{实测内特大洪水：发生在实测流量期间的n年内.(连续),(3)分类{实测内特大洪水：发生在实测流量期间的n年内.(连续),(3)分类{资料内特大洪水:发生在实测流量期间的n年内.(连续),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0215_L014,DWUR,0.3,geology,(1)同频率放大法：要求放大后的设计洪水过程线的峰和不同时段的,(1)同频率放大法：要求放大后的设计洪水过程线的洪峰和不同时段的,(1)同频率放大法：要求放大后的设计洪水过程线的洪峰和不同时段的,(1)同频率放大法：要求放大后的设计洪水过程线的峰和不同时段的,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0216_L031,DWUR,0.3,geology,(水科院水文所公式)，适用于：一般条,(水科院水文所公式)，适用于：一般条件,(水科院水文所公式)，适用于：一般条件,(水科院水文所公式)，适用于：一般条,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0217_L010,DWUR,0.3,geology,物理风化作用：只发生机械破碎而化学成分未改变的风化作用只暗碎,物理风化作用：只发生机械破碎而化学成分未改变的风化作用。只崩碎。,物理风化作用：只发生机械破碎而化学成分未改变的风化作用。只崩碎。,物理风化作用：只发生机械破碎而化学成分未改变的风化作用只嚼碎了,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0217_L035,DWUR,0.3,geology,→含水氧化铝矿物,→含水氧化铝矿物`,→含水氧化铝矿物`,3→含水氧化铝矿物,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0218_L031,DWUR,0.3,geology,一般情况下.只发生机械破碎，而无化学分解.,一般情况下，只发生机械破碎，而无化学分解。,一般情况下，只发生机械破碎，而无化学分解。,"一般情况下.只发生机械破碎,而无化学分解.",accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0219_L035,DWUR,0.3,geology,具有板理.片理、薄层理石,具有板理、片理、薄层理的,具有板理、片理、薄层理的,具有板理·片理、薄层理岩石,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0220_L006,DWUR,0.3,geology,松驰：应力不变，应变随时间增加而减小。,松弛：应变不变，应力随时间增加而减小。,松弛：应变不变，应力随时间增加而减小。,松驰：应力不变，应变随时间增加而减小。,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+GeoP0221_L014,DWUR,0.3,geology,同生矿床：矿体与围岩在同一地质作用。,同生矿床：矿体与围岩在同一地质作用中。,同生矿床：矿体与围岩在同一地质作用中。,(同生矿床：矿体与围岩在同一地质作用.,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0222_L013,DWUR,0.3,geology,二、易需保成矿因素,二、影响成矿因素,二、影响成矿因素,二、易聚体成矿因素,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+GeoP0225_L011,DWUR,0.3,geology,格子构造：晶体内部的质点(分子、原子、离子、络阴离子等)是三维空间作周期性重复排列构成的构造。,格子构造：晶体内部的质点(分子、原子、离子、络阴离子等)在三维空间作周期性重复排列构成的构造。,格子构造：晶体内部的质点(分子、原子、离子、络阴离子等)在三维空间作周期性重复排列构成的构造。,格子构造：晶体内部的质点(分子、原子、离子、络阴离子等)是三维空间作周期性重复排列构成的构造。,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0225_L026,DWUR,0.3,geology,面网(面网密度:单位面积内结网的数目),面网(面网密度:单位面积内结点的数目),面网(面网密度:单位面积内结点的数目),面网(面网密度:单位面积内结网的数目),accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0225_L054,DWUR,0.3,geology,晶面(晶体最外层面网)是平行向外推移面生长的。,晶面(晶体最外层面网)是平行向外推移而生长的。,晶面(晶体最外层面网)是平行向外推移而生长的。,晶面(晶体最外层面网)是平行向外推移面生长的。,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0227_L020,DWUR,0.3,geology,②、A矿物交代B矿物，B早于A⑦、梳状、晶洞、环带、条带构造等.,②、A矿物交代B矿物，B早于A ⑦、梳状、晶洞、环带、条带构造等.,②、A矿物交代B矿物，B早于A ⑦、梳状、晶洞、环带、条带构造等.,②、A矿物交代B矿物，B早于A⑦、梳状、晶洞、环带、条带构造等。,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0228_L019,DWUR,0.3,geology,金属硫化物过渡，高温热液阶段,金属硫化物过渡 高温热液阶段,金属硫化物过渡 高温热液阶段,金属硫化物过渡，高温热液阶段,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0229_L002,DWUR,0.3,geology,·风化(壳)矿床：由于风化作用使物质发生重新组合和分配，属集成矿，属典型的外,·风化(壳)矿床：由于风化作用使物质发生重新组合和分配，属表生矿，属典型的外,·风化(壳)矿床：由于风化作用使物质发生重新组合和分配，属表生矿，属典型的外,·风化(壳)矿床：由于风化作用使物质发生重新组合和分配，属集成矿，属典型的外,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0229_L006,DWUR,0.3,geology,找矿标志.,找矿标志、,找矿标志、,找矿标志.,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0229_L010,DWUR,0.3,geology,1、风化岩床的地质特征及工业意义,1、风化壳的地质特征及工业意义,1、风化壳的地质特征及工业意义,1、风化岩床的地质特征及工业意义,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0229_L013,DWUR,0.3,geology,③、浅度深，距原生岩石或矿体近，作为原生矿床的直接而有效的找矿标志。,③、埋藏浅，距原生岩石或矿体近，作为原生矿床的直接而有效的找矿标志。,③、埋藏浅，距原生岩石或矿体近，作为原生矿床的直接而有效的找矿标志。,"③、浅度深,距原生岩石或矿体近,作为原生矿床的直接而有效的找矿标志，",accepted,accepted,1,4,3,gemini:gemini-3-flash-preview
+GeoP0229_L014,DWUR,0.3,geology,④、按出露形态矿体可分三类、A面型，B线型，C岩溶形,④、按出露形态、矿体可分三类：A面型，B线型，C岩溶型,④、按出露形态、矿体可分三类：A面型，B线型，C岩溶型,④、按出露形态矿体可分三类，A面型，B线型，C岩溶形,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+GeoP0229_L030,DWUR,0.3,geology,d.无明显层理,d: 无明显层理,d: 无明显层理,d.无明显层理,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0231_L015,DWUR,0.3,geology,P：江苏海州磷矿床,P₂ 江苏海州磷矿床,P₂ 江苏海州磷矿床,P：江苏海州磷矿床,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0232_L020,DWUR,0.3,geology,·矿体：组成矿床的基本单位，是矿石在三维空间的堆积体，占有一定空间,.矿体：组成矿床的基本单位，是矿石在三维空间的堆积体，占有一定空间,.矿体：组成矿床的基本单位，是矿石在三维空间的堆积体，占有一定空间,·矿体：组成矿床的基本单位，是矿石在三维空间的堆积体，占有一定空间，,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0233_L008,DWUR,0.3,geology,·浓度克拉克值：某一元素在特定地质体中的含量与其克拉克值的比值、,",浓度克拉克值：某一元素在特定地质体中的含量与其克拉克值的比值.",",浓度克拉克值：某一元素在特定地质体中的含量与其克拉克值的比值.",·浓度克拉克值：某一元素在特定地质体中的含量与其克拉克值的比值、,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0233_L026,DWUR,0.3,geology,4.元素分布规律对影响矿床形成的意义：,4.元素分布规律对研究矿床形成的意义：,4.元素分布规律对研究矿床形成的意义：,4、元素分布规律对影响矿床形成的意义：,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+GeoP0234_L020,DWUR,0.3,geology,①野外观察：收集地质与矿化现象的实际资源,①、野外观察：收集地质与矿化现象的实际资料、,①、野外观察：收集地质与矿化现象的实际资料、,①、野外观察：收集地质与矿化现象的实际资源,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0235_L002,DWUR,0.3,geology,岩浆矿床.在地壳深处，各类岩浆通过结晶与分异作用使分散在岩浆中的有用组分发生,· 岩浆矿床：在地壳深处，各类岩浆通过结晶与分异作用使分散在岩浆中的有用组分发生,· 岩浆矿床：在地壳深处，各类岩浆通过结晶与分异作用使分散在岩浆中的有用组分发生,"·岩浆矿床.在地壳深处,各类岩浆通过结晶与分异作用使分散在岩浆中的有用组分发生",accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0235_L030,DWUR,0.3,geology,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛等挥发分,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛及挥发分,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛及挥发分,矿物下沉堆积，形成早期岩浆矿床。晚期残余岩浆富含铁、钛等挥发分，,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0236_L004,DWUR,0.3,geology,岩矿庭床。此阶段成岩与成矿同步发生。,岩矿同生矿床。此阶段成岩与成矿同步发生。,岩矿同生矿床。此阶段成岩与成矿同步发生。,岩矿床。此阶段成岩与成矿同步发生.,accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+GeoP0236_L008,DWUR,0.3,geology,①、发生位置与时机：a：岩浆侵入到地壳浅部之后b：地下深部.或岩浆通道中,①、发生位置与时机：a：岩浆侵入到地壳浅部之后 b：地下深部，或岩浆通道中,①、发生位置与时机：a：岩浆侵入到地壳浅部之后 b：地下深部，或岩浆通道中,①、发生位置与时机：a:岩浆侵入到地壳浅部之后b:地下深部.或岩浆通道中,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+GeoP0236_L009,DWUR,0.3,geology,② 与母岩关系：a：产于侵入母岩体内部或顶部，同源同期b.可以岩矿同体也可以,② 与母岩关系：a：产于侵入母岩体内部或顶部，同源同期 b. 可以岩矿同体也可以,② 与母岩关系：a：产于侵入母岩体内部或顶部，同源同期 b. 可以岩矿同体也可以,"②与母岩关系：a:产于侵入母岩体内部或顶部,同源同期b.可以岩矿同体也可以",accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+GeoP0236_L011,DWUR,0.3,geology,③、矿体形态：a、上悬矿体底部层状矿体，脉状矿体b.岩矿同体矿体，纯硫化物,③、矿体形态： a、上悬矿体、底部层状矿体，脉状矿体 b.岩矿同体矿体，纯硫化物,③、矿体形态： a、上悬矿体、底部层状矿体，脉状矿体 b.岩矿同体矿体，纯硫化物,"③、矿体形态、a.上悬矿体、底部层状矿体,脉状矿体b.岩矿同体矿体,纯硫化物",accepted,accepted,3,4,1,gemini:gemini-3-flash-preview
+GeoP0238_L023,DWUR,0.3,geology,5.伟晶岩矿床成矿作用：,5.伟晶岩矿床成矿作用；,5.伟晶岩矿床成矿作用；,5.伟晶岩矿床成矿作用：,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0240_L008,DWUR,0.3,geology,交换，而主要由于物理化学条件改变，引起沉淀物质直接淀沉于所在的构造,交换，而主要由于物理化学条件改变，引起沉淀物质便直接淀沉于所在的构造,交换，而主要由于物理化学条件改变，引起沉淀物质便直接淀沉于所在的构造,交换，而主要由于物理化学条件改变，引起沉淀物质直接淀沉于所在的构造,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+GeoP0240_L012,DWUR,0.3,geology,·云英岩化、花岗岩类岩石中，高温蚀变产生玉主要由白云母、石英组合的岩石。,，云英岩化：花岗岩类岩石中，高温蚀变产生的主要由白云母、石英组合的岩石。,，云英岩化：花岗岩类岩石中，高温蚀变产生的主要由白云母、石英组合的岩石。,"·云英岩化、花岗岩类岩石中,高温蚀变产生主要由白云母、石英组合的岩石.",accepted,accepted,1,3,2,gemini:gemini-3-flash-preview
+GeoP0240_L020,DWUR,0.3,geology,②、构造是成矿热液运移通道和成矿物质沉淀富集场所，受构造的间些性,②、构造是成矿热液运移通道和成矿物质沉淀富集场所，受构造的间歇性,②、构造是成矿热液运移通道和成矿物质沉淀富集场所，受构造的间歇性,③、构造是成矿热液运移通道和成矿物质沉淀富集场所，受构造的间些性,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+GeoP0241_L036,DWUR,0.3,geology,实际发生区别的反电子数4~7时.,实际发生区别时的仪表电子数4~7时.,实际发生区别时的仪表电子数4~7时.,实际发生区别的仅d电子数4~7时.,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+MedP0200_L031,DWUR,0.3,medicine,新亚甲蓝WHO推荐使用,新亚甲蓝 WHO推荐使用,新亚甲蓝 WHO推荐使用,新亚甲蓝WHO推荐使用,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0201_L018,DWUR,0.3,medicine,肝硬化+腹水,矽化+脱水,矽化+脱水,肝硬化+腹水,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+MedP0201_L039,DWUR,0.3,medicine,血性腹水,延性脆性,延性脆性,血性腹水,accepted,accepted,0,3,3,gemini:gemini-3-flash-preview
+MedP0222_L018,DWUR,0.3,medicine,CB(结合胆红素,CB(结合胆红素),CB(结合胆红素),CB(结合胆红素,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0222_L064,DWUR,0.3,medicine,生态：生长抑系，奥曲肽(收缩内脏血管),止血：生长抑素，奥曲肽(收缩内脏血管),止血：生长抑素，奥曲肽(收缩内脏血管),生态：生长抑素，奥曲肽(收缩内脏血管),accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0225_L036,DWUR,0.3,medicine,即胆汁酸盐，可胆汁酸盐，简称胆盐。,即胆汁酸盐，或胆汁酸盐。简称胆盐。,即胆汁酸盐，或胆汁酸盐。简称胆盐。,即胆汁酸盐，即胆汁酸盐，简称胆盐。,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0227_L016,DWUR,0.3,medicine,二、康复评定方法：,二、质量评定方法：,二、质量评定方法：,二、康复评定方法:,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+MedP0228_L011,DWUR,0.3,medicine,华法林在123，这样学习真简单。”,“华法林斑岩123，这样学习真简单。”,“华法林斑岩123，这样学习真简单。”,“华法林在123，这样学习真简单。”,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0228_L012,DWUR,0.3,medicine,洋地黄特别适用于,该地质特别适用于,该地质特别适用于,洋地黄特别适用于,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+MedP0229_L018,DWUR,0.3,medicine,2.减数分裂,2.减数分层,2.减数分层,2.减数分裂,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0231_L003,DWUR,0.3,medicine,深静脉血栓(DVT)是其血栓主要来源,深静脉血栓(DVT)是其栓子主要来源,深静脉血栓(DVT)是其栓子主要来源,深静脉血栓(DVT)是其血栓主要来源,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+MedP0232_L010,DWUR,0.3,medicine,局部水肿.,局部水晶.,局部水晶.,局部水肿.,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0235_L019,DWUR,0.3,medicine,(4)酸性：酸性天冬浴,(4)酸性：酸性天然熔,(4)酸性：酸性天然熔,(4)酸性：酸性天冬谷,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0236_L012,DWUR,0.3,medicine,组织换气：组织细胞与组织血管间气体交换,组织换气：组织细胞与组织毛细血管间气体交换,组织换气：组织细胞与组织毛细血管间气体交换,组织换气：组织细胞与组织血管间气体交换,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+MedP0238_L001,DWUR,0.3,medicine,运化水谷：脾为“后天之本，气血生化之源”：食物消化吸收,运化水谷：脾为“后天之本，气血生化之源”；食物消化吸收,运化水谷：脾为“后天之本，气血生化之源”；食物消化吸收,运化水谷：脾为“后天之本，气血生化之源”：食物消化吸收,accepted,accepted,0,1,1,gemini:gemini-3-flash-preview
+MedP0240_L044,DWUR,0.3,medicine,①中枢神经系统知病,①中枢神经系统诊断,①中枢神经系统诊断,①中枢神经系统疾病,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0241_L018,DWUR,0.3,medicine,②镜下：无结构颗粒状红染物，不见坏死部位原有组织结构残影种核,③镜下：无结构颗粒状红染物，不见坏死部位原有组织结构残影和核,③镜下：无结构颗粒状红染物，不见坏死部位原有组织结构残影和核,②镜下：无结构颗粒状红染物，不见坏死部位原有组织结构残影核,accepted,accepted,1,2,1,gemini:gemini-3-flash-preview
+MedP0241_L019,DWUR,0.3,medicine,碎屑.更为彻底的特殊类型的凝固性坏死,干酪.更为彻底的特殊类型的凝固性坏死,干酪.更为彻底的特殊类型的凝固性坏死,碎屑.更为彻底的特殊类型的凝固性坏死,accepted,accepted,0,2,2,gemini:gemini-3-flash-preview
+MedP0243_L012,DWUR,0.3,medicine,1.骨迷路：耳蜗、前庭.骨半规管,1.骨迷路：耳蜗、前庭、骨半规管,1.骨迷路：耳蜗、前庭、骨半规管,1.骨迷路:耳蜗.前庭.骨半规管.,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
+MedP0246_L026,DWUR,0.3,medicine,正常血小板2~15f1正偏态分布,正常血小板 2~15fl 正偏态分布,正常血小板 2~15fl 正偏态分布,正常血小板2～15fl正偏态分布,accepted,accepted,2,3,1,gemini:gemini-3-flash-preview
