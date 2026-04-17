@@ -1,0 +1,299 @@
+{
+  "run_id": "20260417_run033658",
+  "reuse_cached_vlm": true,
+  "m5_cache_path": "cloud_result_sync/exB/02_runs/m5_full_call_cache.jsonl",
+  "m6_cache_path": "cloud_result_sync/exB/02_runs/m6_full_call_cache.jsonl",
+  "cache_semantics": "vlm_only_cache_pool",
+  "results": [
+    {
+      "exp_id": "M5",
+      "system_name": "BestRouter-only",
+      "budget": 0.1,
+      "metrics": {
+        "Strategy": "GCR",
+        "Target_Budget": 0.1,
+        "Actual_Call_Rate": 0.0984,
+        "Overall_CER": 0.090873,
+        "Boundary_Deletion_Recall@B": 0.151899,
+        "Substitution_CER": 0.051313,
+        "P95_Latency_MS": 0.0,
+        "Avg_Token_Usage": 0.0,
+        "Total_Token_Usage": 0.0,
+        "N_Latency_Valid": 337,
+        "N_Token_Valid": 0,
+        "AER": 0.816,
+        "CVR": 0.0,
+        "N_valid": 3424
+      },
+      "reliability_metrics": {
+        "hallucination_rate": 0.001752,
+        "format_collapse_rate": 0.006717,
+        "over_correction_rate": 0.00993,
+        "false_rejection_rate": 0.0,
+        "backfill_reject_rate": 0.0,
+        "breaker_trigger_rate": 0.0
+      }
+    },
+    {
+      "exp_id": "M5",
+      "system_name": "BestRouter-only",
+      "budget": 0.2,
+      "metrics": {
+        "Strategy": "GCR",
+        "Target_Budget": 0.2,
+        "Actual_Call_Rate": 0.1971,
+        "Overall_CER": 0.090385,
+        "Boundary_Deletion_Recall@B": 0.257384,
+        "Substitution_CER": 0.051104,
+        "P95_Latency_MS": 0.0,
+        "Avg_Token_Usage": 0.0,
+        "Total_Token_Usage": 0.0,
+        "N_Latency_Valid": 675,
+        "N_Token_Valid": 0,
+        "AER": 0.683,
+        "CVR": 0.0,
+        "N_valid": 3424
+      },
+      "reliability_metrics": {
+        "hallucination_rate": 0.004089,
+        "format_collapse_rate": 0.00847,
+        "over_correction_rate": 0.026577,
+        "false_rejection_rate": 0.0,
+        "backfill_reject_rate": 0.0,
+        "breaker_trigger_rate": 0.0
+      }
+    },
+    {
+      "exp_id": "M5",
+      "system_name": "BestRouter-only",
+      "budget": 0.3,
+      "metrics": {
+        "Strategy": "GCR",
+        "Target_Budget": 0.3,
+        "Actual_Call_Rate": 0.2798,
+        "Overall_CER": 0.087373,
+        "Boundary_Deletion_Recall@B": 0.316456,
+        "Substitution_CER": 0.049049,
+        "P95_Latency_MS": 0.0,
+        "Avg_Token_Usage": 0.0,
+        "Total_Token_Usage": 0.0,
+        "N_Latency_Valid": 958,
+        "N_Token_Valid": 0,
+        "AER": 0.6879,
+        "CVR": 0.0,
+        "N_valid": 3424
+      },
+      "reliability_metrics": {
+        "hallucination_rate": 0.006717,
+        "format_collapse_rate": 0.00847,
+        "over_correction_rate": 0.037675,
+        "false_rejection_rate": 0.0,
+        "backfill_reject_rate": 0.0,
+        "breaker_trigger_rate": 0.0
+      }
+    },
+    {
+      "exp_id": "M5",
+      "system_name": "BestRouter-only",
+      "budget": 0.5,
+      "metrics": {
+        "Strategy": "GCR",
+        "Target_Budget": 0.5,
+        "Actual_Call_Rate": 0.4387,
+        "Overall_CER": 0.083978,
+        "Boundary_Deletion_Recall@B": 0.496484,
+        "Substitution_CER": 0.048092,
+        "P95_Latency_MS": 0.0,
+        "Avg_Token_Usage": 0.0,
+        "Total_Token_Usage": 0.0,
+        "N_Latency_Valid": 1502,
+        "N_Token_Valid": 0,
+        "AER": 0.6198,
+        "CVR": 0.0,
+        "N_valid": 3424
+      },
+      "reliability_metrics": {
+        "hallucination_rate": 0.006717,
+        "format_collapse_rate": 0.010222,
+        "over_correction_rate": 0.06396,
+        "false_rejection_rate": 0.0,
+        "backfill_reject_rate": 0.0,
+        "breaker_trigger_rate": 0.0
+      }
+    },
+    {
+      "exp_id": "M5",
+      "system_name": "BestRouter-only",
+      "budget": 0.8,
+      "metrics": {
+        "Strategy": "GCR",
+        "Target_Budget": 0.8,
+        "Actual_Call_Rate": 0.7123,
+        "Overall_CER": 0.073165,
+        "Boundary_Deletion_Recall@B": 0.7609,
+        "Substitution_CER": 0.042259,
+        "P95_Latency_MS": 0.0,
+        "Avg_Token_Usage": 0.0,
+        "Total_Token_Usage": 0.0,
+        "N_Latency_Valid": 2439,
+        "N_Token_Valid": 0,
+        "AER": 0.6392,
+        "CVR": 0.0,
+        "N_valid": 3424
+      },
+      "reliability_metrics": {
+        "hallucination_rate": 0.01285,
+        "format_collapse_rate": 0.017523,
+        "over_correction_rate": 0.101636,
+        "false_rejection_rate": 0.0,
+        "backfill_reject_rate": 0.0,
+        "breaker_trigger_rate": 0.0
+      }
+    },
+    {
+      "exp_id": "M6",
+      "system_name": "SH-DA++",
+      "budget": 0.1,
+      "metrics": {
+        "Strategy": "GCR",
+        "Target_Budget": 0.1,
+        "Actual_Call_Rate": 0.0984,
+        "Overall_CER": 0.096183,
+        "Boundary_Deletion_Recall@B": 0.151899,
+        "Substitution_CER": 0.053037,
+        "P95_Latency_MS": 0.0,
+        "Avg_Token_Usage": 0.0,
+        "Total_Token_Usage": 0.0,
+        "N_Latency_Valid": 337,
+        "N_Token_Valid": 0,
+        "AER": 0.5163,
+        "CVR": 0.2967,
+        "N_valid": 3424
+      },
+      "reliability_metrics": {
+        "hallucination_rate": 0.000292,
+        "format_collapse_rate": 0.00847,
+        "over_correction_rate": 0.005841,
+        "false_rejection_rate": 0.029206,
+        "backfill_reject_rate": 0.029206,
+        "breaker_trigger_rate": 0.0
+      }
+    },
+    {
+      "exp_id": "M6",
+      "system_name": "SH-DA++",
+      "budget": 0.2,
+      "metrics": {
+        "Strategy": "GCR",
+        "Target_Budget": 0.2,
+        "Actual_Call_Rate": 0.1971,
+        "Overall_CER": 0.094982,
+        "Boundary_Deletion_Recall@B": 0.257384,
+        "Substitution_CER": 0.052096,
+        "P95_Latency_MS": 0.0,
+        "Avg_Token_Usage": 0.0,
+        "Total_Token_Usage": 0.0,
+        "N_Latency_Valid": 675,
+        "N_Token_Valid": 0,
+        "AER": 0.4933,
+        "CVR": 0.1896,
+        "N_valid": 3424
+      },
+      "reliability_metrics": {
+        "hallucination_rate": 0.000876,
+        "format_collapse_rate": 0.009638,
+        "over_correction_rate": 0.015187,
+        "false_rejection_rate": 0.037383,
+        "backfill_reject_rate": 0.037383,
+        "breaker_trigger_rate": 0.0
+      }
+    },
+    {
+      "exp_id": "M6",
+      "system_name": "SH-DA++",
+      "budget": 0.3,
+      "metrics": {
+        "Strategy": "GCR",
+        "Target_Budget": 0.3,
+        "Actual_Call_Rate": 0.2798,
+        "Overall_CER": 0.092248,
+        "Boundary_Deletion_Recall@B": 0.316456,
+        "Substitution_CER": 0.050721,
+        "P95_Latency_MS": 0.0,
+        "Avg_Token_Usage": 0.0,
+        "Total_Token_Usage": 0.0,
+        "N_Latency_Valid": 958,
+        "N_Token_Valid": 0,
+        "AER": 0.4937,
+        "CVR": 0.1827,
+        "N_valid": 3424
+      },
+      "reliability_metrics": {
+        "hallucination_rate": 0.001168,
+        "format_collapse_rate": 0.010222,
+        "over_correction_rate": 0.01986,
+        "false_rejection_rate": 0.05111,
+        "backfill_reject_rate": 0.05111,
+        "breaker_trigger_rate": 0.0
+      }
+    },
+    {
+      "exp_id": "M6",
+      "system_name": "SH-DA++",
+      "budget": 0.5,
+      "metrics": {
+        "Strategy": "GCR",
+        "Target_Budget": 0.5,
+        "Actual_Call_Rate": 0.4387,
+        "Overall_CER": 0.090908,
+        "Boundary_Deletion_Recall@B": 0.496484,
+        "Substitution_CER": 0.049676,
+        "P95_Latency_MS": 0.0,
+        "Avg_Token_Usage": 0.0,
+        "Total_Token_Usage": 0.0,
+        "N_Latency_Valid": 1502,
+        "N_Token_Valid": 0,
+        "AER": 0.4521,
+        "CVR": 0.1625,
+        "N_valid": 3424
+      },
+      "reliability_metrics": {
+        "hallucination_rate": 0.000584,
+        "format_collapse_rate": 0.015187,
+        "over_correction_rate": 0.03972,
+        "false_rejection_rate": 0.071262,
+        "backfill_reject_rate": 0.071262,
+        "breaker_trigger_rate": 0.0
+      }
+    },
+    {
+      "exp_id": "M6",
+      "system_name": "SH-DA++",
+      "budget": 0.8,
+      "metrics": {
+        "Strategy": "GCR",
+        "Target_Budget": 0.8,
+        "Actual_Call_Rate": 0.7123,
+        "Overall_CER": 0.083716,
+        "Boundary_Deletion_Recall@B": 0.7609,
+        "Substitution_CER": 0.044905,
+        "P95_Latency_MS": 0.0,
+        "Avg_Token_Usage": 0.0,
+        "Total_Token_Usage": 0.0,
+        "N_Latency_Valid": 2439,
+        "N_Token_Valid": 0,
+        "AER": 0.4641,
+        "CVR": 0.1632,
+        "N_valid": 3424
+      },
+      "reliability_metrics": {
+        "hallucination_rate": 0.002336,
+        "format_collapse_rate": 0.026285,
+        "over_correction_rate": 0.057243,
+        "false_rejection_rate": 0.116238,
+        "backfill_reject_rate": 0.116238,
+        "breaker_trigger_rate": 0.0
+      }
+    }
+  ]
+}

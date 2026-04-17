@@ -1,0 +1,2 @@
+python_version=3.10.19
+git_commit=e17dcd1fa062a14653dbca59b8c929030f54237e

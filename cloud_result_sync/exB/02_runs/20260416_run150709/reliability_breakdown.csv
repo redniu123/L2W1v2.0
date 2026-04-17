@@ -1,7 +1,0 @@
-run_id,exp_id,system_name,budget,num_samples,hallucination_rate,format_collapse_rate,over_correction_rate,false_rejection_rate,backfill_reject_rate,breaker_trigger_rate
-20260416_run150709,M5,BestRouter-only,0.1,3424,0.001752,0.006717,0.00993,0.0,0.0,0.0
-20260416_run150709,M5,BestRouter-only,0.2,3424,0.004089,0.00847,0.026577,0.0,0.0,0.0
-20260416_run150709,M5,BestRouter-only,0.3,3424,0.006717,0.00847,0.037675,0.0,0.0,0.0
-20260416_run150709,M6,SH-DA++,0.1,3424,0.0,0.009054,0.007301,0.031834,0.031834,0.0
-20260416_run150709,M6,SH-DA++,0.2,3424,0.0,0.010222,0.0184,0.038843,0.038843,0.0
-20260416_run150709,M6,SH-DA++,0.3,3424,0.0,0.010806,0.024241,0.057243,0.057243,0.0

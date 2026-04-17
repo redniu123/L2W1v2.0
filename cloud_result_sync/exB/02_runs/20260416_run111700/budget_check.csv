@@ -1,7 +1,0 @@
-run_id,exp_id,system_name,budget,target_call_rate,actual_call_rate,abs_diff,valid_threshold,call_rate_valid
-20260416_run111700,M5,BestRouter-only,0.1,0.1,0.0984,0.0016,0.005,valid
-20260416_run111700,M5,BestRouter-only,0.2,0.2,0.1971,0.0029,0.005,valid
-20260416_run111700,M5,BestRouter-only,0.3,0.3,0.2798,0.0202,0.005,invalid
-20260416_run111700,M6,SH-DA++,0.1,0.1,0.0984,0.0016,0.005,valid
-20260416_run111700,M6,SH-DA++,0.2,0.2,0.1971,0.0029,0.005,valid
-20260416_run111700,M6,SH-DA++,0.3,0.3,0.2798,0.0202,0.005,invalid
