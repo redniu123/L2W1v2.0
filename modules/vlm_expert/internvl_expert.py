@@ -27,14 +27,17 @@ class InternVL2Expert(BaseVLMExpert):
         is_awq = "awq" in self.model_path.lower()
         print(f"[InternVL2] Loading {self.model_path} (AWQ={is_awq}, {self.torch_dtype})...")
 
-        # device_map="auto" 在新版 transformers 触发 meta tensor 初始化导致 .item() 报错
-        # 直接指定 cuda:0 绕过
+        # InternVL3 在部分 transformers 版本下若配合 meta 初始化会触发
+        # `Tensor.item() cannot be called on meta tensors`。
+        # 关闭 low_cpu_mem_usage，并在加载后显式搬到 cuda:0，避免 meta device 路径。
         self.model = AutoModel.from_pretrained(
             self.model_path,
-            dtype=dtype,
-            device_map="cuda:0",
+            torch_dtype=dtype,
+            low_cpu_mem_usage=False,
             trust_remote_code=True,
         ).eval()
+        if torch.cuda.is_available():
+            self.model = self.model.to("cuda:0")
 
         # transformers >=4.50 不再自动继承 GenerationMixin，手动 patch
         lm = getattr(self.model, "language_model", None)
