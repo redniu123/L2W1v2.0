@@ -27,13 +27,15 @@ class InternVL2Expert(BaseVLMExpert):
         is_awq = "awq" in self.model_path.lower()
         print(f"[InternVL2] Loading {self.model_path} (AWQ={is_awq}, {self.torch_dtype})...")
 
-        # InternVL3 在部分 transformers 版本下若配合 meta 初始化会触发
-        # `Tensor.item() cannot be called on meta tensors`。
-        # 关闭 low_cpu_mem_usage，并在加载后显式搬到 cuda:0，避免 meta device 路径。
+        # InternVL3 在当前环境下仍可能误入 meta device 初始化路径。
+        # 显式把默认 device 拉回 CPU，并禁用 device_map，避免 meta tensor 构造。
+        if hasattr(torch, "set_default_device"):
+            torch.set_default_device("cpu")
         self.model = AutoModel.from_pretrained(
             self.model_path,
-            torch_dtype=dtype,
+            dtype=dtype,
             low_cpu_mem_usage=False,
+            device_map=None,
             trust_remote_code=True,
         ).eval()
         if torch.cuda.is_available():
