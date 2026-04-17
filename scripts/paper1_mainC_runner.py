@@ -11,7 +11,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
 from scripts.run_efficiency_frontier import ensure_agent_a_result_schema,infer_all_samples,summarize_extended_metrics,summarize_latency_and_token_usage,build_agent_b_callable
 from modules.vlm_expert import AgentBFactory
 from modules.vlm_expert.provider_pools import get_provider_pool
-M={'V1':('Qwen3-VL-8B','local_vlm','qwen2.5_vl','./models/agent_b_vlm/qwen3-vl-8b-instruct'),'V2':('MiniCPM-V 4.5','local_vlm','minicpm_v','./models/agent_b_vlm/minicpm-v-4.5-8b-lmk'),'V3':('Gemini 3 Flash Preview','gemini','',''),'V4':('Claude Sonnet 4.6','claude','','')}
+M={'V1':('Qwen3-VL-8B','local_vlm','qwen2.5_vl','./models/agent_b_vlm/qwen3-vl-8b-instruct'),'V2':('MiniCPM-V 4.5','local_vlm','minicpm_v','./models/agent_b_vlm/MiniCPM-V-4_5'),'V3':('Gemini 3 Flash Preview','gemini','',''),'V4':('Claude Sonnet 4.6','claude','','')}
 B=[0.05,0.10,0.20,0.30,0.50,0.80,1.00]
 WMW,WNW,WDW=0.5,0.3,0.2;MTH,DTH,GB=0.35,0.20,0.10
 
