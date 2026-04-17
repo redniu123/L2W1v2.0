@@ -22,10 +22,14 @@ class MiniCPMVExpert(BaseVLMExpert):
 
     def _init_model(self):
         import torch
-        from transformers import AutoModel, AutoTokenizer
+        from transformers import AutoTokenizer
+        from transformers.dynamic_module_utils import get_class_from_dynamic_module
 
         is_int4 = "int4" in self.model_path.lower()
         print(f"[MiniCPM-V] Loading {self.model_path} (int4={is_int4})...")
+
+        if hasattr(torch, "set_default_device"):
+            torch.set_default_device("cpu")
 
         load_kwargs = dict(
             device_map=None,
@@ -35,12 +39,16 @@ class MiniCPMVExpert(BaseVLMExpert):
         if not is_int4:
             load_kwargs["torch_dtype"] = torch.float16 if self.torch_dtype == "float16" else torch.bfloat16
 
-        if hasattr(torch, "set_default_device"):
-            torch.set_default_device("cpu")
+        model_cls = get_class_from_dynamic_module(
+            "modeling_minicpmv.MiniCPMV",
+            self.model_path,
+        )
+        if not hasattr(model_cls, "all_tied_weights_keys"):
+            model_cls.all_tied_weights_keys = {}
 
-        self.model = AutoModel.from_pretrained(self.model_path, **load_kwargs)
+        self.model = model_cls.from_pretrained(self.model_path, **load_kwargs)
         if not hasattr(self.model, "all_tied_weights_keys"):
-            self.model.all_tied_weights_keys = list(getattr(self.model, "_tied_weights_keys", []) or [])
+            self.model.all_tied_weights_keys = {}
         self.model = self.model.eval()
         if torch.cuda.is_available():
             self.model = self.model.to("cuda:0")
