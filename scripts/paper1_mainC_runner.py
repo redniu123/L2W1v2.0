@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """paper1 Main C cross-model RouterOnly runner."""
-import argparse,csv,json,random,sys,time
+import argparse,csv,json,random,sys,time,threading
 from concurrent.futures import ThreadPoolExecutor,as_completed
 from datetime import datetime
 from pathlib import Path
@@ -30,16 +30,24 @@ def s(rt,r,eta):
     if mi<MTH: q+=GB
     if dr>DTH: q+=GB
     return float(q if rt=='WUR' else q+eta*rd)
+def attach(fn,backend,label,parallel,maxc=1,keyc=1):
+    fn._backend=backend;fn._model_label=label;fn._supports_parallel=parallel;fn._max_concurrency=maxc;fn._key_count=keyc;return fn
 def claude(cfg):
-    pool=get_provider_pool('claude_sonnet_46',cfg['agent_b'].get('key_file','key.txt'));base_url=pool.base_url;api_key=pool.keys[0];model_name=pool.model_name;timeout=cfg['agent_b'].get('timeout',360)
+    pool=get_provider_pool('claude_sonnet_46',cfg['agent_b'].get('key_file','key.txt'));base_url=pool.base_url;keys=list(pool.keys);model_name=pool.model_name;timeout=cfg['agent_b'].get('timeout',360);idx=0;lock=threading.Lock()
+    def next_key():
+        nonlocal idx
+        with lock:
+            k=keys[idx]
+            idx=(idx+1)%len(keys)
+            return k
     def call(p):
-        t0=time.perf_counter();ocr=p.get('T_A','');payload={'model':model_name,'messages':[{'role':'user','content':[{'type':'text','text':f'你是中文OCR纠错助手。仅输出修正后的完整文本。原始OCR文本：{ocr}'}]}],'temperature':0.1,'max_tokens':256}
+        t0=time.perf_counter();ocr=p.get('T_A','');api_key=next_key();payload={'model':model_name,'messages':[{'role':'user','content':[{'type':'text','text':f'你是中文OCR纠错助手。仅输出修正后的完整文本。原始OCR文本：{ocr}'}]}],'temperature':0.1,'max_tokens':256}
         try:
             r=requests.post(f'{base_url}/chat/completions',headers={'Authorization':f'Bearer {api_key}','Content-Type':'application/json'},json=payload,timeout=timeout);r.raise_for_status();txt=r.json()['choices'][0]['message']['content'].strip().split('\n')[0].strip();return {'corrected_text':txt or ocr,'latency_ms':round((time.perf_counter()-t0)*1000,3),'token_usage':None,'error_type':'none'}
         except Exception as e: return {'corrected_text':ocr,'latency_ms':round((time.perf_counter()-t0)*1000,3),'token_usage':None,'error_type':type(e).__name__}
-    return call
+    return attach(call,'claude',f'claude:{model_name}',True,1200,len(keys))
 def mk(backend,model_type,model_path,cfg,skip):
-    if skip: return lambda p:{'corrected_text':p.get('T_A',''),'latency_ms':0.0,'token_usage':None,'error_type':'mock_skip'}
+    if skip: return attach(lambda p:{'corrected_text':p.get('T_A',''),'latency_ms':0.0,'token_usage':None,'error_type':'mock_skip'},'mock','mock',False,1,1)
     if backend=='gemini': return build_agent_b_callable(cfg)
     if backend=='claude': return claude(cfg)
     cc=json.loads(json.dumps(cfg));cc['agent_b']={'skip':False,'backend':'local_vlm','model_type':model_type,'model_path':model_path,'torch_dtype':'float16','max_new_tokens':128};expert=AgentBFactory.create(cc)
@@ -48,7 +56,7 @@ def mk(backend,model_type,model_path,cfg,skip):
         try:
             r=expert.process_hard_sample(img,{'ocr_text':ta,'suspicious_index':i,'suspicious_char':sc,'risk_level':'medium'});corr=r.get('corrected_text',ta) if isinstance(r,dict) else (r if isinstance(r,str) else ta);tok=r.get('token_usage') if isinstance(r,dict) else None;err=r.get('error_type','none') if isinstance(r,dict) else 'none';return {'corrected_text':corr,'latency_ms':round((time.perf_counter()-t0)*1000,3),'token_usage':tok,'error_type':err}
         except Exception as e: return {'corrected_text':ta,'latency_ms':round((time.perf_counter()-t0)*1000,3),'token_usage':None,'error_type':type(e).__name__}
-    return call
+    return attach(call,'local_vlm',f'local_vlm:{model_type}:{Path(model_path).name}',False,1,1)
 def fc(rows,agent_b,name,pv,run_id):
     sp=bool(getattr(agent_b,'_supports_parallel',False));mw=int(getattr(agent_b,'_max_concurrency',1) or 1);kc=int(getattr(agent_b,'_key_count',1) or 1);nw=max(1,min(mw,kc)) if sp else 1
     def one(r):
