@@ -178,7 +178,7 @@ def main():
     parser.add_argument('--finance_dict', default='data/dicts/Finance.txt')
     parser.add_argument('--medicine_dict', default='data/dicts/Medicine.txt')
     parser.add_argument('--output_dir', default='paper1_runs/online_budget_validation')
-    parser.add_argument('--strategy', default='WUR', choices=['GCR', 'WUR', 'DGCR', 'DWUR'])
+    parser.add_argument('--strategy', default='GCR', choices=['GCR', 'WUR', 'DGCR', 'DWUR'])
     parser.add_argument('--target_budget', type=float, default=0.10)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--n_samples', type=int, default=None)
