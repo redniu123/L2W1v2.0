@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """paper1 Main C cross-model RouterOnly runner."""
 import argparse,csv,json,random,sys,time
+from concurrent.futures import ThreadPoolExecutor,as_completed
 from datetime import datetime
 from pathlib import Path
 import Levenshtein,numpy as np,requests,yaml
@@ -49,10 +50,16 @@ def mk(backend,model_type,model_path,cfg,skip):
         except Exception as e: return {'corrected_text':ta,'latency_ms':round((time.perf_counter()-t0)*1000,3),'token_usage':None,'error_type':type(e).__name__}
     return call
 def fc(rows,agent_b,name,pv,run_id):
-    out=[]
-    for r in tqdm(rows,desc=f'Full-call {name}',leave=False):
-        rs=agent_b({'T_A':r['T_A'],'image_path':r.get('img_path',r.get('image_path','')),'min_conf_idx':r.get('min_conf_idx',-1),'sample_id':r.get('sample_id','')});up=rs.get('corrected_text',r['T_A']);up=up if isinstance(up,str) and up else r['T_A'];out.append({'sample_id':r.get('sample_id',''),'image_path':r.get('image_path',''),'source_image_id':r.get('source_image_id',''),'domain':r.get('domain','geology'),'split':r.get('split','test'),'gt':r['T_GT'],'ocr_text':r['T_A'],'final_text_if_upgraded':up,'vlm_raw_output':up,'latency_ms':rs.get('latency_ms'),'token_usage':rs.get('token_usage'),'error_type':rs.get('error_type','none'),'has_professional_terms':r.get('has_professional_terms',False),'professional_terms':r.get('professional_terms',[]),'is_correct_ocr':r['T_A']==r['T_GT'],'edit_distance_ocr':Levenshtein.distance(norm(r['T_A']),norm(r['T_GT'])),'vlm_model':name,'prompt_version':pv,'run_id':run_id})
-    return out
+    sp=bool(getattr(agent_b,'_supports_parallel',False));mw=int(getattr(agent_b,'_max_concurrency',1) or 1);kc=int(getattr(agent_b,'_key_count',1) or 1);nw=max(1,min(mw,kc)) if sp else 1
+    def one(r):
+        rs=agent_b({'T_A':r['T_A'],'image_path':r.get('img_path',r.get('image_path','')),'min_conf_idx':r.get('min_conf_idx',-1),'sample_id':r.get('sample_id','')});up=rs.get('corrected_text',r['T_A']);up=up if isinstance(up,str) and up else r['T_A']
+        return {'sample_id':r.get('sample_id',''),'image_path':r.get('image_path',''),'source_image_id':r.get('source_image_id',''),'domain':r.get('domain','geology'),'split':r.get('split','test'),'gt':r['T_GT'],'ocr_text':r['T_A'],'final_text_if_upgraded':up,'vlm_raw_output':up,'latency_ms':rs.get('latency_ms'),'token_usage':rs.get('token_usage'),'error_type':rs.get('error_type','none'),'has_professional_terms':r.get('has_professional_terms',False),'professional_terms':r.get('professional_terms',[]),'is_correct_ocr':r['T_A']==r['T_GT'],'edit_distance_ocr':Levenshtein.distance(norm(r['T_A']),norm(r['T_GT'])),'vlm_model':name,'prompt_version':pv,'run_id':run_id}
+    if nw<=1: return [one(r) for r in tqdm(rows,desc=f'Full-call {name}',leave=False)]
+    ordered=[None]*len(rows)
+    with ThreadPoolExecutor(max_workers=nw) as ex:
+        futs={ex.submit(one,r):i for i,r in enumerate(rows)}
+        for fut in tqdm(as_completed(futs),total=len(futs),desc=f'Full-call {name} [{nw} concurrent]',leave=False): ordered[futs[fut]]=fut.result()
+    return ordered
 def main():
     p=argparse.ArgumentParser(description='paper1 Main C cross-model RouterOnly runner');p.add_argument('--config',default='configs/router_config.yaml');p.add_argument('--test_jsonl',default='data/l2w1data/test.jsonl');p.add_argument('--image_root',default='data/l2w1data/images');p.add_argument('--rec_model_dir',default='./models/agent_a_ppocr/PP-OCRv5_server_rec_infer');p.add_argument('--rec_char_dict_path',default='ppocr/utils/ppocrv5_dict.txt');p.add_argument('--geo_dict',default='data/dicts/Geology.txt');p.add_argument('--finance_dict',default='data/dicts/Finance.txt');p.add_argument('--medicine_dict',default='data/dicts/Medicine.txt');p.add_argument('--output_dir',default='paper1_runs/mainC');p.add_argument('--best_router',default='WUR',choices=['GCR','WUR','DGCR','DWUR']);p.add_argument('--budgets',default=','.join(f'{b:.2f}' for b in B));p.add_argument('--models',default='V1,V2,V3,V4');p.add_argument('--seed',type=int,default=42);p.add_argument('--n_samples',type=int,default=None);p.add_argument('--use_gpu',action='store_true',default=False);p.add_argument('--use_cache',action='store_true',default=False);p.add_argument('--rebuild_cache',action='store_true',default=False);p.add_argument('--prompt_version',default=None);p.add_argument('--agent_b_skip',action='store_true',default=False);a=p.parse_args();random.seed(a.seed);np.random.seed(a.seed)
     cfg=yaml.safe_load(Path(a.config).read_text(encoding='utf-8'));pv=a.prompt_version or cfg.get('prompt_version') or cfg.get('mainline',{}).get('prompt_version','prompt_v1.1');eta=float((cfg or {}).get('sh_da_v4',{}).get('rule_scorer',{}).get('eta',0.5));budgets=[float(x) for x in a.budgets.split(',') if x.strip()];chosen={x.strip() for x in a.models.split(',') if x.strip()}
