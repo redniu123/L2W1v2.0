@@ -61,22 +61,52 @@ class BaseVLMExpert(ABC):
             "is_corrected": corrected_text != ocr_text,
         }
 
+    def _strip_enclosing_brackets(self, text: str, fallback: str) -> str:
+        if not text:
+            return fallback
+        stripped = text.strip()
+        pairs = [
+            ("【", "】"),
+            ("[", "]"),
+            ("(", ")"),
+            ("（", "）"),
+            ("{", "}"),
+            ("｛", "｝"),
+            ("<", ">"),
+        ]
+        changed = True
+        while changed and stripped:
+            changed = False
+            candidate = stripped.strip()
+            for left, right in pairs:
+                if candidate.startswith(left) and candidate.endswith(right):
+                    inner = candidate[len(left):-len(right)].strip()
+                    if inner:
+                        stripped = inner
+                        changed = True
+                        break
+        if not stripped:
+            return fallback
+
+        fallback_core = fallback.strip()
+        normalized = stripped.translate(str.maketrans({"（": "(", "）": ")", "【": "[", "】": "]", "｛": "{", "｝": "}"}))
+        fallback_normalized = fallback_core.translate(str.maketrans({"（": "(", "）": ")", "【": "[", "】": "]", "｛": "{", "｝": "}"}))
+        if normalized == fallback_normalized:
+            return fallback_core or stripped
+        return stripped
+
     def _parse_output(self, raw_text: str, fallback: str = "") -> str:
         """解析模型输出：只取第一行，去除引号，防止解释文字混入。"""
         if not raw_text:
             return fallback
         text = raw_text.strip()
 
-        # 去除 Qwen3 思维链 <think>...</think> 块
         import re as _re
         text = _re.sub(r'<think>.*?</think>', '', text, flags=_re.DOTALL).strip()
-        # 去除 "Thinking Process:" 等思维链残留
         text = _re.sub(r'^(Thinking Process|思考过程|思维链)[:\uff1a].*', '', text, flags=_re.MULTILINE).strip()
 
-        # 过滤英文分析输出（模型无视指令时降级）
         if _re.search(r'^\s*(\d+\.\s*)?\*{0,2}(Analyze|analyze|Analysis|Step|Correction|Result)', text):
             return fallback
-        # 过滤纯英文输出（OCR 任务应输出中文）
         chinese_chars = len(_re.findall(r'[\u4e00-\u9fff]', text))
         total_chars = len(_re.sub(r'\s', '', text))
         if total_chars > 4 and chinese_chars / max(total_chars, 1) < 0.3:
@@ -95,7 +125,7 @@ class BaseVLMExpert(ABC):
         text = text.split("\n")[0].strip()
         text = text.strip('"\'\u201c\u201d\u2018\u2019')
         text = text.strip()
-        # 防复述检测
+        text = self._strip_enclosing_brackets(text, fallback)
         PROMPT_FRAGMENTS = [
             "尽可能保持原句原貌", "绝对禁止润色", "绝对禁止对句子",
             "最高约束红线", "请直接输出修正后", "系统检测到该文本",
