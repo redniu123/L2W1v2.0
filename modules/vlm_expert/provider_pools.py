@@ -67,11 +67,13 @@ def _extract_standalone_pool(
 
 
 def _extract_claude_pool(text: str, base_url: str) -> Optional[ProviderPool]:
-    model_match = re.search(r'MODEL_NAME_claude\s*=\s*["\']([^"\']+)["\']', text, flags=re.IGNORECASE)
+    model_match = re.search(r'MODEL_NAME_(?:claude|GPT)\s*=\s*["\']([^"\']+)["\']', text, flags=re.IGNORECASE)
     if model_match:
         model_name = model_match.group(1).strip()
         tail = text[model_match.end():]
-        keys = re.findall(r"(?m)^\s*(sk-[A-Za-z0-9]+)\s*$", tail)
+        next_section = re.search(r'(?m)^\s*MODEL_NAME_[A-Za-z0-9_]+\s*=', tail)
+        block = tail[:next_section.start()] if next_section else tail
+        keys = re.findall(r"(?m)^\s*(sk-[A-Za-z0-9]+)\s*$", block)
         if keys:
             return ProviderPool(
                 name="claude_sonnet_46",
