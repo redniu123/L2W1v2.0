@@ -15,7 +15,7 @@ class ProviderPool:
 
 
 _DEFAULT_BASE_URL = "https://www.lemonapi.site/v1"
-_DEFAULT_CLAUDE_MODEL = "gpt-5.4-xhigh"
+_DEFAULT_CLAUDE_MODEL = "gpt-5.4"
 
 
 def _extract_base_url(text: str) -> str:
