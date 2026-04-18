@@ -15,7 +15,7 @@ class ProviderPool:
 
 
 _DEFAULT_BASE_URL = "https://www.lemonapi.site/v1"
-_DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6-thinking"
+_DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6"
 
 
 def _extract_base_url(text: str) -> str:
