@@ -54,7 +54,7 @@ def claude(cfg):
             r=requests.post(f'{base_url}/chat/completions',headers={'Authorization':f'Bearer {api_key}','Content-Type':'application/json'},json=payload,timeout=timeout);r.raise_for_status();txt=r.json()['choices'][0]['message']['content'].strip().split('\n')[0].strip();return {'corrected_text':txt or ocr,'latency_ms':round((time.perf_counter()-t0)*1000,3),'token_usage':None,'error_type':'none'}
         except requests.HTTPError as e: return {'corrected_text':ocr,'latency_ms':round((time.perf_counter()-t0)*1000,3),'token_usage':None,'error_type':fmt_http_error(e)}
         except Exception as e: return {'corrected_text':ocr,'latency_ms':round((time.perf_counter()-t0)*1000,3),'token_usage':None,'error_type':type(e).__name__}
-    return attach(call,'claude',f'claude:{model_name}',True,1,len(keys))
+    return attach(call,'claude',f'claude:{model_name}',True,10,len(keys))
 def mk(backend,model_type,model_path,cfg,skip):
     if skip: return attach(lambda p:{'corrected_text':p.get('T_A',''),'latency_ms':0.0,'token_usage':None,'error_type':'mock_skip'},'mock','mock',False,1,1)
     if backend=='gemini': return build_agent_b_callable(cfg)
