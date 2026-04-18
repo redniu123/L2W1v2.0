@@ -32,6 +32,14 @@ def s(rt,r,eta):
     return float(q if rt=='WUR' else q+eta*rd)
 def attach(fn,backend,label,parallel,maxc=1,keyc=1):
     fn._backend=backend;fn._model_label=label;fn._supports_parallel=parallel;fn._max_concurrency=maxc;fn._key_count=keyc;return fn
+
+def fmt_http_error(e):
+    r=getattr(e,'response',None)
+    if r is not None:
+        body=(r.text or '').replace('\n',' ')[:240]
+        return f"HTTPError:{r.status_code}:{body}" if body else f"HTTPError:{r.status_code}"
+    return type(e).__name__
+
 def claude(cfg):
     pool=get_provider_pool('claude_sonnet_46',cfg['agent_b'].get('key_file','key.txt'));base_url=pool.base_url;keys=list(pool.keys);model_name=pool.model_name;timeout=cfg['agent_b'].get('timeout',360);idx=0;lock=threading.Lock()
     def next_key():
@@ -44,6 +52,7 @@ def claude(cfg):
         t0=time.perf_counter();ocr=p.get('T_A','');api_key=next_key();payload={'model':model_name,'messages':[{'role':'user','content':[{'type':'text','text':f'你是中文OCR纠错助手。仅输出修正后的完整文本。原始OCR文本：{ocr}'}]}],'temperature':0.1,'max_tokens':256}
         try:
             r=requests.post(f'{base_url}/chat/completions',headers={'Authorization':f'Bearer {api_key}','Content-Type':'application/json'},json=payload,timeout=timeout);r.raise_for_status();txt=r.json()['choices'][0]['message']['content'].strip().split('\n')[0].strip();return {'corrected_text':txt or ocr,'latency_ms':round((time.perf_counter()-t0)*1000,3),'token_usage':None,'error_type':'none'}
+        except requests.HTTPError as e: return {'corrected_text':ocr,'latency_ms':round((time.perf_counter()-t0)*1000,3),'token_usage':None,'error_type':fmt_http_error(e)}
         except Exception as e: return {'corrected_text':ocr,'latency_ms':round((time.perf_counter()-t0)*1000,3),'token_usage':None,'error_type':type(e).__name__}
     return attach(call,'claude',f'claude:{model_name}',True,1,len(keys))
 def mk(backend,model_type,model_path,cfg,skip):
