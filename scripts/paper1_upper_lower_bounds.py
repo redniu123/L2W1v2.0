@@ -4,9 +4,10 @@ import argparse,csv,json,time,sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
-import Levenshtein,yaml,requests
+import Levenshtein,yaml
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
 
 from modules.vlm_expert.gemini_expert import GeminiAgentB, GeminiConfig
 from modules.vlm_expert import AgentBFactory
@@ -47,8 +48,17 @@ def acc_rows(rows, text_key):
     return round(sum(1 for r in rows if r.get(text_key,'') == r.get('gt','')) / len(rows), 6) if rows else 0.0
 
 def resolve_image_path(workspace_root: Path, rel_path: str) -> str:
-    rel = rel_path.replace('dataset/images/', 'data/l2w1data/images/')
-    return str((workspace_root / rel).resolve())
+    rel = Path(rel_path)
+    rel_str = str(rel).replace('\\', '/')
+    candidates = [
+        workspace_root / rel,
+        workspace_root / rel_str.replace('dataset/images/', 'data/l2w1data/images/'),
+        workspace_root / 'data' / 'l2w1data' / 'images' / rel.name,
+    ]
+    for p in candidates:
+        if p.exists():
+            return str(p.resolve())
+    raise FileNotFoundError(f'Image not found for {rel_path}; tried: ' + ' | '.join(str(x) for x in candidates))
 
 def build_bonly_gemini(cfg):
     ab = cfg.get('agent_b', {})
@@ -103,7 +113,7 @@ def main():
     p.add_argument('--maina_full_cache', default='paper1_runs/mainA/20260417_run112203/shared_repmodel_full_call_cache.jsonl')
     p.add_argument('--test_jsonl', default='data/l2w1data/test.jsonl')
     p.add_argument('--output_root', default='paper1_runs/upper_lower_bounds')
-    p.add_argument('--workspace_root', default='G:/Code/PaddleOCR/L2W1')
+    p.add_argument('--workspace_root', default=str(REPO_ROOT))
     p.add_argument('--b_only_backend', choices=['gemini','local_vlm'], default='gemini')
     p.add_argument('--n_samples', type=int, default=None)
     p.add_argument('--local_model_type', default='qwen2.5_vl')
@@ -126,7 +136,7 @@ def main():
 
     out = Path(a.output_root) / datetime.now().strftime('%Y%m%d_run%H%M%S')
     out.mkdir(parents=True, exist_ok=True)
-    workspace_root = Path(a.workspace_root)
+    workspace_root = Path(a.workspace_root).resolve()
 
     a_only, a_plus_b = [], []
     for r in full:
@@ -183,7 +193,7 @@ def main():
         sid = ao['sample_id']; bo = b_map[sid]; ab = ab_map[sid]
         case_pool.append({'sample_id': sid,'domain': ao['domain'],'ocr_text': ao['ocr_text'],'b_only_text': bo['final_text'],'a_plus_b_text': ab['final_text'],'gt': ao['gt'],'edit_distance_a_only': ao['edit_distance_final'],'edit_distance_b_only': bo['edit_distance_final'],'edit_distance_a_plus_b': ab['edit_distance_final'],'a_plus_b_better_than_b_only': ab['edit_distance_final'] < bo['edit_distance_final'],'a_plus_b_better_than_a_only': ab['edit_distance_final'] < ao['edit_distance_final'],'b_only_error_type': bo.get('error_type','none')})
     wcsv(out / 'upper_lower_case_pool.csv', case_pool)
-    (out / 'manifest.json').write_text(json.dumps({'b_only_backend': a.b_only_backend, 'backend_label': bonly_label, 'n_samples': len(full), 'gemini_max_workers': a.gemini_max_workers, 'error_stats': error_stats}, ensure_ascii=False, indent=2), encoding='utf-8')
+    (out / 'manifest.json').write_text(json.dumps({'b_only_backend': a.b_only_backend, 'backend_label': bonly_label, 'n_samples': len(full), 'gemini_max_workers': a.gemini_max_workers, 'workspace_root': str(workspace_root), 'error_stats': error_stats}, ensure_ascii=False, indent=2), encoding='utf-8')
     print(out)
 
 if __name__ == '__main__':
