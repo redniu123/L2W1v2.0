@@ -328,6 +328,8 @@ def infer_all_samples(samples, recognizer, domain_engine, data_root, image_root)
         boundary_stats = boundary_stats_list[0] if boundary_stats_list else {}
 
         top1_probs = (top2_info or {}).get("top1_probs") or []
+        if (not top1_probs) and (top2_info or {}).get("top2_probs"):
+            top1_probs = [float(x[0]) for x in (top2_info or {}).get("top2_probs", []) if isinstance(x, (list, tuple)) and len(x) >= 1]
         mean_conf = float(np.mean(top1_probs)) if top1_probs else float(conf)
         min_conf = float(np.min(top1_probs)) if top1_probs else float(conf)
         min_conf_idx = int(np.argmin(top1_probs)) if top1_probs else None
