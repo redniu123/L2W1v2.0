@@ -1383,6 +1383,7 @@ class TextRecognizerWithLogits(object):
                             "top1_conf_mean": top1_conf_mean,
                             "top2_conf_mean": top2_conf_mean,
                             "conf_gap_mean": conf_gap_mean,
+                            "top1_probs": top2_probs[:, 0].tolist() if T <= 100 else None,
                             # 完整序列 (可选，用于详细分析，仅当 T <= 100 时保存)
                             "top2_indices": top2_indices.tolist() if T <= 100 else None,
                             "top2_probs": top2_probs.tolist() if T <= 100 else None,
