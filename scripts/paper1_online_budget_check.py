@@ -187,7 +187,8 @@ def main():
     p.add_argument('--medicine_dict', default='data/dicts/Medicine.txt')
     p.add_argument('--output_dir', default='paper1_runs/online_budget_validation')
     p.add_argument('--mainc_root', default='paper1_runs/mainC')
-    p.add_argument('--mainc_run_dir', required=True)
+    p.add_argument('--mainc_run_dir', default=None)
+    p.add_argument('--full_call_cache_path', default=None)
     p.add_argument('--mainc_model_id', default='V3', choices=['V1', 'V2', 'V3', 'V4'])
     p.add_argument('--strategy', default='GCR', choices=['GCR', 'WUR', 'DGCR', 'DWUR'])
     p.add_argument('--target_budget', type=float, default=0.10)
@@ -227,7 +228,12 @@ def main():
     if a.n_samples and a.n_samples < len(all_results):
         all_results = all_results[:a.n_samples]
 
-    full_call_path = Path(a.mainc_run_dir) / f'{a.mainc_model_id}_full_call_cache.jsonl'
+    if a.full_call_cache_path:
+        full_call_path = Path(a.full_call_cache_path)
+    elif a.mainc_run_dir:
+        full_call_path = Path(a.mainc_run_dir) / f'{a.mainc_model_id}_full_call_cache.jsonl'
+    else:
+        full_call_path = Path(a.mainc_root) / f'{a.mainc_model_id}_full_call_cache.jsonl'
     if not full_call_path.exists():
         raise FileNotFoundError(f'Main C full-call cache not found: {full_call_path}')
     cached_lookup = build_cached_result_lookup(load_jsonl(full_call_path))

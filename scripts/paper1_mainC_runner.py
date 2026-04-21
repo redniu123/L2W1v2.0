@@ -12,8 +12,10 @@ from scripts.run_efficiency_frontier import ensure_agent_a_result_schema,infer_a
 from modules.vlm_expert import AgentBFactory
 from modules.vlm_expert.provider_pools import get_provider_pool
 M={'V1':('Qwen3-VL-8B','local_vlm','qwen2.5_vl','./models/agent_b_vlm/qwen3-vl-8b-instruct'),'V2':('MiniCPM-V 4.5','local_vlm','minicpm_v','./models/agent_b_vlm/MiniCPM-V-4_5'),'V3':('Gemini 3 Flash Preview','gemini','',''),'V4':('gpt-5.4','claude','','')}
-B=[0.05,0.10,0.20,0.30,0.50,0.80,1.00]
+B=[0.05,0.10,0.20,0.30,0.50,0.80]
 WMW,WNW,WDW=0.5,0.3,0.2;MTH,DTH,GB=0.35,0.20,0.10
+
+def rjsonl(p): return [json.loads(x) for x in Path(p).read_text(encoding='utf-8').splitlines() if x.strip()]
 
 def norm(t): return '' if not t else t.translate(str.maketrans({'（':'(','）':')','【':'[','】':']','｛':'{','｝':'}','，':',','：':':','；':';','！':'!','？':'?','。':'.'}))
 def wjsonl(p,rows):
@@ -70,16 +72,24 @@ def fc(rows,agent_b,name,pv,run_id):
     sp=bool(getattr(agent_b,'_supports_parallel',False));mw=int(getattr(agent_b,'_max_concurrency',1) or 1);kc=int(getattr(agent_b,'_key_count',1) or 1);nw=max(1,min(mw,kc)) if sp else 1
     def one(r):
         rs=agent_b({'T_A':r['T_A'],'image_path':r.get('img_path',r.get('image_path','')),'min_conf_idx':r.get('min_conf_idx',-1),'sample_id':r.get('sample_id','')});up=rs.get('corrected_text',r['T_A']);up=up if isinstance(up,str) and up else r['T_A']
-        return {'sample_id':r.get('sample_id',''),'image_path':r.get('image_path',''),'source_image_id':r.get('source_image_id',''),'domain':r.get('domain','geology'),'split':r.get('split','test'),'gt':r['T_GT'],'ocr_text':r['T_A'],'final_text_if_upgraded':up,'vlm_raw_output':up,'latency_ms':rs.get('latency_ms'),'token_usage':rs.get('token_usage'),'error_type':rs.get('error_type','none'),'has_professional_terms':r.get('has_professional_terms',False),'professional_terms':r.get('professional_terms',[]),'is_correct_ocr':r['T_A']==r['T_GT'],'edit_distance_ocr':Levenshtein.distance(norm(r['T_A']),norm(r['T_GT'])),'vlm_model':name,'prompt_version':pv,'run_id':run_id}
+        return {'sample_id':r.get('sample_id',''),'image_path':r.get('image_path',r.get('img_path','')),'source_image_id':r.get('source_image_id',''),'domain':r.get('domain','geology'),'split':r.get('split','test'),'gt':r['T_GT'],'ocr_text':r['T_A'],'final_text_if_upgraded':up,'vlm_raw_output':up,'latency_ms':rs.get('latency_ms'),'token_usage':rs.get('token_usage'),'error_type':rs.get('error_type','none'),'has_professional_terms':r.get('has_professional_terms',False),'professional_terms':r.get('professional_terms',[]),'is_correct_ocr':r['T_A']==r['T_GT'],'edit_distance_ocr':Levenshtein.distance(norm(r['T_A']),norm(r['T_GT'])),'vlm_model':name,'prompt_version':pv,'run_id':run_id}
     if nw<=1: return [one(r) for r in tqdm(rows,desc=f'Full-call {name}',leave=False)]
     ordered=[None]*len(rows)
     with ThreadPoolExecutor(max_workers=nw) as ex:
         futs={ex.submit(one,r):i for i,r in enumerate(rows)}
         for fut in tqdm(as_completed(futs),total=len(futs),desc=f'Full-call {name} [{nw} concurrent]',leave=False): ordered[futs[fut]]=fut.result()
     return ordered
+
+def normalize_cache(rows,name,pv,run_id):
+    out=[]
+    for r in rows:
+        d=dict(r);ta=d.get('ocr_text',d.get('T_A',''));tg=d.get('gt',d.get('T_GT',''));up=d.get('final_text_if_upgraded',d.get('final_text',ta))
+        d.update({'ocr_text':ta,'gt':tg,'final_text_if_upgraded':up,'vlm_raw_output':d.get('vlm_raw_output',up),'latency_ms':d.get('latency_ms'),'token_usage':d.get('token_usage'),'error_type':d.get('error_type','none'),'has_professional_terms':d.get('has_professional_terms',False),'professional_terms':d.get('professional_terms',[]),'is_correct_ocr':d.get('is_correct_ocr',ta==tg),'edit_distance_ocr':d.get('edit_distance_ocr',Levenshtein.distance(norm(ta),norm(tg))),'vlm_model':d.get('vlm_model',name),'prompt_version':d.get('prompt_version',pv),'run_id':d.get('run_id',run_id)})
+        out.append(d)
+    return out
 def main():
-    p=argparse.ArgumentParser(description='paper1 Main C cross-model RouterOnly runner');p.add_argument('--config',default='configs/router_config.yaml');p.add_argument('--test_jsonl',default='data/l2w1data/test.jsonl');p.add_argument('--image_root',default='data/l2w1data/images');p.add_argument('--rec_model_dir',default='./models/agent_a_ppocr/PP-OCRv5_server_rec_infer');p.add_argument('--rec_char_dict_path',default='ppocr/utils/ppocrv5_dict.txt');p.add_argument('--geo_dict',default='data/dicts/Geology.txt');p.add_argument('--finance_dict',default='data/dicts/Finance.txt');p.add_argument('--medicine_dict',default='data/dicts/Medicine.txt');p.add_argument('--output_dir',default='paper1_runs/mainC');p.add_argument('--best_router',default='GCR',choices=['GCR','WUR','DGCR','DWUR']);p.add_argument('--budgets',default=','.join(f'{b:.2f}' for b in B));p.add_argument('--models',default='V1,V2,V3,V4');p.add_argument('--seed',type=int,default=42);p.add_argument('--n_samples',type=int,default=None);p.add_argument('--use_gpu',action='store_true',default=False);p.add_argument('--use_cache',action='store_true',default=False);p.add_argument('--rebuild_cache',action='store_true',default=False);p.add_argument('--prompt_version',default=None);p.add_argument('--agent_b_skip',action='store_true',default=False);a=p.parse_args();random.seed(a.seed);np.random.seed(a.seed)
-    cfg=yaml.safe_load(Path(a.config).read_text(encoding='utf-8'));pv=a.prompt_version or cfg.get('prompt_version') or cfg.get('mainline',{}).get('prompt_version','prompt_v1.1');eta=float((cfg or {}).get('sh_da_v4',{}).get('rule_scorer',{}).get('eta',0.5));budgets=[float(x) for x in a.budgets.split(',') if x.strip()];chosen={x.strip() for x in a.models.split(',') if x.strip()}
+    p=argparse.ArgumentParser(description='paper1 Main C cross-model RouterOnly runner');p.add_argument('--config',default='configs/router_config.yaml');p.add_argument('--test_jsonl',default='data/l2w1data/test.jsonl');p.add_argument('--image_root',default='data/l2w1data/images');p.add_argument('--rec_model_dir',default='./models/agent_a_ppocr/PP-OCRv5_server_rec_infer');p.add_argument('--rec_char_dict_path',default='ppocr/utils/ppocrv5_dict.txt');p.add_argument('--geo_dict',default='data/dicts/Geology.txt');p.add_argument('--finance_dict',default='data/dicts/Finance.txt');p.add_argument('--medicine_dict',default='data/dicts/Medicine.txt');p.add_argument('--output_dir',default='paper1_runs/mainC');p.add_argument('--full_call_cache_dir',default='paper1_runs/mainC');p.add_argument('--reuse_full_call_cache',action='store_true',default=True);p.add_argument('--best_router',default='GCR',choices=['GCR','WUR','DGCR','DWUR']);p.add_argument('--budgets',default=','.join(f'{b:.2f}' for b in B));p.add_argument('--models',default='V1,V2,V3,V4');p.add_argument('--seed',type=int,default=42);p.add_argument('--n_samples',type=int,default=None);p.add_argument('--use_gpu',action='store_true',default=False);p.add_argument('--use_cache',action='store_true',default=False);p.add_argument('--rebuild_cache',action='store_true',default=False);p.add_argument('--prompt_version',default=None);p.add_argument('--agent_b_skip',action='store_true',default=False);a=p.parse_args();random.seed(a.seed);np.random.seed(a.seed)
+    cfg=yaml.safe_load(Path(a.config).read_text(encoding='utf-8'));pv=a.prompt_version or cfg.get('prompt_version') or cfg.get('mainline',{}).get('prompt_version','prompt_v1.1');eta=float((cfg or {}).get('sh_da_v4',{}).get('rule_scorer',{}).get('eta',0.5));budgets=[float(x) for x in a.budgets.split(',') if x.strip()];chosen=[x.strip() for x in a.models.split(',') if x.strip()]
     import argparse as _ap
     rec=_ap.Namespace(rec_model_dir=a.rec_model_dir,rec_char_dict_path=a.rec_char_dict_path,rec_image_shape='3, 48, 320',rec_batch_num=6,rec_algorithm='SVTR_LCNet',use_space_char=True,use_gpu=a.use_gpu,use_xpu=False,use_npu=False,use_mlu=False,use_metax_gpu=False,use_gcu=False,ir_optim=True,use_tensorrt=False,min_subgraph_size=15,precision='fp32',gpu_mem=500,gpu_id=0,enable_mkldnn=None,cpu_threads=10,warmup=False,benchmark=False,save_log_path='./log_output/',show_log=False,use_onnx=False,max_batch_size=10,return_word_box=False,drop_score=0.5,max_text_length=25,rec_image_inverse=True,use_det=False,det_model_dir='')
     from modules.paddle_engine.predict_rec_modified import TextRecognizerWithLogits
@@ -88,11 +98,14 @@ def main():
     if a.use_cache and not a.rebuild_cache and cache.exists(): rows=ensure_agent_a_result_schema(json.loads(cache.read_text(encoding='utf-8')))
     else: rows=ensure_agent_a_result_schema(infer_all_samples(samples,recog,de,None,a.image_root));cache.write_text(json.dumps(rows,ensure_ascii=False),encoding='utf-8')
     if a.n_samples and a.n_samples<len(rows): rows=rows[:a.n_samples]
-    ranked=sorted(range(len(rows)),key=lambda i:s(a.best_router,rows[i],eta),reverse=True);run_id=datetime.now().strftime('%Y%m%d_run%H%M%S');run_dir=out/run_id;run_dir.mkdir(parents=True,exist_ok=True)
-    main_rows=[]
+    ranked=sorted(range(len(rows)),key=lambda i:s(a.best_router,rows[i],eta),reverse=True);run_id=datetime.now().strftime('%Y%m%d_run%H%M%S');run_dir=out/run_id;run_dir.mkdir(parents=True,exist_ok=True);cache_dir=Path(a.full_call_cache_dir);main_rows=[]
     for exp_id in chosen:
         if exp_id not in M: continue
-        name,backend,model_type,model_path=M[exp_id];agent_b=mk(backend,model_type,model_path,cfg,a.agent_b_skip);full=fc(rows,agent_b,name,pv,run_id);wjsonl(run_dir/f'{exp_id}_full_call_cache.jsonl',full)
+        name,backend,model_type,model_path=M[exp_id];src_cache=cache_dir/f'{exp_id}_full_call_cache.jsonl'
+        if a.reuse_full_call_cache and src_cache.exists(): full=normalize_cache(rjsonl(src_cache),name,pv,run_id)
+        else:
+            agent_b=mk(backend,model_type,model_path,cfg,a.agent_b_skip);full=fc(rows,agent_b,name,pv,run_id)
+        wjsonl(run_dir/f'{exp_id}_full_call_cache.jsonl',full)
         for b in budgets:
             n=int(round(len(full)*b));up=set(ranked[:n]);rmap={i:k+1 for k,i in enumerate(ranked)};ps=[];cer=gtl=nup=nacc=0
             for i,it in enumerate(full):
