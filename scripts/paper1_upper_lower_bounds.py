@@ -39,13 +39,20 @@ def wcsv(p, rows):
         w.writeheader()
         w.writerows(rows)
 
+def read_sample_ids(path: str):
+    if not path:
+        return None
+    return {x.strip() for x in Path(path).read_text(encoding='utf-8').splitlines() if x.strip()}
+
 def cer_rows(rows, text_key):
-    num = sum(Levenshtein.distance(norm(r.get(text_key,'')), norm(r.get('gt',''))) for r in rows)
-    den = sum(len(norm(r.get('gt',''))) for r in rows)
+    valid = [r for r in rows if r.get(text_key, '') != '']
+    num = sum(Levenshtein.distance(norm(r.get(text_key,'')), norm(r.get('gt',''))) for r in valid)
+    den = sum(len(norm(r.get('gt',''))) for r in valid)
     return round(num/den, 6) if den else 0.0
 
 def acc_rows(rows, text_key):
-    return round(sum(1 for r in rows if r.get(text_key,'') == r.get('gt','')) / len(rows), 6) if rows else 0.0
+    valid = [r for r in rows if r.get(text_key, '') != '']
+    return round(sum(1 for r in valid if r.get(text_key,'') == r.get('gt','')) / len(valid), 6) if valid else 0.0
 
 def resolve_image_path(workspace_root: Path, rel_path: str) -> str:
     rel = Path(rel_path)
@@ -116,6 +123,7 @@ def main():
     p.add_argument('--workspace_root', default=str(REPO_ROOT))
     p.add_argument('--b_only_backend', choices=['gemini','local_vlm'], default='gemini')
     p.add_argument('--n_samples', type=int, default=None)
+    p.add_argument('--sample_ids_file', default='')
     p.add_argument('--local_model_type', default='qwen2.5_vl')
     p.add_argument('--local_model_path', default='./models/agent_b_vlm/qwen3-vl-8b-instruct')
     p.add_argument('--gemini_max_workers', type=int, default=300)
@@ -129,10 +137,13 @@ def main():
         cfg['agent_b']['model_path'] = a.local_model_path
 
     full = rjsonl(a.maina_full_cache)
-    tests = rjsonl(a.test_jsonl)
-    gt_map = {r['sample_id']: r for r in tests}
+    wanted = read_sample_ids(a.sample_ids_file)
+    if wanted is not None:
+        full = [r for r in full if r['sample_id'] in wanted]
     if a.n_samples:
         full = full[:a.n_samples]
+    tests = rjsonl(a.test_jsonl)
+    gt_map = {r['sample_id']: r for r in tests}
 
     out = Path(a.output_root) / datetime.now().strftime('%Y%m%d_run%H%M%S')
     out.mkdir(parents=True, exist_ok=True)
@@ -147,10 +158,10 @@ def main():
     bonly_call, bonly_label = build_bonly_gemini(cfg) if a.b_only_backend == 'gemini' else build_bonly_local(cfg)
 
     b_only, error_stats = [], {}
+    indexed = list(enumerate(full))
+    results = [None] * len(full)
     if a.b_only_backend == 'gemini':
-        indexed = list(enumerate(full))
-        results = [None] * len(full)
-        with ThreadPoolExecutor(max_workers=a.gemini_max_workers) as ex:
+        with ThreadPoolExecutor(max_workers=min(a.gemini_max_workers, max(1, len(full)))) as ex:
             fut2idx = {}
             for idx, r in indexed:
                 img = resolve_image_path(workspace_root, gt_map[r['sample_id']]['image_path'])
@@ -162,28 +173,33 @@ def main():
                     results[idx] = fut.result()
                 except Exception as e:
                     results[idx] = {'text': '', 'latency_ms': None, 'error_type': type(e).__name__}
-        for r, rs in zip(full, results):
-            txt = (rs or {}).get('text') or r['ocr_text']
-            err = (rs or {}).get('error_type', 'none')
-            error_stats[err] = error_stats.get(err, 0) + 1
-            b_only.append({'sample_id': r['sample_id'], 'domain': r.get('domain',''), 'image_path': r.get('image_path',''), 'gt': r['gt'], 'ocr_text': r['ocr_text'], 'final_text': txt, 'system_name': 'B-Only Recognition', 'backend_label': bonly_label, 'latency_ms': (rs or {}).get('latency_ms'), 'error_type': err, 'edit_distance_final': Levenshtein.distance(norm(txt), norm(r['gt']))})
     else:
-        for r in full:
+        for idx, r in indexed:
             img = resolve_image_path(workspace_root, gt_map[r['sample_id']]['image_path'])
-            rs = bonly_call(img)
-            txt = rs.get('text') or r['ocr_text']
-            err = rs.get('error_type', 'none')
-            error_stats[err] = error_stats.get(err, 0) + 1
-            b_only.append({'sample_id': r['sample_id'], 'domain': r.get('domain',''), 'image_path': r.get('image_path',''), 'gt': r['gt'], 'ocr_text': r['ocr_text'], 'final_text': txt, 'system_name': 'B-Only Recognition', 'backend_label': bonly_label, 'latency_ms': rs.get('latency_ms'), 'error_type': err, 'edit_distance_final': Levenshtein.distance(norm(txt), norm(r['gt']))})
+            try:
+                results[idx] = bonly_call(img)
+            except Exception as e:
+                results[idx] = {'text': '', 'latency_ms': None, 'error_type': type(e).__name__}
+
+    failed_rows = []
+    for r, rs in zip(full, results):
+        txt = (rs or {}).get('text', '')
+        err = (rs or {}).get('error_type', 'none')
+        error_stats[err] = error_stats.get(err, 0) + 1
+        row = {'sample_id': r['sample_id'], 'domain': r.get('domain',''), 'image_path': r.get('image_path',''), 'gt': r['gt'], 'ocr_text': r['ocr_text'], 'final_text': txt, 'system_name': 'B-Only Recognition', 'backend_label': bonly_label, 'latency_ms': (rs or {}).get('latency_ms'), 'error_type': err, 'edit_distance_final': Levenshtein.distance(norm(txt), norm(r['gt'])) if txt else None}
+        b_only.append(row)
+        if err != 'none':
+            failed_rows.append(row)
 
     wjsonl(out / 'A_only_outputs.jsonl', a_only)
     wjsonl(out / 'A_plus_B_correction_outputs.jsonl', a_plus_b)
     wjsonl(out / 'B_only_recognition_outputs.jsonl', b_only)
     wcsv(out / 'b_only_error_stats.csv', [{'error_type': k, 'count': v} for k, v in sorted(error_stats.items())])
+    wcsv(out / 'b_only_failed_samples.csv', failed_rows)
     wcsv(out / 'tab_upper_lower_bounds.csv', [
-        {'system_name':'A-Only', 'CER': cer_rows(a_only,'final_text'), 'accuracy': acc_rows(a_only,'final_text'), 'n_samples': len(a_only), 'backend_label':'agent_a'},
-        {'system_name':'B-Only Recognition', 'CER': cer_rows(b_only,'final_text'), 'accuracy': acc_rows(b_only,'final_text'), 'n_samples': len(b_only), 'backend_label': bonly_label},
-        {'system_name':'A+B Correction', 'CER': cer_rows(a_plus_b,'final_text'), 'accuracy': acc_rows(a_plus_b,'final_text'), 'n_samples': len(a_plus_b), 'backend_label':'reuse_maina_gemini_cache'},
+        {'system_name':'A-Only', 'CER': cer_rows(a_only,'final_text'), 'accuracy': acc_rows(a_only,'final_text'), 'n_samples': len(a_only), 'n_eval': len(a_only), 'backend_label':'agent_a'},
+        {'system_name':'B-Only Recognition', 'CER': cer_rows(b_only,'final_text'), 'accuracy': acc_rows(b_only,'final_text'), 'n_samples': len(b_only), 'n_eval': sum(1 for r in b_only if r.get('final_text','') != ''), 'backend_label': bonly_label},
+        {'system_name':'A+B Correction', 'CER': cer_rows(a_plus_b,'final_text'), 'accuracy': acc_rows(a_plus_b,'final_text'), 'n_samples': len(a_plus_b), 'n_eval': len(a_plus_b), 'backend_label':'reuse_maina_gemini_cache'},
     ])
 
     b_map = {r['sample_id']: r for r in b_only}
@@ -191,9 +207,9 @@ def main():
     case_pool = []
     for ao in a_only:
         sid = ao['sample_id']; bo = b_map[sid]; ab = ab_map[sid]
-        case_pool.append({'sample_id': sid,'domain': ao['domain'],'ocr_text': ao['ocr_text'],'b_only_text': bo['final_text'],'a_plus_b_text': ab['final_text'],'gt': ao['gt'],'edit_distance_a_only': ao['edit_distance_final'],'edit_distance_b_only': bo['edit_distance_final'],'edit_distance_a_plus_b': ab['edit_distance_final'],'a_plus_b_better_than_b_only': ab['edit_distance_final'] < bo['edit_distance_final'],'a_plus_b_better_than_a_only': ab['edit_distance_final'] < ao['edit_distance_final'],'b_only_error_type': bo.get('error_type','none')})
+        case_pool.append({'sample_id': sid,'domain': ao['domain'],'ocr_text': ao['ocr_text'],'b_only_text': bo['final_text'],'a_plus_b_text': ab['final_text'],'gt': ao['gt'],'edit_distance_a_only': ao['edit_distance_final'],'edit_distance_b_only': bo['edit_distance_final'],'edit_distance_a_plus_b': ab['edit_distance_final'],'a_plus_b_better_than_b_only': (bo['edit_distance_final'] is not None) and ab['edit_distance_final'] < bo['edit_distance_final'],'a_plus_b_better_than_a_only': ab['edit_distance_final'] < ao['edit_distance_final'],'b_only_error_type': bo.get('error_type','none')})
     wcsv(out / 'upper_lower_case_pool.csv', case_pool)
-    (out / 'manifest.json').write_text(json.dumps({'b_only_backend': a.b_only_backend, 'backend_label': bonly_label, 'n_samples': len(full), 'gemini_max_workers': a.gemini_max_workers, 'workspace_root': str(workspace_root), 'error_stats': error_stats}, ensure_ascii=False, indent=2), encoding='utf-8')
+    (out / 'manifest.json').write_text(json.dumps({'b_only_backend': a.b_only_backend, 'backend_label': bonly_label, 'n_samples': len(full), 'gemini_max_workers': a.gemini_max_workers, 'workspace_root': str(workspace_root), 'sample_ids_file': a.sample_ids_file, 'error_stats': error_stats}, ensure_ascii=False, indent=2), encoding='utf-8')
     print(out)
 
 if __name__ == '__main__':
