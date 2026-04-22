@@ -4,8 +4,13 @@
 import argparse
 import csv
 import json
+import sys
 from datetime import datetime
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 import Levenshtein
 
@@ -65,7 +70,6 @@ def normalize_cache(rows, name, pv, run_id):
 
 def build_budget_rows(full, ranked, model_name, run_id, prompt_version):
     budgets = [0.05, 0.10, 0.20, 0.30, 0.50, 0.80]
-    main_rows = []
     for b in budgets:
         n = int(round(len(full) * b))
         up = set(ranked[:n])
@@ -105,7 +109,7 @@ def build_budget_rows(full, ranked, model_name, run_id, prompt_version):
         ex = summarize_extended_metrics(ps)
         us = summarize_latency_and_token_usage(ps)
         ar = (nup / len(full)) if full else 0.0
-        main_rows.append({
+        summary = {
             'run_id': run_id,
             'model_name': model_name,
             'router_name': 'GCR',
@@ -122,8 +126,8 @@ def build_budget_rows(full, ranked, model_name, run_id, prompt_version):
             'avg_token_usage': us['Avg_Token_Usage'],
             'prompt_version': prompt_version,
             'n_valid': len(full),
-        })
-        yield b, ps, main_rows[-1]
+        }
+        yield b, ps, summary
 
 
 def main():
@@ -166,11 +170,9 @@ def main():
             raise FileNotFoundError(f'missing source cache: {src_cache}')
         full = normalize_cache(rjsonl(src_cache), model_name, a.prompt_version, run_id)
         wjsonl(run_dir / f'{prefix}_full_call_cache.jsonl', full)
-        budget_rows = []
         for b, ps, summary in build_budget_rows(full, ranked, model_name, run_id, a.prompt_version):
-            budget_rows.append(summary)
-            wjsonl(run_dir / f'{prefix}_offline_budget_{int(round(b*100)):02d}.jsonl', ps)
-        main_rows.extend(budget_rows)
+            main_rows.append(summary)
+            wjsonl(run_dir / f'{prefix}_offline_budget_{int(round(b * 100)):02d}.jsonl', ps)
         manifest['models'][prefix] = {
             'model_name': model_name,
             'src_cache': str(src_cache),
