@@ -1,0 +1,5 @@
+sample_id,ocr_text,pred_text,gt_text,domain
+s1,中国地质,中国地质,中国地质,geo
+s2,中囯地质,中囯地质,中国地质,geo
+s3, 中国 金融 , 中国 金融 ,中国金融,finance
+

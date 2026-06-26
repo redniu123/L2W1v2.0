@@ -1,0 +1,40 @@
+{
+  "cases": [
+    {
+      "prediction": "",
+      "reference": "",
+      "edit_distance": 0,
+      "reference_length": 0,
+      "cer": 0.0
+    },
+    {
+      "prediction": "abc",
+      "reference": "",
+      "edit_distance": 3,
+      "reference_length": 0,
+      "cer": 1.0
+    },
+    {
+      "prediction": "中国",
+      "reference": "中国",
+      "edit_distance": 0,
+      "reference_length": 2,
+      "cer": 0.0
+    },
+    {
+      "prediction": "中囯",
+      "reference": "中国",
+      "edit_distance": 1,
+      "reference_length": 2,
+      "cer": 0.5
+    },
+    {
+      "prediction": "中国A",
+      "reference": "中国",
+      "edit_distance": 1,
+      "reference_length": 2,
+      "cer": 0.5
+    }
+  ]
+}
+
