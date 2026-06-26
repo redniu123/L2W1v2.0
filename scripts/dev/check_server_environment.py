@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# DEPRECATED (Stage 9): moved out of the active scripts/ root for organization.
+# Kept for traceability only. Do NOT run during cleanup (loads models / calls APIs).
 """Read-only server migration environment check for the L2W1 paper project.
 
 This script does not run OCR, does not call VLM APIs, and does not read key
@@ -17,7 +19,7 @@ from typing import Callable, Iterable
 
 
 EXPECTED_TEST_ROWS = 3424
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 @dataclass
