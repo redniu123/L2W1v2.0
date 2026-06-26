@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# DEPRECATED (Stage 9): moved out of the active scripts/ root for organization.
+# Kept for traceability only. Do NOT run during cleanup (loads models / calls APIs).
 """
 SH-DA++ v5.1 Phase 2 Task 2: Agent B 单样本冒烟测试
 
@@ -18,7 +20,7 @@ from typing import Optional
 
 import yaml
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from modules.router.backfill import BackfillConfig, RouteType, StrictBackfillController
 from modules.router.sh_da_router import SHDARouter

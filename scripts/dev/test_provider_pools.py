@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# DEPRECATED (Stage 9): moved out of the active scripts/ root for organization.
+# Kept for traceability only. Do NOT run during cleanup (loads models / calls APIs).
 """Provider pool accuracy-first test harness for Gemini/Claude relay pools."""
 
 from __future__ import annotations
@@ -17,7 +19,7 @@ from typing import Any, Dict, List
 
 import requests
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from modules.vlm_expert.provider_pools import ProviderPool, get_provider_pool, load_provider_pools

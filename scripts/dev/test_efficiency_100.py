@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# DEPRECATED (Stage 9): moved out of the active scripts/ root for organization.
+# Kept for traceability only. Do NOT run during cleanup (loads models / calls APIs).
 """
 SH-DA++ v5.1: Quick Test on 100 Samples
 
@@ -23,7 +25,7 @@ import numpy as np
 import yaml
 from tqdm import tqdm
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 # 复用 run_efficiency_frontier.py 的函数
 from scripts.run_efficiency_frontier import (

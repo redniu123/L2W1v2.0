@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# DEPRECATED (Stage 9): moved out of the active scripts/ root for organization.
+# Kept for traceability only. Do NOT run during cleanup (loads models / calls APIs).
 """
 SH-DA++ v5.1: Multi-VLM Smoke Test
 
@@ -23,7 +25,7 @@ os.environ.setdefault("CUDA_VISIBLE_DEVICES", "2")
 
 import yaml
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 
 def get_peak_vram_gb() -> float:

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# DEPRECATED (Stage 9): moved out of the active scripts/ root for organization.
+# Kept for traceability only. Do NOT run during cleanup (loads models / calls APIs).
 """
 SH-DA++ Stage 2: Module Testing Script
 
@@ -15,7 +17,7 @@ from pathlib import Path
 import numpy as np
 
 # 添加项目根目录到路径
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from modules.router.backfill import (
     BackfillConfig,
