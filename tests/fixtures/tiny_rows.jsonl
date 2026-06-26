@@ -1,0 +1,4 @@
+{"sample_id": "s1", "ocr_text": "中国地质", "pred_text": "中国地质", "gt_text": "中国地质", "domain": "geo"}
+{"sample_id": "s2", "ocr_text": "中囯地质", "pred_text": "中囯地质", "gt_text": "中国地质", "domain": "geo"}
+{"sample_id": "s3", "ocr_text": " 中国\t金融\n", "pred_text": " 中国 金融 ", "gt_text": "中国金融", "domain": "finance"}
+

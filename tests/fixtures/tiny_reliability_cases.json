@@ -1,0 +1,74 @@
+[
+  {
+    "name": "corrected_one_char",
+    "agent_a_text": "中囯地质",
+    "system_text": "中国地质",
+    "reference_text": "中国地质",
+    "expected_class": "corrected",
+    "expected_ocr_r": 0.0,
+    "expected_correction_rate": 1.0
+  },
+  {
+    "name": "improved_two_errors_to_one",
+    "agent_a_text": "中囯地貭",
+    "system_text": "中国地貭",
+    "reference_text": "中国地质",
+    "expected_class": "improved",
+    "expected_ocr_r": 0.0,
+    "expected_correction_rate": 0.5
+  },
+  {
+    "name": "unchanged_wrong",
+    "agent_a_text": "中囯地质",
+    "system_text": "中囯地质",
+    "reference_text": "中国地质",
+    "expected_class": "unchanged_wrong",
+    "expected_ocr_r": 0.0,
+    "expected_correction_rate": 0.0
+  },
+  {
+    "name": "worsened",
+    "agent_a_text": "中囯地质",
+    "system_text": "中囯地貭",
+    "reference_text": "中国地质",
+    "expected_class": "worsened",
+    "expected_ocr_r": 0.3333333333333333,
+    "expected_correction_rate": 0.0
+  },
+  {
+    "name": "unchanged_correct",
+    "agent_a_text": "中国地质",
+    "system_text": "中国地质",
+    "reference_text": "中国地质",
+    "expected_class": "unchanged_correct",
+    "expected_ocr_r": 0.0,
+    "expected_correction_rate": 1.0
+  },
+  {
+    "name": "overcorrected",
+    "agent_a_text": "中国地质",
+    "system_text": "中囯地质",
+    "reference_text": "中国地质",
+    "expected_class": "overcorrected",
+    "expected_ocr_r": 0.25,
+    "expected_correction_rate": 1.0
+  },
+  {
+    "name": "empty_reference_empty_prediction",
+    "agent_a_text": "",
+    "system_text": "",
+    "reference_text": "",
+    "expected_class": "unchanged_correct",
+    "expected_ocr_r": 0.0,
+    "expected_correction_rate": 0.0
+  },
+  {
+    "name": "empty_reference_nonempty_prediction",
+    "agent_a_text": "",
+    "system_text": "abc",
+    "reference_text": "",
+    "expected_class": "overcorrected",
+    "expected_ocr_r": 0.0,
+    "expected_correction_rate": 0.0
+  }
+]
