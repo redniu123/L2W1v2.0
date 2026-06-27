@@ -28,7 +28,7 @@ from tqdm import tqdm
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 # 复用 run_efficiency_frontier.py 的函数
-from scripts.run_efficiency_frontier import (
+from scripts.experiments.efficiency_frontier import (
     build_agent_b_callable,
     compute_cer,
     infer_all_samples,

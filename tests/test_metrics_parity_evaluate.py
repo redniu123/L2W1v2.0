@@ -22,10 +22,10 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def _load_old_evaluate_module():
-    module_path = ROOT / "scripts" / "evaluate.py"
+    module_path = ROOT / "scripts" / "tools" / "evaluate.py"
     spec = importlib.util.spec_from_file_location("paper1_evaluate_for_parity", module_path)
     if spec is None or spec.loader is None:
-        pytest.skip("scripts/evaluate.py could not be loaded with importlib")
+        pytest.skip("scripts/tools/evaluate.py could not be loaded with importlib")
     module = importlib.util.module_from_spec(spec)
     previous_dont_write_bytecode = sys.dont_write_bytecode
     sys.dont_write_bytecode = True

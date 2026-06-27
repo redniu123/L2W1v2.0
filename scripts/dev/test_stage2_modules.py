@@ -26,7 +26,7 @@ from modules.router.backfill import (
     StrictBackfillController,
 )
 from modules.router.calibrated_scorer import CalibratedScorer, CalibratedScorerConfig
-from scripts.prepare_calibration_data import generate_deletion_label
+from scripts.tools.prepare_calibration_data import generate_deletion_label
 
 
 def test_label_generator():

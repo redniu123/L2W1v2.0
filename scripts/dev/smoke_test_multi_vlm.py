@@ -117,7 +117,7 @@ def main():
         mp = Path(cfg.get("model_path", ""))
         if not mp.exists():
             print(f"[ERROR] Model not found: {mp}")
-            print(f"  Run: python scripts/download_vlms.py --model {cfg.get('model_type')}")
+            print(f"  Run: python scripts/tools/download_vlms.py --model {cfg.get('model_type')}")
             sys.exit(1)
 
     print(f"  image      : {img_path}")

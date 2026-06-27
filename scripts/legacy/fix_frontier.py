@@ -175,7 +175,7 @@ part2 = (
     "    main()\n"
 )
 
-path = Path('scripts/run_efficiency_frontier.py')
+path = Path('scripts/experiments/efficiency_frontier.py')
 current = path.read_text(encoding='utf-8')
 if 'def run_pipeline' in current:
     current = current[:current.index('def run_pipeline')]
