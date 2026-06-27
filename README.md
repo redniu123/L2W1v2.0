@@ -7,7 +7,7 @@
 [![CI](https://github.com/redniu123/L2W1v2.0/actions/workflows/ci.yml/badge.svg)](https://github.com/redniu123/L2W1v2.0/actions)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![checks](https://img.shields.io/badge/ruff%20%7C%20mypy--strict-passing-success)
-![tests](https://img.shields.io/badge/tests-134%20passing-success)
+![tests](https://img.shields.io/badge/tests-148%20passing-success)
 
 ---
 
@@ -39,13 +39,13 @@ does not change any Paper 1 numbers.
 |--------|----------------|
 | `l2w1.config`  | Unified settings loader (`env > .env > yaml > default`). Never reads secret files — only passes their paths. |
 | `l2w1.io`      | JSONL / CSV / cache IO helpers. |
-| `l2w1.metrics` | CER, edit distance, reliability (OCR-R, CR, CVR/AER), summaries. |
+| `l2w1.metrics` | CER, edit distance, reliability (OCR-R, CR, CVR/AER), summaries, and extended frontier metrics (boundary-deletion recall, substitution CER, latency / token usage). |
 | `l2w1.routing` | Pure routing logic: calibrated scorer, online budget controller, circuit breaker, strict backfill. |
 | `l2w1.replay`  | Read-only offline / online-budget replay over cached results (no API, no model). |
 | `l2w1.vlm`     | VLM (Agent B) interface abstraction + mock + cache-only implementations. |
 | `l2w1.ocr`     | OCR (Agent A) interface abstraction + mock + cache-only implementations. |
 
-Design notes and per-stage reports live in [`docs/`](docs/) (`CLEANUP_STAGE5..9_*.md`).
+Design notes and per-stage reports live in [`docs/`](docs/) (`CLEANUP_STAGE*.md`).
 
 ---
 
@@ -56,7 +56,7 @@ Design notes and per-stage reports live in [`docs/`](docs/) (`CLEANUP_STAGE5..9_
 pip install -e ".[dev]"
 
 # run the test suite (synthetic fixtures only — no data/models/network needed)
-pytest -q                 # 134 passed
+pytest -q                 # 148 passed
 
 # lint + type-check
 ruff check src/ tests/
@@ -119,9 +119,11 @@ ppocr/, tools/   vendored PaddleOCR code (do not modify)
 
 ## Status
 
-Refactor stages 0–9 complete. The library is stable and tested; remaining work (wiring the
-config layer into legacy scripts, thinning the frozen Paper 1 runners) is tracked in the
-`docs/CLEANUP_STAGE*` reports.
+Refactor stages 0–11 complete. The library is stable and tested (148 passing); the latest
+stage extracted the extended frontier metrics out of the experiment scripts into
+`l2w1.metrics.extended`. Remaining work (wiring the config layer into legacy scripts,
+thinning the frozen Paper 1 runners, migrating experiment scripts off `modules/` onto
+`l2w1.routing`) is tracked in the `docs/CLEANUP_STAGE*` reports.
 
 ## License
 
