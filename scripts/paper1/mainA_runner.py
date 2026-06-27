@@ -12,6 +12,8 @@ from scripts._common import add_repo_root_to_path
 
 add_repo_root_to_path()
 
+from l2w1.replay.offline import replay_offline
+from l2w1.replay.scoring import router_score
 from scripts.experiments.efficiency_frontier import build_agent_b_callable,ensure_agent_a_result_schema,infer_all_samples,summarize_extended_metrics,summarize_latency_and_token_usage
 WMW,WNW,WDW=0.5,0.3,0.2;MTH,DTH,GB=0.35,0.20,0.10
 STRATS=['GCR','WUR','DGCR','DWUR'];BUDGETS=[0.01,0.02,0.03,0.05,0.08,0.10,0.15,0.20,0.25,0.30,0.40,0.50,0.60,0.80,1.00];MAIN={0.10,0.20,0.30}
@@ -84,15 +86,16 @@ def main():
     if a.n_samples and a.n_samples<len(ar): ar=ar[:a.n_samples]
     run_id=datetime.now().strftime('%Y%m%d_run%H%M%S');run_dir=out/run_id;run_dir.mkdir(parents=True,exist_ok=True)
     full=build_full(ar,agent_b,pv,ab,run_id);wjsonl(run_dir/'shared_repmodel_full_call_cache.jsonl',full);(run_dir/'config_snapshot.yaml').write_text(yaml.safe_dump({'run_id':run_id,'args':vars(a),'config':cfg},allow_unicode=True,sort_keys=False),encoding='utf-8')
+    # main() reuses the l2w1 library; local score()/norm()/replay() kept as parity-test golden references
     rs_rows=[];rs_map={s:[] for s in STRATS}
     for r in ar:
         rr={'sample_id':r.get('sample_id',''),'domain':r.get('domain','geology')}
-        for s0 in STRATS: sc=score(s0,r,eta=eta);rs_map[s0].append(sc);rr[f'{s0}_score']=round(sc,6)
+        for s0 in STRATS: sc=router_score(s0,r,eta=eta);rs_map[s0].append(sc);rr[f'{s0}_score']=round(sc,6)
         rs_rows.append(rr)
     wcsv(run_dir/'router_score_matrix.csv',list(rs_rows[0].keys()) if rs_rows else ['sample_id'],rs_rows)
     main_rows=[];all_ps=[]
     for s0 in STRATS:
         for b in budgets:
-            res=replay(s0,b,full,rs_map[s0],pv,run_id);main_rows.append(res['summary']);all_ps.extend(res['per_sample']);wjsonl(run_dir/f'offline_budget_{int(round(b*100)):02d}_{s0}.jsonl',res['per_sample'])
+            res=replay_offline(s0,b,full,rs_map[s0],prompt_version=pv,run_id=run_id,extended_metrics_fn=summarize_extended_metrics,usage_metrics_fn=summarize_latency_and_token_usage);main_rows.append(res['summary']);all_ps.extend(res['per_sample']);wjsonl(run_dir/f'offline_budget_{int(round(b*100)):02d}_{s0}.jsonl',res['per_sample'])
     wcsv(run_dir/'tab_mainA_results.csv',list(main_rows[0].keys()) if main_rows else ['router_name'],main_rows);dr=domain_rows(all_ps);wcsv(run_dir/'tab_mainA_domain_results.csv',list(dr[0].keys()) if dr else ['router_name'],dr);br=[r for r in main_rows if round(float(r['budget']),2) in MAIN];wcsv(run_dir/'tab_mainA_budget_check.csv',list(br[0].keys()) if br else ['router_name'],br);cp=case_pool(all_ps);wcsv(run_dir/'mainA_case_pool.csv',list(cp[0].keys()) if cp else ['sample_id'],cp);print(run_dir)
 if __name__=='__main__': main()
