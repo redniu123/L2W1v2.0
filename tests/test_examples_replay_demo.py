@@ -12,9 +12,7 @@ def test_replay_offline_demo_runs_on_synthetic_cache() -> None:
     assert summary["actual_call_rate"] == 0.5
     assert summary["CER"] == 0.0
 
-    upgraded = {
-        row["sample_id"] for row in result["per_sample"] if row["selected_for_upgrade"]
-    }
+    upgraded = {row["sample_id"] for row in result["per_sample"] if row["selected_for_upgrade"]}
     assert upgraded == {"demo-boundary", "demo-substitution"}
     assert all(row["image_path"].startswith("synthetic/") for row in result["per_sample"])
 

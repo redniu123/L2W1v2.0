@@ -18,12 +18,13 @@ models/
 
 # 忽略结果文件
 results/
-
-# 允许 GitHub 中转云端结果
-!cloud_result_sync/
-!cloud_result_sync/**
+outputs/
+paper1_runs/
+paper1_runs_old/
+cloud_result_sync/
 
 # 忽略日志
+logs/
 log_output/
 *.log
 
@@ -44,7 +45,18 @@ fix_out.txt
 data/geo/geotext/
 
 # 忽略 key 文件（安全）
+.env
+.env.*
+!.env.example
 key.txt
+GPTkey.txt
+GPT.config
+*.key
+*.pem
+*.token
 
 # 忽略数据集划分文件（大文件，本地生成）
+data/
 data/raw/
+*.zip
+*.out

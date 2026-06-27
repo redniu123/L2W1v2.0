@@ -113,9 +113,7 @@ class StrictBackfillController:
             if route_type == RouteType.BOUNDARY:
                 path_rejection = self._check_boundary_constraint(T_A, T_cand)
             elif route_type == RouteType.AMBIGUITY:
-                path_rejection = self._check_ambiguity_constraint(
-                    T_A, T_cand, idx_susp, top2_chars
-                )
+                path_rejection = self._check_ambiguity_constraint(T_A, T_cand, idx_susp, top2_chars)
             if path_rejection is not None:
                 return path_rejection
 

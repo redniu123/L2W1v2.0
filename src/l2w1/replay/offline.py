@@ -10,7 +10,9 @@ from .scoring import normalize_format
 MetricSummaryFn = Callable[[list[dict[str, Any]]], dict[str, Any]]
 
 
-def select_offline_upgrades(scores: Sequence[float], budget: float) -> tuple[set[int], dict[int, int]]:
+def select_offline_upgrades(
+    scores: Sequence[float], budget: float
+) -> tuple[set[int], dict[int, int]]:
     ranked = sorted(range(len(scores)), key=lambda index: scores[index], reverse=True)
     n_upgrades = int(round(len(scores) * budget))
     upgrade_indexes = set(ranked[:n_upgrades])
