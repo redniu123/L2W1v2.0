@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import pytest
-from scripts import paper1_online_budget_check as old_online
-from scripts.run_efficiency_frontier import (
+from scripts.experiments.efficiency_frontier import (
     summarize_extended_metrics,
     summarize_latency_and_token_usage,
 )
+from scripts.paper1 import online_budget_check as old_online
 
 from l2w1.replay.online_budget import replay_online
 from l2w1.replay.scoring import router_score

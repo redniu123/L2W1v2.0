@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import pytest
-from scripts import paper1_mainA_runner as old_main
-from scripts.run_efficiency_frontier import (
+from scripts.experiments.efficiency_frontier import (
     summarize_extended_metrics,
     summarize_latency_and_token_usage,
 )
+from scripts.paper1 import mainA_runner as old_main
 
 from l2w1.replay.offline import replay_offline, select_offline_upgrades
 from l2w1.replay.scoring import normalize_format, router_score
