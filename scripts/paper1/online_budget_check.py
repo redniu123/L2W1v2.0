@@ -18,6 +18,7 @@ from scripts._common import add_repo_root_to_path
 
 add_repo_root_to_path()
 
+from l2w1.replay.online_budget import replay_online
 from modules.router.uncertainty_router import BudgetControllerConfig, OnlineBudgetController
 from scripts.experiments.efficiency_frontier import ensure_agent_a_result_schema, infer_all_samples, summarize_extended_metrics, summarize_latency_and_token_usage
 
@@ -246,7 +247,7 @@ def main():
     run_id = datetime.now().strftime('%Y%m%d_run%H%M%S')
     run_dir = output_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
-    result = run_online_routeronly(a.strategy, a.target_budget, all_results, cached_lookup, budget_cfg, run_id=run_id, prompt_version=prompt_version, agent_b_label=agent_b_label, eta=eta)
+    result = replay_online(a.strategy, a.target_budget, all_results, cached_lookup, budget_cfg, run_id=run_id, prompt_version=prompt_version, agent_b_label=agent_b_label, eta=eta, extended_metrics_fn=summarize_extended_metrics, usage_metrics_fn=summarize_latency_and_token_usage)
 
     with (run_dir / 'online_budget_validation.csv').open('w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=list(result['summary'].keys()))
