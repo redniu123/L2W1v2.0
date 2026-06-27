@@ -1,58 +1,128 @@
-# L2W1 项目
+# L2W1 — Hierarchical Multi-Agent OCR Correction
 
-分层多智能体 OCR 系统，基于 PaddleOCR-VL 和 Qwen2.5-VL 实现。
+> A research system (Paper 1) that pairs a fast OCR pass with a cost-aware router and a
+> selective VLM "expert" to correct hard cases — and a clean, tested Python library
+> (`l2w1`) extracted from that research code.
 
-## 项目结构
+[![CI](https://github.com/redniu123/L2W1v2.0/actions/workflows/ci.yml/badge.svg)](https://github.com/redniu123/L2W1v2.0/actions)
+![python](https://img.shields.io/badge/python-3.10%2B-blue)
+![checks](https://img.shields.io/badge/ruff%20%7C%20mypy--strict-passing-success)
+![tests](https://img.shields.io/badge/tests-134%20passing-success)
+
+---
+
+## What it does
 
 ```
-L2W1/
-├── configs/                # 配置文件：模型超参数、推理阈值、Prompt 模板
-├── data/                   # 数据工程核心目录
-│   ├── raw/                # 原始数据集：SCUT-HCCDoc, VisCGEC, CASIA
-│   ├── processed/          # 经过自动化流水线处理的行级图像与标注
-│   └── sft/                # 用于 Agent B 微调的 JSON 格式"错题集"
-├── docs/                   # 文档：技术规范(Spec)、开题报告、论文草稿
-├── models/                 # 模型权重管理（建议链接到大容量存储盘）
-│   ├── agent_a_ppocr/      # PP-OCRv5 预训练权重
-│   ├── router_qwen/        # Qwen2.5-0.5B 权重
-│   └── agent_b_vlm/        # Qwen2.5-VL-3B (Int4/FP16) 权重
-├── modules/                # 核心功能模块化实现
-│   ├── paddle_engine/      # Agent A: 包含源码手术后的 predict_rec_modified.py
-│   ├── router/             # Router: 视觉熵计算与语义 PPL 评估器
-│   └── vlm_expert/         # Agent B: 动态分辨率配置与显式索引推理逻辑
-├── notebooks/              # 实验分析：Loss 曲线分析、Badcase 可视化分析
-├── outputs/                # 实验产出：日志、微调后的 Checkpoints、可视化热力图
-├── scripts/                # 执行脚本
-│   ├── data_pipeline.py    # 自动化数据处理流水线
-│   ├── train_agent_b.py    # Agent B 的 SFT 训练脚本
-│   └── evaluate.py         # 核心评价指标（CER, OCR-R）计算脚本
-├── requirements.txt        # 依赖环境
-└── README.md               # 项目主说明文档
+Input image
+  └─→ Agent A  (PaddleOCR-VL)          fast first-pass recognition
+        └─→ Router (SH-DA)             decides per-sample using visual entropy + semantic PPL
+              ├─→ easy sample  → return Agent A output directly
+              └─→ hard sample  → Agent B (Qwen2.5-VL / Gemini) → fine-grained correction
 ```
 
-## 核心背景
+The router spends a limited "upgrade budget" only where it pays off. Key metrics:
+**CER** (character error rate), **OCR-R** (over-correction rate), **CR** (correction rate),
+and **CVR / AER** (constraint-violation / accepted-edit rate).
 
-L2W1 是分层多智能体架构：
-- **Agent A (PaddleOCR-VL)**: 作为初步扫描器，负责初步 OCR 识别
-- **Router**: 负责路由决策，判断是否需要调用 Agent B
-- **Agent B (Qwen2.5-VL)**: 作为专家模型，处理复杂或困难样本
+---
 
-## 关键技术点
+## The `l2w1` library
 
-1. **CTC Logits 导出**: 解决 PaddleOCR-VL 封装过深导致无法获取 CTC Logits 的问题
-2. **动态路由**: 基于视觉熵计算与语义 PPL 评估器进行路由决策
-3. **BBox 裁剪**: Agent B 适配逻辑 - BBox 坐标对齐 + 0.3 倍上下文扩充 + 336x336 标准化画布
+The heart of this repo is a from-scratch, fully-tested core library under `src/l2w1/`,
+progressively extracted from messy research scripts into clean, importable modules.
+Every extracted module is backed by **parity tests** that assert the new implementation
+produces *value-identical* output to the original research code — so the refactor provably
+does not change any Paper 1 numbers.
 
-## 环境依赖
+| Module | Responsibility |
+|--------|----------------|
+| `l2w1.config`  | Unified settings loader (`env > .env > yaml > default`). Never reads secret files — only passes their paths. |
+| `l2w1.io`      | JSONL / CSV / cache IO helpers. |
+| `l2w1.metrics` | CER, edit distance, reliability (OCR-R, CR, CVR/AER), summaries. |
+| `l2w1.routing` | Pure routing logic: calibrated scorer, online budget controller, circuit breaker, strict backfill. |
+| `l2w1.replay`  | Read-only offline / online-budget replay over cached results (no API, no model). |
+| `l2w1.vlm`     | VLM (Agent B) interface abstraction + mock + cache-only implementations. |
+| `l2w1.ocr`     | OCR (Agent A) interface abstraction + mock + cache-only implementations. |
 
-见 `requirements.txt`
+Design notes and per-stage reports live in [`docs/`](docs/) (`CLEANUP_STAGE5..9_*.md`).
 
-## 使用说明
+---
 
-（待补充）
+## Quickstart
 
-## 参考资料
+```bash
+# Python 3.10+. The l2w1 core library is pure-stdlib; install it editable:
+pip install -e ".[dev]"
 
-- PaddleOCR 官方文档
-- Qwen2.5-VL 模型文档
+# run the test suite (synthetic fixtures only — no data/models/network needed)
+pytest -q                 # 134 passed
 
+# lint + type-check
+ruff check src/ tests/
+mypy src/l2w1             # strict mode, clean
+```
+
+> Dependencies are authoritative in `pyproject.toml`. `requirements.txt` pins the full
+> GPU research environment (PaddleOCR + Torch + VLM stack) for reproducing Paper 1 runs;
+> it is **not** needed to use or test the `l2w1` library.
+
+### Thin-entrypoint example
+
+A self-contained demo wires the cache-only OCR/VLM adapters into the offline replay,
+entirely on synthetic in-memory data — no models, no API calls:
+
+```bash
+python scripts/examples/replay_offline_demo.py
+```
+
+```python
+from l2w1.replay.offline import replay_offline
+from l2w1.replay.scoring import router_score
+
+scores = [router_score("WUR", row) for row in rows]
+result = replay_offline("WUR", budget=0.5, full_rows=rows, score_map=scores,
+                        prompt_version="demo")
+print(result["summary"]["CER"])
+```
+
+---
+
+## Repository layout
+
+```
+src/l2w1/        clean, tested core library (the part to reuse)
+tests/           pytest suite incl. parity tests vs. original implementations
+scripts/         CLI entry points; scripts/{dev,legacy,examples}/ separated
+  examples/      thin-entrypoint demos built only on l2w1.*
+modules/         transitional research modules (router/vlm/ocr) — kept for parity & repro
+configs/         routing config (YAML, no secrets)
+docs/            design docs + per-stage cleanup reports
+ppocr/, tools/   vendored PaddleOCR code (do not modify)
+```
+
+> **Not included in this repository:** Paper 1 experiment data, model weights, and result
+> bundles (`data/`, `models/`, `paper1_runs/`, `results/`, `cloud_result_sync/`). These are
+> intentionally excluded — the code is open, the unpublished research artifacts are not.
+
+---
+
+## Engineering
+
+- **Packaging:** installable via `pip install -e .` (`pyproject.toml`, hatchling).
+- **Quality gate:** `ruff` (lint+format), `mypy --strict`, `pytest` — enforced in CI and pre-commit.
+- **Testing philosophy:** synthetic fixtures only; no test depends on real data, models, or network.
+- **Secrets:** never committed. API providers read credentials from a local key file path
+  resolved through `l2w1.config`; that file is git-ignored and absent from history.
+
+---
+
+## Status
+
+Refactor stages 0–9 complete. The library is stable and tested; remaining work (wiring the
+config layer into legacy scripts, thinning the frozen Paper 1 runners) is tracked in the
+`docs/CLEANUP_STAGE*` reports.
+
+## License
+
+Research code released for transparency and reuse of the `l2w1` library. See repository for terms.
